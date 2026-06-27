@@ -145,4 +145,4 @@ function Home() {
   )
 }
 
-export default Homeadd
+export default Home
