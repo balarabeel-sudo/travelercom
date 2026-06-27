@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { HashRouter as Router, Routes, Route } from 'react-router-dom'
 import SplashScreen from './pages/SplashScreen'
 import AccountType from './pages/AccountType'
 import Login from './pages/Login'
