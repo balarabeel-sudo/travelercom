@@ -1,9 +1,9 @@
 import { HashRouter as Router, Routes, Route } from 'react-router-dom'
-import SplashScreen from './pages/SplashScreen'
-import AccountType from './pages/AccountType'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Home from './pages/Home'
+import SplashScreen from './splashScreen'
+import AccountType from './AccountType'
+import Login from './Login'
+import Register from './Ragister'
+import Home from './Home'
 
 function App() {
   return (
