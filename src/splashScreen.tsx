@@ -21,7 +21,7 @@ function SplashScreen() {
       padding: '20px'
     }}>
       <img
-        src="/logo.png"
+        src="https://raw.githubusercontent.com/balarabeel-sudo/travelercom/main/public/logo.png"
         alt="Traveler.com Logo"
         style={{
           width: '180px',
