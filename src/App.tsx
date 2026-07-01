@@ -4,6 +4,9 @@ import AccountType from './AccountType'
 import Login from './Login'
 import Register from './Ragister'
 import Home from './Home'
+import VerifyOTP from './VerifyOTP'
+import UploadDocs from './UploadDocs'
+import PendingApproval from './PendingApproval'
 
 function App() {
   return (
@@ -14,6 +17,9 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/home" element={<Home />} />
+        <Route path="/verify-otp" element={<VerifyOTP />} />
+        <Route path="/upload-docs" element={<UploadDocs />} />
+        <Route path="/pending-approval" element={<PendingApproval />} />
       </Routes>
     </Router>
   )
