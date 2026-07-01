@@ -85,7 +85,7 @@ function Register() {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div style={{ fontSize: '40px', marginBottom: '8px' }}>
-            {isPersonal ? '👤' : '🏢'}
+            {isPersonal ? '🧑' : '🏢'} 
           </div>
           <h1 style={{ fontSize: '22px', fontWeight: 'bold', color }}>
             {isPersonal ? 'Personal Account' : 'Company Account'}
