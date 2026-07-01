@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from './supabaseclient'
+import { supabase } from './supabaseClient'
 
 function Register() {
   const navigate = useNavigate()
