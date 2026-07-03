@@ -43,7 +43,7 @@ function Register() {
     })
 
     if (error) {
-      setError(error.message)
+      setError(error.message || JSON.stringify(error))
       setLoading(false)
     } else {
       navigate(`/verify-otp?email=${email}&type=${accountType}`)
