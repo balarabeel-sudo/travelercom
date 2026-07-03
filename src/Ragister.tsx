@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from "./supabaseClient"
+import { supabase } from './supabaseClient'
 
 function Register() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const accountType = searchParams.get('type') || 'personal'
-  
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -43,7 +43,7 @@ function Register() {
     })
 
     if (error) {
-      setError(JSON.stringify(error))
+      setError(error.message)
       setLoading(false)
     } else {
       navigate(`/verify-otp?email=${email}&type=${accountType}`)
@@ -85,7 +85,7 @@ function Register() {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div style={{ fontSize: '40px', marginBottom: '8px' }}>
-            {isPersonal ? '🧑' : '🏢'} 
+            {isPersonal ? '👤' : '🏢'}
           </div>
           <h1 style={{ fontSize: '22px', fontWeight: 'bold', color }}>
             {isPersonal ? 'Personal Account' : 'Company Account'}
@@ -131,7 +131,7 @@ function Register() {
               <option value="bus">🚌 Bus Company</option>
               <option value="airline">✈️ Airline</option>
               <option value="event_center">🎪 Event Center</option>
-              <option value="travel_agency">🧳 Travel Agency</option>
+              <option value="travel_agency">🗺️ Travel Agency</option>
             </select>
           </>
         )}
@@ -180,15 +180,17 @@ function Register() {
             cursor: loading ? 'not-allowed' : 'pointer',
             marginBottom: '16px',
             marginTop: '8px'
-          }}>
-          {loading ? 'Creating account...' : isPersonal ? '✅ Create Account' : '✅ Create Company Account'}
+          }}
+        >
+          {loading ? 'Creating account...' : isPersonal ? '✅ Create Account' : '✅ Register Company'}
         </button>
 
         <p style={{ textAlign: 'center', color: '#666', fontSize: '13px' }}>
           Already have an account?{' '}
           <span
             onClick={() => navigate('/login')}
-            style={{ color, cursor: 'pointer', fontWeight: 'bold' }}>
+            style={{ color, cursor: 'pointer', fontWeight: 'bold' }}
+          >
             Login
           </span>
         </p>
