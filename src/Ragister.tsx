@@ -97,7 +97,7 @@ function Register() {
 
         {error && (
           <p style={{ color: 'red', fontSize: '13px', marginBottom: '12px', textAlign: 'center' }}>
-            {error}
+            {typeof error === 'string' ? error : JSON.stringify(error)}
           </p>
         )}
 
