@@ -41,13 +41,25 @@ function Register() {
         }
       }
     })
+if (error) {
+  console.error("Supabase Error:", error); // Don debugging
+  
+  let errorMsg = 'An error occurred. Please try again.';
+  
+  if (error.message) {
+    errorMsg = error.message;
+  } else if (error.error_description) {
+    errorMsg = error.error_description;
+  } else {
+    errorMsg = JSON.stringify(error);
+  }
 
-    if (error) {
-      setError(error.message || JSON.stringify(error))
-      setLoading(false)
-    } else {
-      navigate(`/verify-otp?email=${email}&type=${accountType}`)
-    }
+  setError(errorMsg);
+  setLoading(false);
+} else {
+  navigate(`/verify-otp?email=\( {email}&type= \){accountType}`);
+}
+    
   }
 
   const inputStyle = {
