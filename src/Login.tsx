@@ -1,10 +1,40 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from './supabaseClient'
 
 function Login() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  const handleLogin = async () => {
+    setErrorMsg('')
+
+    if (!email || !password) {
+      setErrorMsg('Da fatan za a cika email da password')
+      return
+    }
+
+    setLoading(true)
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    })
+
+    setLoading(false)
+
+    if (error) {
+      setErrorMsg('Email ko password ba daidai ba ne. Ka sake gwadawa.')
+      return
+    }
+
+    if (data.user) {
+      navigate('/home')
+    }
+  }
 
   return (
     <div style={{
@@ -41,6 +71,20 @@ function Login() {
           Login to your account
         </p>
 
+        {errorMsg && (
+          <div style={{
+            background: '#fee2e2',
+            color: '#dc2626',
+            padding: '10px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            marginBottom: '16px',
+            textAlign: 'center'
+          }}>
+            {errorMsg}
+          </div>
+        )}
+
         <input
           type="email"
           placeholder="Email address"
@@ -74,20 +118,21 @@ function Login() {
         />
 
         <button
-          onClick={() => navigate('/home')}
+          onClick={handleLogin}
+          disabled={loading}
           style={{
             width: '100%',
             padding: '14px',
-            background: '#0ea5e9',
+            background: loading ? '#94d3f0' : '#0ea5e9',
             color: 'white',
             border: 'none',
             borderRadius: '8px',
             fontSize: '16px',
             fontWeight: 'bold',
-            cursor: 'pointer',
+            cursor: loading ? 'not-allowed' : 'pointer',
             marginBottom: '16px'
           }}>
-          Login
+          {loading ? 'Ana shiga...' : 'Login'}
         </button>
 
         <p style={{ textAlign: 'center', color: '#666', fontSize: '14px' }}>
