@@ -1,14 +1,7 @@
-import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 function SplashScreen() {
   const navigate = useNavigate()
-
-  useEffect(() => {
-    setTimeout(() => {
-      navigate('/account-type')
-    }, 3000)
-  }, [])
 
   return (
     <div style={{
