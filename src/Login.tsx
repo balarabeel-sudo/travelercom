@@ -13,7 +13,7 @@ function Login() {
     setErrorMsg('')
 
     if (!email || !password) {
-      setErrorMsg('Da fatan za a cika email da password')
+      setErrorMsg('Please enter both email and password')
       return
     }
 
@@ -27,7 +27,7 @@ function Login() {
     setLoading(false)
 
     if (error) {
-      setErrorMsg('Email ko password ba daidai ba ne. Ka sake gwadawa.')
+      setErrorMsg('Incorrect email or password. Please try again.')
       return
     }
 
@@ -132,7 +132,7 @@ function Login() {
             cursor: loading ? 'not-allowed' : 'pointer',
             marginBottom: '16px'
           }}>
-          {loading ? 'Ana shiga...' : 'Login'}
+          {loading ? 'Logging in...' : 'Login'}
         </button>
 
         <p style={{ textAlign: 'center', color: '#666', fontSize: '14px' }}>
