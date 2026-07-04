@@ -9,6 +9,7 @@ function Register() {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [registered, setRegistered] = useState(false)
 
   // Personal fields
   const [fullName, setFullName] = useState('')
@@ -41,25 +42,26 @@ function Register() {
         }
       }
     })
-if (error) {
-  console.error("Supabase Error:", error); // Don debugging
-  
-  let errorMsg = 'An error occurred. Please try again.';
-  
-  if (error.message) {
-    errorMsg = error.message;
-  } else if (error.error_description) {
-    errorMsg = error.error_description;
-  } else {
-    errorMsg = JSON.stringify(error);
-  }
 
-  setError(errorMsg);
-  setLoading(false);
-} else {
-  navigate(`/verify-otp?email=\( {email}&type= \){accountType}`);
-}
-    
+    if (error) {
+      console.error("Supabase Error:", error);
+
+      let errorMsg = 'An error occurred. Please try again.';
+
+      if (error.message) {
+        errorMsg = error.message;
+      } else if ((error as any).error_description) {
+        errorMsg = (error as any).error_description;
+      } else {
+        errorMsg = JSON.stringify(error);
+      }
+
+      setError(errorMsg);
+      setLoading(false);
+    } else {
+      setLoading(false)
+      setRegistered(true)
+    }
   }
 
   const inputStyle = {
@@ -75,6 +77,60 @@ if (error) {
 
   const isPersonal = accountType === 'personal'
   const color = isPersonal ? '#0ea5e9' : '#f97316'
+
+  // Bayan signup ya yi nasara: nuna sakon "duba email ɗinka" maimakon zuwa OTP page
+  if (registered) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#f8fafc',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: '400px',
+          background: 'white',
+          borderRadius: '20px',
+          padding: '32px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '56px', marginBottom: '16px' }}>📧</div>
+          <h1 style={{ fontSize: '22px', fontWeight: 'bold', color, marginBottom: '12px' }}>
+            Check Your Email
+          </h1>
+          <p style={{ color: '#666', fontSize: '14px', marginBottom: '8px' }}>
+            Mun aika maka link na tabbatarwa zuwa:
+          </p>
+          <p style={{ color: '#1a1a1a', fontWeight: 'bold', fontSize: '15px', marginBottom: '24px' }}>
+            {email}
+          </p>
+          <p style={{ color: '#666', fontSize: '13px', marginBottom: '24px' }}>
+            Danna link ɗin da ke cikin email ɗin domin ka tabbatar da account ɗinka, sannan ka koma nan don Login.
+          </p>
+          <button
+            onClick={() => navigate('/login')}
+            style={{
+              width: '100%',
+              padding: '14px',
+              background: color,
+              color: 'white',
+              border: 'none',
+              borderRadius: '10px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}>
+            Go to Login
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{
