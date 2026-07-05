@@ -73,6 +73,7 @@ function Home() {
   const services = [
     { icon: '🏨', label: 'Hotels & Stays', desc: 'Find your comfort', path: '/hotels' },
     { icon: '🚌', label: 'Bus Stations', desc: 'Travel by road', path: '/buses' },
+    { icon: '🚆', label: 'Railway', desc: 'Travel by train', path: '/trains' },
     { icon: '✈️', label: 'Domestic Flights', desc: 'Fly across Nigeria', path: '/flights' },
     { icon: '🗺️', label: 'Tours & Attractions', desc: 'Explore places', path: '/tours' },
     { icon: '🎪', label: 'Event Centers', desc: 'Book a venue', path: '/events' },
@@ -188,16 +189,63 @@ function Home() {
         <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
           Our Services
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '8px' }}>
-          {services.slice(0, 4).map((s) => (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+          {services.map((s) => (
             <ServiceCard key={s.label} {...s} navigate={navigate} />
           ))}
         </div>
-        <div style={{ marginBottom: '24px' }}>
-          <ServiceCard {...services[4]} navigate={navigate} wide />
-        </div>
       </div>
 
+      {/* ---------- BOTTOM NAVIGATION ---------- */}
+      <BottomNav active="home" navigate={navigate} />
+
+    </div>
+  )function BottomNav({ active, navigate }: { active: string; navigate: (p: string) => void }) {
+  const items = [
+    { key: 'home', icon: '🏠', label: 'Home', path: '/home' },
+    { key: 'search', icon: '🔍', label: 'Search', path: '/search' },
+    { key: 'bookings', icon: '🎫', label: 'Bookings', path: '/bookings' },
+    { key: 'account', icon: '👤', label: 'Account', path: '/account' },
+  ]
+
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      maxWidth: '480px',
+      margin: '0 auto',
+      background: COLORS.card,
+      borderTop: `1px solid ${COLORS.border}`,
+      display: 'flex',
+      justifyContent: 'space-around',
+      padding: '10px 0 14px 0',
+      boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
+    }}>
+      {items.map((item) => (
+        <div
+          key={item.key}
+          onClick={() => navigate(item.path)}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            cursor: 'pointer',
+            gap: '2px'
+          }}>
+          <span style={{ fontSize: '20px', opacity: active === item.key ? 1 : 0.5 }}>
+            {item.icon}
+          </span>
+          <span style={{
+            fontSize: '10.5px',
+            fontWeight: active === item.key ? 700 : 500,
+            color: active === item.key ? COLORS.primary : COLORS.textMuted
+          }}>
+            {item.label}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -246,3 +294,4 @@ function ServiceCard({ icon, label, desc, path, navigate, wide }: {
 }
 
 export default Home
+}
