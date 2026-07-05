@@ -17,7 +17,6 @@ function Home() {
   const [loading, setLoading] = useState(true)
   const [accountType, setAccountType] = useState<'personal' | 'company'>('personal')
   const [displayName, setDisplayName] = useState('')
-  const [destination, setDestination] = useState('')
 
   useEffect(() => {
     const loadUser = async () => {
@@ -135,53 +134,6 @@ function Home() {
         <p style={{ fontSize: '13px', opacity: 0.9, marginBottom: '18px' }}>
           Hotels, Transport, Flights & Tours in One Platform
         </p>
-
-        {/* Search card */}
-        <div style={{
-          background: 'white',
-          borderRadius: '14px',
-          padding: '14px',
-        }}>
-          <input
-            type="text"
-            placeholder="Where are you going?"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: '10px',
-              fontSize: '14px',
-              marginBottom: '10px',
-              boxSizing: 'border-box',
-              color: COLORS.text
-            }}
-          />
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '10px', color: COLORS.textMuted, fontWeight: 'bold' }}>CHECK-IN</label>
-              <input type="date" style={{ width: '100%', padding: '8px', border: `1px solid ${COLORS.border}`, borderRadius: '8px', fontSize: '12px', boxSizing: 'border-box' }} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '10px', color: COLORS.textMuted, fontWeight: 'bold' }}>CHECK-OUT</label>
-              <input type="date" style={{ width: '100%', padding: '8px', border: `1px solid ${COLORS.border}`, borderRadius: '8px', fontSize: '12px', boxSizing: 'border-box' }} />
-            </div>
-          </div>
-          <button style={{
-            width: '100%',
-            padding: '12px',
-            background: COLORS.secondary,
-            color: 'white',
-            border: 'none',
-            borderRadius: '10px',
-            fontWeight: 'bold',
-            fontSize: '14px',
-            cursor: 'pointer'
-          }}>
-            🔍 Search
-          </button>
-        </div>
       </div>
 
       {/* ---------- QUICK SERVICES GRID ---------- */}
