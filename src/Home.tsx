@@ -198,9 +198,12 @@ function Home() {
 
       {/* ---------- BOTTOM NAVIGATION ---------- */}
       <BottomNav active="home" navigate={navigate} />
-
     </div>
-  )function BottomNav({ active, navigate }: { active: string; navigate: (p: string) => void }) {
+    
+  )
+}
+
+function BottomNav({ active, navigate }: { active: string; navigate: (p: string) => void }) {
   const items = [
     { key: 'home', icon: '🏠', label: 'Home', path: '/home' },
     { key: 'search', icon: '🔍', label: 'Search', path: '/search' },
@@ -294,4 +297,3 @@ function ServiceCard({ icon, label, desc, path, navigate, wide }: {
 }
 
 export default Home
-}
