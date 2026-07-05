@@ -78,6 +78,17 @@ function Home() {
     { icon: '🎪', label: 'Event Centers', desc: 'Book a venue', path: '/events' },
   ]
 
+  const destinations = [
+    { city: 'Lagos', emoji: '🌆', color: '#0369a1' },
+    { city: 'Abuja', emoji: '🏛️', color: '#0EA5E9' },
+    { city: 'Kaduna', emoji: '🕌', color: '#F97316' },
+    { city: 'Kano', emoji: '🏺', color: '#0369a1' },
+    { city: 'Port Harcourt', emoji: '🌊', color: '#0EA5E9' },
+  ]
+
+  // No real listings yet — will be populated once companies start adding services
+  const hotels: { name: string; city: string; rating: number; price: number; rooms: number }[] = []
+
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
 
@@ -131,7 +142,7 @@ function Home() {
         <h2 style={{ fontSize: '21px', fontWeight: 800, lineHeight: 1.3, marginBottom: '6px' }}>
           Explore Nigeria With Confidence
         </h2>
-        <p style={{ fontSize: '13px', opacity: 0.9, marginBottom: '18px' }}>
+        <p style={{ fontSize: '13px', opacity: 0.9 }}>
           Hotels, Transport, Flights & Tours in One Platform
         </p>
       </div>
@@ -148,10 +159,138 @@ function Home() {
         </div>
       </div>
 
+      {/* ---------- FEATURED DESTINATIONS ---------- */}
+      <div style={{ marginBottom: '24px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px', padding: '0 16px' }}>
+          Featured Destinations
+        </h3>
+        <div style={{
+          display: 'flex',
+          gap: '12px',
+          overflowX: 'auto',
+          padding: '0 16px 4px 16px',
+        }}>
+          {destinations.map((d) => (
+            <div
+              key={d.city}
+              onClick={() => navigate(`/search?city=${d.city}`)}
+              style={{
+                minWidth: '140px',
+                borderRadius: '16px',
+                overflow: 'hidden',
+                background: COLORS.card,
+                boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+                cursor: 'pointer',
+                flexShrink: 0
+              }}>
+              <div style={{
+                height: '90px',
+                background: `linear-gradient(135deg, ${d.color}, ${COLORS.primary})`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '32px'
+              }}>
+                {d.emoji}
+              </div>
+              <div style={{ padding: '10px' }}>
+                <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '2px' }}>
+                  {d.city}
+                </p>
+                <p style={{ fontSize: '11px', color: COLORS.primary, fontWeight: 600 }}>
+                  Explore →
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ---------- RECOMMENDED HOTELS ---------- */}
+      <div style={{ padding: '0 16px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>
+            Recommended Hotels
+          </h3>
+          <span
+            onClick={() => navigate('/hotels')}
+            style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer' }}>
+            See all →
+          </span>
+        </div>
+
+        {hotels.length === 0 ? (
+          <div style={{
+            background: COLORS.card,
+            borderRadius: '16px',
+            padding: '24px',
+            textAlign: 'center',
+            color: COLORS.textMuted,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+          }}>
+            <p style={{ fontSize: '13px' }}>No hotels available yet</p>
+            <p style={{ fontSize: '12px', marginTop: '4px' }}>Check back soon!</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {hotels.map((h) => (
+              <div
+                key={h.name}
+                onClick={() => navigate('/hotels')}
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  background: COLORS.card,
+                  borderRadius: '16px',
+                  padding: '10px',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+                  cursor: 'pointer'
+                }}>
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '12px',
+                  background: `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '28px',
+                  flexShrink: 0
+                }}>
+                  🏨
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>{h.name}</p>
+                    <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{h.city} • ⭐ {h.rating}</p>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <div>
+                      <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.primary }}>₦{h.price.toLocaleString()}<span style={{ fontSize: '10px', color: COLORS.textMuted, fontWeight: 400 }}> /night</span></p>
+                      <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{h.rooms} rooms left</p>
+                    </div>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: 'white',
+                      background: COLORS.secondary,
+                      padding: '5px 10px',
+                      borderRadius: '8px'
+                    }}>
+                      View
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ---------- BOTTOM NAVIGATION ---------- */}
       <BottomNav active="home" navigate={navigate} />
+
     </div>
-    
   )
 }
 
