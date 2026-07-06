@@ -515,5 +515,58 @@ function ServiceCard({ icon, label, desc, path, navigate, wide }: {
     </div>
   )
 }
+function EmptyCard({ text, subtext }: { text: string; subtext?: string }) {
+  return (
+    <div style={{
+      background: COLORS.card,
+      borderRadius: '16px',
+      padding: '20px',
+      textAlign: 'center',
+      color: COLORS.textMuted,
+      boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+    }}>
+      <p style={{ fontSize: '13px' }}>{text}</p>
+      {subtext && <p style={{ fontSize: '12px', marginTop: '4px' }}>{subtext}</p>}
+    </div>
+  )
+}
 
+function RouteCard({ route, company, time, price, navigate, path }: {
+  route: string; company: string; time: string; price: number;
+  navigate: (p: string) => void; path: string
+}) {
+  return (
+    <div
+      onClick={() => navigate(path)}
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: COLORS.card,
+        borderRadius: '14px',
+        padding: '14px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+        cursor: 'pointer'
+      }}>
+      <div>
+        <p style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.text }}>{route}</p>
+        <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{company} • {time}</p>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.primary, marginBottom: '4px' }}>₦{price.toLocaleString()}</p>
+        <span style={{
+          fontSize: '10.5px',
+          fontWeight: 700,
+          color: 'white',
+          background: COLORS.secondary,
+          padding: '4px 10px',
+          borderRadius: '8px'
+        }}>
+          Book
+        </span>
+      </div>
+    </div>
+  )
+}
 export default Home 
+
