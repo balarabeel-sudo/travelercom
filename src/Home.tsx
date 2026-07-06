@@ -17,6 +17,7 @@ function Home() {
   const [loading, setLoading] = useState(true)
   const [accountType, setAccountType] = useState<'personal' | 'company'>('personal')
   const [displayName, setDisplayName] = useState('')
+  const [companyApproval, setCompanyApproval] = useState<'pending' | 'approved' | 'rejected'>('pending')
 
   useEffect(() => {
     const loadUser = async () => {
@@ -26,8 +27,33 @@ function Home() {
         return
       }
       const meta = data.user.user_metadata || {}
-      setAccountType(meta.account_type === 'company' ? 'company' : 'personal')
+      const isCompany = meta.account_type === 'company'
+      setAccountType(isCompany ? 'company' : 'personal')
       setDisplayName(meta.full_name || '')
+
+      if (isCompany) {
+        const { data: existing } = await supabase
+          .from('companies')
+          .select('approval_status')
+          .eq('owner_id', data.user.id)
+          .maybeSingle()
+
+        if (existing) {
+          setCompanyApproval(existing.approval_status)
+        } else {
+          const { data: created } = await supabase
+            .from('companies')
+            .insert({
+              owner_id: data.user.id,
+              business_name: meta.full_name || 'My Company',
+              approval_status: 'pending'
+            })
+            .select('approval_status')
+            .single()
+          setCompanyApproval(created?.approval_status || 'pending')
+        }
+      }
+
       setLoading(false)
     }
     loadUser()
@@ -53,17 +79,132 @@ function Home() {
     )
   }
 
-  // Company users see a completely separate dashboard (built in a later step)
   if (accountType === 'company') {
+    const analytics = [
+      { label: 'Total Bookings', value: 0, icon: '📦' },
+      { label: 'Revenue', value: '₦0', icon: '💰' },
+      { label: 'Pending Bookings', value: 0, icon: '⏳' },
+      { label: 'Completed', value: 0, icon: '✅' },
+      { label: 'Active Listings', value: 0, icon: '📋' },
+    ]
+
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center' }}>
-        <div>
-          <p style={{ color: COLORS.textMuted, fontSize: '14px', marginBottom: '12px' }}>
-            Company Dashboard coming in the next step.
-          </p>
-          <button onClick={handleLogout} style={{ padding: '10px 24px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>
-            Logout
-          </button>
+      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
+
+        <div style={{
+          padding: '18px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: COLORS.card,
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+        }}>
+          <div>
+            <h1 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.secondary, letterSpacing: '0.5px' }}>
+              TRAVELER<span style={{ color: COLORS.primary }}>.COM</span>
+            </h1>
+            <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Company: {displayName}</p>
+          </div>
+          <div
+            onClick={handleLogout}
+            title="Logout"
+            style={{
+              width: '34px', height: '34px', borderRadius: '50%', background: COLORS.secondary,
+              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '16px', cursor: 'pointer'
+            }}>
+            🚪
+          </div>
+        </div>
+
+        {companyApproval !== 'approved' && (
+          <div style={{
+            background: companyApproval === 'rejected' ? '#fef2f2' : '#fff7ed',
+            border: `1px solid ${companyApproval === 'rejected' ? '#fca5a5' : '#fdba74'}`,
+            margin: '16px',
+            borderRadius: '14px',
+            padding: '14px'
+          }}>
+            <p style={{ fontSize: '13px', fontWeight: 700, color: companyApproval === 'rejected' ? '#b91c1c' : '#c2410c', marginBottom: '4px' }}>
+              {companyApproval === 'rejected' ? '❌ Application Rejected' : '⏳ Account Pending Approval'}
+            </p>
+            <p style={{ fontSize: '12px', color: companyApproval === 'rejected' ? '#991b1b' : '#9a3412' }}>
+              {companyApproval === 'rejected'
+                ? 'Please contact support for more information.'
+                : 'Upload your CAC document to get approved and start listing your services.'}
+            </p>
+          </div>
+        )}
+
+        <div style={{ padding: '0 16px' }}>
+
+          <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
+            Overview
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+            {analytics.map((a) => (
+              <div key={a.label} style={{
+                background: COLORS.card,
+                borderRadius: '14px',
+                padding: '16px',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+              }}>
+                <div style={{ fontSize: '20px', marginBottom: '6px' }}>{a.icon}</div>
+                <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>{a.value}</p>
+                <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{a.label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+            <div
+              onClick={() => navigate('/upload-docs')}
+              style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '26px', marginBottom: '6px' }}>📄</div>
+              <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Upload CAC</p>
+            </div>
+            <div
+              onClick={() => navigate('/add-listing')}
+              style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '26px', marginBottom: '6px' }}>➕</div>
+              <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Add Listing</p>
+            </div>
+            <div
+              onClick={() => navigate('/verify-booking')}
+              style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '26px', marginBottom: '6px' }}>📷</div>
+              <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Verify Booking</p>
+            </div>
+            <div
+              onClick={() => navigate('/company-wallet')}
+              style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '26px', marginBottom: '6px' }}>💳</div>
+              <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Wallet</p>
+            </div>
+          </div>
+
+          <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
+            My Listings
+          </h3>
+          <div style={{
+            background: COLORS.card, borderRadius: '14px', padding: '20px', marginBottom: '24px',
+            textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+          }}>
+            <p style={{ fontSize: '13px' }}>No listings yet</p>
+          </div>
+
+          <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
+            Bookings Received
+          </h3>
+          <div style={{
+            background: COLORS.card, borderRadius: '14px', padding: '20px',
+            textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+          }}>
+            <p style={{ fontSize: '13px' }}>No bookings yet</p>
+          </div>
         </div>
       </div>
     )
