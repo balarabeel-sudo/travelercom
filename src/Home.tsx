@@ -88,6 +88,8 @@ function Home() {
 
   // No real listings yet — will be populated once companies start adding services
   const hotels: { name: string; city: string; rating: number; price: number; rooms: number }[] = []
+  const busRoutes: { route: string; company: string; time: string; price: number }[] = []
+  const flights: { route: string; company: string; time: string; price: number }[] = []
 
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
@@ -286,10 +288,137 @@ function Home() {
           </div>
         )}
       </div>
+     {/* ---------- POPULAR BUS ROUTES ---------- */}
+      <div style={{ padding: '0 16px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>
+            Popular Bus Routes
+          </h3>
+          <span onClick={() => navigate('/buses')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer' }}>
+            See all →
+          </span>
+        </div>
+        {busRoutes.length === 0 ? (
+          <EmptyCard text="No bus routes available yet" />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {busRoutes.map((r) => (
+              <RouteCard key={r.route} {...r} navigate={navigate} path="/buses" />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ---------- DOMESTIC FLIGHTS ---------- */}
+      <div style={{ padding: '0 16px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>
+            Domestic Flights
+          </h3>
+          <span onClick={() => navigate('/flights')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer' }}>
+            See all →
+          </span>
+        </div>
+        {flights.length === 0 ? (
+          <EmptyCard text="No flights available yet" />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {flights.map((f) => (
+              <RouteCard key={f.route} {...f} navigate={navigate} path="/flights" />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ---------- PROMO BANNER ---------- */}
+      <div style={{ padding: '0 16px', marginBottom: '24px' }}>
+        <div style={{
+          background: `linear-gradient(135deg, ${COLORS.secondary}, #ea580c)`,
+          borderRadius: '18px',
+          padding: '20px',
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: '0 8px 20px rgba(249,115,22,0.25)'
+        }}>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: '15px', fontWeight: 800, marginBottom: '4px' }}>
+              Travel Nigeria with Traveler.com
+            </p>
+            <p style={{ fontSize: '12px', opacity: 0.95 }}>
+              One platform for hotels, buses, trains & flights.
+            </p>
+          </div>
+          <div style={{ fontSize: '36px', marginLeft: '12px' }}>🧳</div>
+        </div>
+      </div>
+
+      {/* ---------- RECENT BOOKINGS ---------- */}
+      <div style={{ padding: '0 16px', marginBottom: '24px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
+          Recent Bookings
+        </h3>
+        <EmptyCard text="No bookings yet" subtext="Book your first trip!" />
+      </div>
 
       {/* ---------- BOTTOM NAVIGATION ---------- */}
       <BottomNav active="home" navigate={navigate} />
 
+    </div>
+  )
+}
+
+function EmptyCard({ text, subtext }: { text: string; subtext?: string }) {
+  return (
+    <div style={{
+      background: COLORS.card,
+      borderRadius: '16px',
+      padding: '20px',
+      textAlign: 'center',
+      color: COLORS.textMuted,
+      boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+    }}>
+      <p style={{ fontSize: '13px' }}>{text}</p>
+      {subtext && <p style={{ fontSize: '12px', marginTop: '4px' }}>{subtext}</p>}
+    </div>
+  )
+}
+
+function RouteCard({ route, company, time, price, navigate, path }: {
+  route: string; company: string; time: string; price: number;
+  navigate: (p: string) => void; path: string
+}) {
+  return (
+    <div
+      onClick={() => navigate(path)}
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: COLORS.card,
+        borderRadius: '14px',
+        padding: '14px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+        cursor: 'pointer'
+      }}>
+      <div>
+        <p style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.text }}>{route}</p>
+        <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{company} • {time}</p>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.primary, marginBottom: '4px' }}>₦{price.toLocaleString()}</p>
+        <span style={{
+          fontSize: '10.5px',
+          fontWeight: 700,
+          color: 'white',
+          background: COLORS.secondary,
+          padding: '4px 10px',
+          borderRadius: '8px'
+        }}>
+          Book
+        </span>
+      </div>
     </div>
   )
 }
@@ -387,4 +516,4 @@ function ServiceCard({ icon, label, desc, path, navigate, wide }: {
   )
 }
 
-export default Home
+export default Home 
