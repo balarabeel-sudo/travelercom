@@ -7,6 +7,7 @@ import Home from './Home'
 import VerifyOTP from './VerifyOTP'
 import UploadDocs from './UploadDocs'
 import PendingApproval from './PendingApproval'
+import VerifyBooking from './VerifyBooking'
 
 function App() {
   return (
@@ -20,9 +21,10 @@ function App() {
         <Route path="/verify-otp" element={<VerifyOTP />} />
         <Route path="/upload-docs" element={<UploadDocs />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
+        <Route path="/verify-booking" element={<VerifyBooking />} />
       </Routes>
     </Router>
   )
 }
 
-export default App 
+export default App
