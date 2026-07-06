@@ -40,18 +40,20 @@ function Home() {
 
         if (existing) {
           setCompanyApproval(existing.approval_status)
-        } else {
+(created?.approval_status || 'pending')
+   } else {
           const { data: created } = await supabase
             .from('companies')
             .insert({
               owner_id: data.user.id,
               business_name: meta.full_name || 'My Company',
+              business_type: meta.business_type || null,
               approval_status: 'pending'
             })
             .select('approval_status')
             .single()
           setCompanyApproval(created?.approval_status || 'pending')
-        }
+        }     
       }
 
       setLoading(false)
