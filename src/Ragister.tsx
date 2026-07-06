@@ -197,13 +197,10 @@ function Register() {
               <option value="">Select Business Type</option>
               <option value="hotel">🏨 Hotel</option>
               <option value="bus">🚌 Bus Company</option>
-              <option value="airline">✈️ Airline</option>
+              <option value="train">🚆 Railway / Train</option>
+              <option value="flight">✈️ Airline</option>
               <option value="event_center">🎪 Event Center</option>
-              <option value="travel_agency">🗺️ Travel Agency</option>
-            </select>
-          </>
-        )}
-
+              <option value="tour">🗺️ Tour Company</option>
         <input
           type="email"
           placeholder="Email Address"
