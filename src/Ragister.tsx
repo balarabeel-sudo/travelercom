@@ -192,16 +192,18 @@ function Register() {
             <select
               value={businessType}
               onChange={(e) => setBusinessType(e.target.value)}
-              style={{ ...inputStyle, color: businessType ? '#1a1a1a' : '#999' }}
-            >
-            <option value="">Select Business Type</option>
+           >
+              <option value="">Select Business Type</option>
               <option value="hotel">🏨 Hotel</option>
               <option value="bus">🚌 Bus Company</option>
               <option value="train">🚆 Railway / Train</option>
               <option value="flight">✈️ Airline</option>
               <option value="event_center">🎪 Event Center</option>
               <option value="tour">🗺️ Tour Company</option>
-              
+            </select>
+          </>
+        )}
+
         <input
           type="email"
           placeholder="Email Address"
