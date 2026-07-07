@@ -136,7 +136,6 @@ function Home() {
         )}
 
         {companyApproval !== 'approved' && (
-        {companyApproval !== 'approved' && (
           <div style={{
             background: companyApproval === 'rejected' ? '#fef2f2' : '#fff7ed',
             border: `1px solid ${companyApproval === 'rejected' ? '#fca5a5' : '#fdba74'}`,
