@@ -32,6 +32,27 @@ function Home() {
       setAccountType(isCompany ? 'company' : 'personal')
       setDisplayName(meta.full_name || '')
 
+      // Ensure a profiles row exists for this user (required for companies/wallets/bookings FK)
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', data.user.id)
+        .maybeSingle()
+
+      if (!existingProfile) {
+        const { error: profileErr } = await supabase.from('profiles').insert({
+          id: data.user.id,
+          full_name: meta.full_name || null,
+          phone_number: meta.phone || null,
+          account_type: isCompany ? 'company' : 'personal',
+          company_name: isCompany ? (meta.full_name || null) : null,
+          status: 'pending',
+        })
+        if (profileErr) {
+          setDebugError('PROFILE error: ' + profileErr.message)
+        }
+      }
+      
       if (isCompany) {
         const { data: existing, error: existingErr } = await supabase
           .from('companies')
