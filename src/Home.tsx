@@ -128,9 +128,6 @@ function Home() {
             🚪
           </div>
         </div>
-        
-</div>
-        </div>
 
         {debugError && (
           <div style={{ margin: '16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', padding: '12px' }}>
