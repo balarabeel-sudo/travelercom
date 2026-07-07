@@ -18,6 +18,7 @@ function Home() {
   const [accountType, setAccountType] = useState<'personal' | 'company'>('personal')
   const [displayName, setDisplayName] = useState('')
   const [companyApproval, setCompanyApproval] = useState<'pending' | 'approved' | 'rejected'>('pending')
+  const [debugError, setDebugError] = useState('')
 
   useEffect(() => {
     const loadUser = async () => {
@@ -32,17 +33,20 @@ function Home() {
       setDisplayName(meta.full_name || '')
 
       if (isCompany) {
-        const { data: existing } = await supabase
+        const { data: existing, error: existingErr } = await supabase
           .from('companies')
           .select('approval_status')
           .eq('owner_id', data.user.id)
           .maybeSingle()
 
+        if (existingErr) {
+          setDebugError('SELECT error: ' + existingErr.message)
+        }
+
         if (existing) {
           setCompanyApproval(existing.approval_status)
-(created?.approval_status || 'pending')
-   } else {
-          const { data: created } = await supabase
+        } else {
+          const { data: created, error: insertErr } = await supabase
             .from('companies')
             .insert({
               owner_id: data.user.id,
@@ -52,8 +56,11 @@ function Home() {
             })
             .select('approval_status')
             .single()
+          if (insertErr) {
+            setDebugError('INSERT error: ' + insertErr.message)
+          }
           setCompanyApproval(created?.approval_status || 'pending')
-        }     
+        }
       }
 
       setLoading(false)
@@ -121,7 +128,17 @@ function Home() {
             🚪
           </div>
         </div>
+        
+</div>
+        </div>
 
+        {debugError && (
+          <div style={{ margin: '16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', padding: '12px' }}>
+            <p style={{ fontSize: '11px', color: '#991b1b', wordBreak: 'break-word' }}>{debugError}</p>
+          </div>
+        )}
+
+        {companyApproval !== 'approved' && (
         {companyApproval !== 'approved' && (
           <div style={{
             background: companyApproval === 'rejected' ? '#fef2f2' : '#fff7ed',
