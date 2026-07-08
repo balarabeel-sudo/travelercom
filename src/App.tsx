@@ -10,6 +10,7 @@ import PendingApproval from './PendingApproval'
 import VerifyBooking from './VerifyBooking'
 import Account from './Account'
 import AddListing from './AddListing'
+import Hotels from './Hotels'
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
         <Route path="/verify-booking" element={<VerifyBooking />} />
         <Route path="/account" element={<Account />} />
         <Route path="/add-listing" element={<AddListing />} />
+        <Route path="/hotels" element={<Hotels />} />
       </Routes>
     </Router>
   )
