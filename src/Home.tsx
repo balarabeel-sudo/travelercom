@@ -18,7 +18,6 @@ function Home() {
   const [accountType, setAccountType] = useState<'personal' | 'company'>('personal')
   const [displayName, setDisplayName] = useState('')
   const [companyApproval, setCompanyApproval] = useState<'pending' | 'approved' | 'rejected'>('pending')
-  const [debugError, setDebugError] = useState('')
 
   useEffect(() => {
     const loadUser = async () => {
@@ -40,7 +39,7 @@ function Home() {
         .maybeSingle()
 
       if (!existingProfile) {
-        const { error: profileErr } = await supabase.from('profiles').insert({
+        await supabase.from('profiles').insert({
           id: data.user.id,
           full_name: meta.full_name || null,
           phone_number: meta.phone || null,
@@ -48,26 +47,19 @@ function Home() {
           company_name: isCompany ? (meta.full_name || null) : null,
           status: 'pending',
         })
-        if (profileErr) {
-          setDebugError('PROFILE error: ' + profileErr.message)
-        }
       }
       
       if (isCompany) {
-        const { data: existing, error: existingErr } = await supabase
+        const { data: existing } = await supabase
           .from('companies')
           .select('approval_status')
           .eq('owner_id', data.user.id)
           .maybeSingle()
 
-        if (existingErr) {
-          setDebugError('SELECT error: ' + existingErr.message)
-        }
-
         if (existing) {
           setCompanyApproval(existing.approval_status)
         } else {
-          const { data: created, error: insertErr } = await supabase
+          const { data: created } = await supabase
             .from('companies')
             .insert({
               owner_id: data.user.id,
@@ -77,9 +69,6 @@ function Home() {
             })
             .select('approval_status')
             .single()
-          if (insertErr) {
-            setDebugError('INSERT error: ' + insertErr.message)
-          }
           setCompanyApproval(created?.approval_status || 'pending')
         }
       }
@@ -149,12 +138,6 @@ function Home() {
             🚪
           </div>
         </div>
-
-        {debugError && (
-          <div style={{ margin: '16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', padding: '12px' }}>
-            <p style={{ fontSize: '11px', color: '#991b1b', wordBreak: 'break-word' }}>{debugError}</p>
-          </div>
-        )}
 
         {companyApproval !== 'approved' && (
           <div style={{
@@ -354,8 +337,7 @@ function Home() {
               key={d.city}
               onClick={() => navigate(`/search?city=${d.city}`)}
               style={{
-                minWidth: '140px',
-                borderRadius: '16px',
+                minWidth: '140px',borderRadius: '16px',
                 overflow: 'hidden',
                 background: COLORS.card,
                 boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
@@ -465,7 +447,8 @@ function Home() {
           </div>
         )}
       </div>
-     {/* ---------- POPULAR BUS ROUTES ---------- */}
+
+      {/* ---------- POPULAR BUS ROUTES ---------- */}
       <div style={{ padding: '0 16px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>
@@ -693,5 +676,5 @@ function ServiceCard({ icon, label, desc, path, navigate, wide }: {
   )
 }
 
-export default Home 
-
+export default Home
+                
