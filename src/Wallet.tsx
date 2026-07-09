@@ -81,7 +81,7 @@ function Wallet() {
     const { data: sessionData } = await supabase.auth.getSession()
     const token = sessionData.session?.access_token
 
-    const { data, error } = await supabase.functions.invoke('verify-paystack-payment', {
+    const { data, error } = await supabase.functions.invoke('smooth-task', {
       body: { reference },
       headers: { Authorization: `Bearer ${token}` },
     })
