@@ -74,28 +74,43 @@ function Wallet() {
     load()
   }, [navigate])
 
-  const verifyPayment = async (reference: string) => {
+const verifyPayment = async (reference: string) => {
     setProcessing(true)
     setMessage(null)
 
-    const { data: sessionData } = await supabase.auth.getSession()
-    const token = sessionData.session?.access_token
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
 
-    const { data, error } = await supabase.functions.invoke('smooth-task', {
-      body: { reference },
-      headers: { Authorization: `Bearer ${token}` },
-    })
+      if (!token) {
+        setMessage({ type: 'error', text: 'DEBUG: No auth token found.' })
+        setProcessing(false)
+        return
+      }
 
-    setProcessing(false)
+      const { data, error } = await supabase.functions.invoke('smooth-task', {
+        body: { reference },
+        headers: { Authorization: `Bearer ${token}` },
+      })
 
-    if (error || data?.error) {
-      setMessage({ type: 'error', text: data?.error || 'Payment verification failed. Please contact support.' })
-      return
+      setProcessing(false)
+
+      if (error) {
+        setMessage({ type: 'error', text: 'DEBUG invoke error: ' + JSON.stringify(error) })
+        return
+      }
+      if (data?.error) {
+        setMessage({ type: 'error', text: 'DEBUG function error: ' + JSON.stringify(data.error) })
+        return
+      }
+
+      setMessage({ type: 'success', text: 'Wallet topped up successfully!' })
+      setAmount('')
+      await loadWallet(userId)
+    } catch (err) {
+      setProcessing(false)
+      setMessage({ type: 'error', text: 'DEBUG catch: ' + String(err) })
     }
-
-    setMessage({ type: 'success', text: 'Wallet topped up successfully!' })
-    setAmount('')
-    await loadWallet(userId)
   }
 
   const handleTopUp = () => {
