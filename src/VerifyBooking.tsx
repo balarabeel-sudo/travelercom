@@ -161,11 +161,12 @@ function VerifyBooking() {
       return
     }
 
-    const newBalance = Number(ownerWallet.balance) + companyReceives
-    const { error: walletUpdateErr } = await supabase
+   const newBalance = Number(ownerWallet.balance) + companyReceives
+    const { data: updatedWallet, error: walletUpdateErr } = await supabase
       .from('wallets')
       .update({ balance: newBalance })
       .eq('id', ownerWallet.id)
+      .select()
 
     if (walletUpdateErr) {
       setConfirming(false)
@@ -173,6 +174,11 @@ function VerifyBooking() {
       return
     }
 
+    if (!updatedWallet || updatedWallet.length === 0) {
+      setConfirming(false)
+      setErrorMsg('DEBUG: wallet update matched 0 rows (likely blocked by RLS). wallet.id=' + ownerWallet.id + ' owner_id=' + companyRow.owner_id)
+      return
+    }
     const { error: txErr } = await supabase.from('transactions').insert({
       user_id: companyRow.owner_id,
       wallet_id: ownerWallet.id,
