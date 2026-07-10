@@ -12,6 +12,7 @@ import Account from './Account'
 import AddListing from './AddListing'
 import Hotels from './Hotels'
 import Wallet from './Wallet'
+import HotelDetails from './HotelDetails'
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
         <Route path="/add-listing" element={<AddListing />} />
         <Route path="/hotels" element={<Hotels />} />
         <Route path="/wallet" element={<Wallet />} />
+        <Route path="/hotels/:id" element={<HotelDetails />} />
       </Routes>
     </Router>
   )
