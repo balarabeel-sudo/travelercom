@@ -96,6 +96,7 @@ function VerifyBooking() {
   const handleConfirmCheckIn = async () => {
     if (!result) return
     setConfirming(true)
+    setErrorMsg('')
 
     const commissionAmount = (result.amount_paid * result.commission_rate) / 100
     const companyReceives = result.amount_paid - commissionAmount
@@ -107,45 +108,84 @@ function VerifyBooking() {
 
     if (bookingErr) {
       setConfirming(false)
-      setErrorMsg('Check-in failed: ' + bookingErr.message)
+      setErrorMsg('DEBUG booking update error: ' + bookingErr.message)
       return
     }
 
-    const { data: companyRow } = await supabase
+    const { data: companyRow, error: companyErr } = await supabase
       .from('companies')
       .select('owner_id')
       .eq('id', result.company_id)
       .maybeSingle()
 
-    if (companyRow) {
-      let { data: ownerWallet } = await supabase
+    if (companyErr) {
+      setConfirming(false)
+      setErrorMsg('DEBUG company lookup error: ' + companyErr.message)
+      return
+    }
+    if (!companyRow) {
+      setConfirming(false)
+      setErrorMsg('DEBUG: company row not found for company_id ' + result.company_id)
+      return
+    }
+
+    let { data: ownerWallet, error: walletFetchErr } = await supabase
+      .from('wallets')
+      .select('id, balance')
+      .eq('user_id', companyRow.owner_id)
+      .maybeSingle()
+
+    if (walletFetchErr) {
+      setConfirming(false)
+      setErrorMsg('DEBUG wallet fetch error: ' + walletFetchErr.message)
+      return
+    }
+
+    if (!ownerWallet) {
+      const { data: newWallet, error: walletCreateErr } = await supabase
         .from('wallets')
+        .insert({ user_id: companyRow.owner_id, balance: 0 })
         .select('id, balance')
-        .eq('user_id', companyRow.owner_id)
-        .maybeSingle()
-
-      if (!ownerWallet) {
-        const { data: newWallet } = await supabase
-          .from('wallets')
-          .insert({ user_id: companyRow.owner_id, balance: 0 })
-          .select('id, balance')
-          .single()
-        ownerWallet = newWallet
+        .single()
+      if (walletCreateErr) {
+        setConfirming(false)
+        setErrorMsg('DEBUG wallet create error: ' + walletCreateErr.message)
+        return
       }
+      ownerWallet = newWallet
+    }
 
-      if (ownerWallet) {
-        const newBalance = Number(ownerWallet.balance) + companyReceives
-        await supabase.from('wallets').update({ balance: newBalance }).eq('id', ownerWallet.id)
+    if (!ownerWallet) {
+      setConfirming(false)
+      setErrorMsg('DEBUG: could not get or create company wallet')
+      return
+    }
 
-        await supabase.from('transactions').insert({
-          user_id: companyRow.owner_id,
-          wallet_id: ownerWallet.id,
-          booking_id: result.id,
-          transaction_type: 'commission_payout',
-          amount: companyReceives,
-          status: 'successful',
-        })
-      }
+    const newBalance = Number(ownerWallet.balance) + companyReceives
+    const { error: walletUpdateErr } = await supabase
+      .from('wallets')
+      .update({ balance: newBalance })
+      .eq('id', ownerWallet.id)
+
+    if (walletUpdateErr) {
+      setConfirming(false)
+      setErrorMsg('DEBUG wallet update error: ' + walletUpdateErr.message)
+      return
+    }
+
+    const { error: txErr } = await supabase.from('transactions').insert({
+      user_id: companyRow.owner_id,
+      wallet_id: ownerWallet.id,
+      booking_id: result.id,
+      transaction_type: 'commission_payout',
+      amount: companyReceives,
+      status: 'successful',
+    })
+
+    if (txErr) {
+      setConfirming(false)
+      setErrorMsg('DEBUG transaction insert error: ' + txErr.message)
+      return
     }
 
     setConfirming(false)
@@ -256,6 +296,12 @@ function VerifyBooking() {
               <Row label="Amount Paid" value={`₦${result.amount_paid.toLocaleString()}`} />
               <Row label="You Receive" value={`₦${(result.amount_paid - (result.amount_paid * result.commission_rate) / 100).toLocaleString()} (after ${result.commission_rate}% fee)`} />
             </div>
+
+            {errorMsg && (
+              <p style={{ fontSize: '11.5px', color: COLORS.red, marginTop: '10px', wordBreak: 'break-word' as const }}>
+                {errorMsg}
+              </p>
+            )}
 
             {isValid && (
               <button
