@@ -24,6 +24,9 @@ type BookingResult = {
   checked_in: boolean
   created_at: string
   category: string
+  amount_paid: number
+  company_id: string
+  commission_rate: number
 } | null
 
 function VerifyBooking() {
@@ -63,7 +66,7 @@ function VerifyBooking() {
 
     const { data: booking } = await supabase
       .from('bookings')
-      .select('id, ticket_code, customer_name, booking_status, checked_in, created_at, services(category)')
+      .select('id, ticket_code, customer_name, booking_status, checked_in, created_at, amount_paid, company_id, services(category, commission_rate)')
       .eq('ticket_code', code.trim().toUpperCase())
       .eq('company_id', company.id)
       .maybeSingle()
@@ -84,21 +87,69 @@ function VerifyBooking() {
       checked_in: booking.checked_in,
       created_at: booking.created_at,
       category: (booking as any).services?.category || '—',
+      amount_paid: Number(booking.amount_paid),
+      company_id: booking.company_id,
+      commission_rate: Number((booking as any).services?.commission_rate ?? 3),
     })
   }
 
   const handleConfirmCheckIn = async () => {
     if (!result) return
     setConfirming(true)
-    const { error } = await supabase
+
+    const commissionAmount = (result.amount_paid * result.commission_rate) / 100
+    const companyReceives = result.amount_paid - commissionAmount
+
+    const { error: bookingErr } = await supabase
       .from('bookings')
-      .update({ checked_in: true, checked_in_at: new Date().toISOString() })
+      .update({ checked_in: true, checked_in_at: new Date().toISOString(), commission_amount: commissionAmount })
       .eq('id', result.id)
 
-    setConfirming(false)
-    if (!error) {
-      setResult({ ...result, checked_in: true })
+    if (bookingErr) {
+      setConfirming(false)
+      setErrorMsg('Check-in failed: ' + bookingErr.message)
+      return
     }
+
+    const { data: companyRow } = await supabase
+      .from('companies')
+      .select('owner_id')
+      .eq('id', result.company_id)
+      .maybeSingle()
+
+    if (companyRow) {
+      let { data: ownerWallet } = await supabase
+        .from('wallets')
+        .select('id, balance')
+        .eq('user_id', companyRow.owner_id)
+        .maybeSingle()
+
+      if (!ownerWallet) {
+        const { data: newWallet } = await supabase
+          .from('wallets')
+          .insert({ user_id: companyRow.owner_id, balance: 0 })
+          .select('id, balance')
+          .single()
+        ownerWallet = newWallet
+      }
+
+      if (ownerWallet) {
+        const newBalance = Number(ownerWallet.balance) + companyReceives
+        await supabase.from('wallets').update({ balance: newBalance }).eq('id', ownerWallet.id)
+
+        await supabase.from('transactions').insert({
+          user_id: companyRow.owner_id,
+          wallet_id: ownerWallet.id,
+          booking_id: result.id,
+          transaction_type: 'commission_payout',
+          amount: companyReceives,
+          status: 'successful',
+        })
+      }
+    }
+
+    setConfirming(false)
+    setResult({ ...result, checked_in: true })
   }
 
   const isValid = result && result.booking_status === 'confirmed' && !result.checked_in
@@ -202,6 +253,8 @@ function VerifyBooking() {
               <Row label="Service Type" value={result.category} />
               <Row label="Status" value={result.booking_status} />
               <Row label="Booked On" value={new Date(result.created_at).toLocaleDateString()} />
+              <Row label="Amount Paid" value={`₦${result.amount_paid.toLocaleString()}`} />
+              <Row label="You Receive" value={`₦${(result.amount_paid - (result.amount_paid * result.commission_rate) / 100).toLocaleString()} (after ${result.commission_rate}% fee)`} />
             </div>
 
             {isValid && (
