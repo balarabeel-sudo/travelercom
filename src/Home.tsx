@@ -198,7 +198,7 @@ function Home() {
               <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Verify Booking</p>
             </div>
             <div
-              onClick={() => navigate('/company-wallet')}
+              onClick={() => navigate('/wallet')}
               style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
               <div style={{ fontSize: '26px', marginBottom: '6px' }}>💳</div>
               <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Wallet</p>
