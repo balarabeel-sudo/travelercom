@@ -59,58 +59,50 @@ function Wallet() {
     setTransactions(txs || [])
   }
 
+  const [loadError, setLoadError] = useState('')
+
   useEffect(() => {
     const load = async () => {
-      const { data, error } = await supabase.auth.getUser()
-      if (error || !data.user) {
-        navigate('/login')
-        return
+      try {
+        const { data, error } = await supabase.auth.getUser()
+        if (error || !data.user) {
+          navigate('/login')
+          return
+        }
+        setUserId(data.user.id)
+        setUserEmail(data.user.email || '')
+        await loadWallet(data.user.id)
+        setLoading(false)
+      } catch (err) {
+        setLoading(false)
+        setLoadError('DEBUG load error: ' + String(err))
       }
-      setUserId(data.user.id)
-      setUserEmail(data.user.email || '')
-      await loadWallet(data.user.id)
-      setLoading(false)
     }
     load()
   }, [navigate])
 
-const verifyPayment = async (reference: string) => {
+  const verifyPayment = async (reference: string) => {
     setProcessing(true)
     setMessage(null)
 
-    try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData.session?.access_token
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
 
-      if (!token) {
-        setMessage({ type: 'error', text: 'DEBUG: No auth token found.' })
-        setProcessing(false)
-        return
-      }
+    const { data, error } = await supabase.functions.invoke('smooth-task', {
+      body: { reference },
+      headers: { Authorization: `Bearer ${token}` },
+    })
 
-      const { data, error } = await supabase.functions.invoke('smooth-task', {
-        body: { reference },
-        headers: { Authorization: `Bearer ${token}` },
-      })
+    setProcessing(false)
 
-      setProcessing(false)
-
-      if (error) {
-        setMessage({ type: 'error', text: 'DEBUG invoke error: ' + JSON.stringify(error) })
-        return
-      }
-      if (data?.error) {
-        setMessage({ type: 'error', text: 'DEBUG function error: ' + JSON.stringify(data.error) })
-        return
-      }
-
-      setMessage({ type: 'success', text: 'Wallet topped up successfully!' })
-      setAmount('')
-      await loadWallet(userId)
-    } catch (err) {
-      setProcessing(false)
-      setMessage({ type: 'error', text: 'DEBUG catch: ' + String(err) })
+    if (error || data?.error) {
+      setMessage({ type: 'error', text: data?.error || 'Payment verification failed. Please contact support.' })
+      return
     }
+
+    setMessage({ type: 'success', text: 'Wallet topped up successfully!' })
+    setAmount('')
+    await loadWallet(userId)
   }
 
   const handleTopUp = () => {
@@ -147,6 +139,19 @@ const verifyPayment = async (reference: string) => {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textMuted }}>
         Loading...
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center' }}>
+        <div>
+          <p style={{ color: COLORS.red, fontSize: '13px', marginBottom: '12px', wordBreak: 'break-word' as const }}>{loadError}</p>
+          <button onClick={() => navigate('/account')} style={{ padding: '10px 20px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: '10px' }}>
+            Back to Account
+          </button>
+        </div>
       </div>
     )
   }
@@ -273,7 +278,7 @@ const verifyPayment = async (reference: string) => {
                   fontWeight: 800,
                   color: tx.transaction_type === 'topup' || tx.transaction_type === 'refund' ? COLORS.green : COLORS.red
                 }}>
-                  {tx.transaction_type === 'topup' || tx.transaction_type === 'refund' ? '+' : '-'}₦{Number(tx.amount).toLocaleString()}
+                  {tx.transaction_type === 'topup' || tx.transaction_type === 'refund' ? '+' : '-'}₦{Number(tx.amount || 0).toLocaleString()}
                 </p>
               </div>
             ))}
