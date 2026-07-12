@@ -18,6 +18,13 @@ function Home() {
   const [accountType, setAccountType] = useState<'personal' | 'company'>('personal')
   const [displayName, setDisplayName] = useState('')
   const [companyApproval, setCompanyApproval] = useState<'pending' | 'approved' | 'rejected'>('pending')
+  const [companyStats, setCompanyStats] = useState({
+    totalBookings: 0,
+    revenue: 0,
+    pendingBookings: 0,
+    completed: 0,
+    activeListings: 0,
+  })
 
   useEffect(() => {
     const loadUser = async () => {
@@ -52,9 +59,11 @@ function Home() {
       if (isCompany) {
         const { data: existing } = await supabase
           .from('companies')
-          .select('approval_status')
+          .select('id, approval_status')
           .eq('owner_id', data.user.id)
           .maybeSingle()
+
+        let companyId = existing?.id
 
         if (existing) {
           setCompanyApproval(existing.approval_status)
@@ -67,9 +76,42 @@ function Home() {
               business_type: meta.business_type || null,
               approval_status: 'pending'
             })
-            .select('approval_status')
+            .select('id, approval_status')
             .single()
           setCompanyApproval(created?.approval_status || 'pending')
+          companyId = created?.id
+        }
+
+        if (companyId) {
+          const { data: allBookings } = await supabase
+            .from('bookings')
+            .select('checked_in, booking_status, amount_paid, services(commission_rate)')
+            .eq('company_id', companyId)
+
+          const bookings = allBookings || []
+          const totalBookings = bookings.length
+          const pendingBookings = bookings.filter((b: any) => !b.checked_in && b.booking_status === 'confirmed').length
+          const completed = bookings.filter((b: any) => b.checked_in).length
+          const revenue = bookings
+            .filter((b: any) => b.checked_in)
+            .reduce((sum: number, b: any) => {
+              const rate = Number(b.services?.commission_rate ?? 3)
+              return sum + Number(b.amount_paid) * (1 - rate / 100)
+            }, 0)
+
+          const { count: activeListings } = await supabase
+            .from('services')
+            .select('id', { count: 'exact', head: true })
+            .eq('company_id', companyId)
+            .eq('status', 'active')
+
+          setCompanyStats({
+            totalBookings,
+            revenue,
+            pendingBookings,
+            completed,
+            activeListings: activeListings || 0,
+          })
         }
       }
 
@@ -100,11 +142,11 @@ function Home() {
 
   if (accountType === 'company') {
     const analytics = [
-      { label: 'Total Bookings', value: 0, icon: '📦' },
-      { label: 'Revenue', value: '₦0', icon: '💰' },
-      { label: 'Pending Bookings', value: 0, icon: '⏳' },
-      { label: 'Completed', value: 0, icon: '✅' },
-      { label: 'Active Listings', value: 0, icon: '📋' },
+      { label: 'Total Bookings', value: companyStats.totalBookings.toString(), icon: '📦' },
+      { label: 'Revenue', value: `₦${companyStats.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: '💰' },
+      { label: 'Pending Bookings', value: companyStats.pendingBookings.toString(), icon: '⏳' },
+      { label: 'Completed', value: companyStats.completed.toString(), icon: '✅' },
+      { label: 'Active Listings', value: companyStats.activeListings.toString(), icon: '📋' },
     ]
 
     return (
