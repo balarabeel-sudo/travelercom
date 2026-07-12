@@ -14,6 +14,7 @@ import Hotels from './Hotels'
 import Wallet from './Wallet'
 import HotelDetails from './HotelDetails'
 import BookingsManagement from './BookingsManagement'
+import ListingsManagement from './ListingsManagement'
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/hotels/:id" element={<HotelDetails />} />
         <Route path="/bookings-management" element={<BookingsManagement />} />
+        <Route path="/listings-management" element={<ListingsManagement />} />
       </Routes>
     </Router>
   )
