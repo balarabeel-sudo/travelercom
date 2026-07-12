@@ -257,14 +257,18 @@ function Home() {
             <p style={{ fontSize: '13px' }}>No listings yet</p>
           </div>
 
-          <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
-            Bookings Received
+          <h3
+            onClick={() => navigate('/bookings-management')}
+            style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px', cursor: 'pointer' }}>
+            Bookings Received →
           </h3>
-          <div style={{
-            background: COLORS.card, borderRadius: '14px', padding: '20px',
-            textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
-          }}>
-            <p style={{ fontSize: '13px' }}>No bookings yet</p>
+          <div
+            onClick={() => navigate('/bookings-management')}
+            style={{
+              background: COLORS.card, borderRadius: '14px', padding: '20px',
+              textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer'
+            }}>
+            <p style={{ fontSize: '13px' }}>Tap to view all bookings</p>
           </div>
         </div>
       </div>
