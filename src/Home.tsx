@@ -247,14 +247,18 @@ function Home() {
             </div>
           </div>
 
-          <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
-            My Listings
+          <h3
+            onClick={() => navigate('/listings-management')}
+            style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px', cursor: 'pointer' }}>
+            My Listings →
           </h3>
-          <div style={{
-            background: COLORS.card, borderRadius: '14px', padding: '20px', marginBottom: '24px',
-            textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
-          }}>
-            <p style={{ fontSize: '13px' }}>No listings yet</p>
+          <div
+            onClick={() => navigate('/listings-management')}
+            style={{
+              background: COLORS.card, borderRadius: '14px', padding: '20px', marginBottom: '24px',
+              textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer'
+            }}>
+            <p style={{ fontSize: '13px' }}>Tap to manage your listings</p>
           </div>
 
           <h3
