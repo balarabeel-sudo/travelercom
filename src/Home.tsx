@@ -278,14 +278,14 @@ function Home() {
       </div>
     )
   }
-
-  const services = [
+  
+const services = [
     { icon: '🏨', label: 'Hotels & Stays', desc: 'Find your comfort', path: '/hotels' },
-    { icon: '🚌', label: 'Bus Stations', desc: 'Travel by road', path: '/buses' },
-    { icon: '🚆', label: 'Railway', desc: 'Travel by train', path: '/trains' },
-    { icon: '✈️', label: 'Domestic Flights', desc: 'Fly across Nigeria', path: '/flights' },
-    { icon: '🗺️', label: 'Tours & Attractions', desc: 'Explore places', path: '/tours' },
-    { icon: '🎪', label: 'Event Centers', desc: 'Book a venue', path: '/events' },
+    { icon: '🚌', label: 'Bus Stations', desc: 'Travel by road', path: '/services/bus' },
+    { icon: '🚆', label: 'Railway', desc: 'Travel by train', path: '/services/train' },
+    { icon: '✈️', label: 'Domestic Flights', desc: 'Fly across Nigeria', path: '/services/flight' },
+    { icon: '🗺️', label: 'Tours & Attractions', desc: 'Explore places', path: '/services/tour' },
+    { icon: '🎪', label: 'Event Centers', desc: 'Book a venue', path: '/services/event_center' },
   ]
 
   const destinations = [
