@@ -193,7 +193,6 @@ function Home() {
           </div>
           <span style={{ fontSize: '18px' }}>→</span>
         </div>
-</parameter>
 
         {companyApproval !== 'approved' && (
           <div style={{
