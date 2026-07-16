@@ -180,6 +180,20 @@ function Home() {
             🚪
           </div>
         </div>
+        <div
+          onClick={() => navigate('/business-suite')}
+          style={{
+            margin: '16px', padding: '16px', borderRadius: '14px',
+            background: 'linear-gradient(135deg, #0F172A, #1E293B)', color: 'white',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'
+          }}>
+          <div>
+            <p style={{ fontSize: '13px', fontWeight: 800 }}>🚀 Traveler Business Suite</p>
+            <p style={{ fontSize: '11px', color: '#94a3b8' }}>Try the new premium dashboard</p>
+          </div>
+          <span style={{ fontSize: '18px' }}>→</span>
+        </div>
+</parameter>
 
         {companyApproval !== 'approved' && (
           <div style={{
