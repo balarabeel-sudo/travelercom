@@ -18,6 +18,7 @@ import ListingsManagement from './ListingsManagement'
 import Services from './Services'
 import ServiceDetails from './ServiceDetails'
 import BusinessSuite from './BusinessSuite'
+import GuestList from './GuestList'
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
         <Route path="/services/:category" element={<Services />} />
         <Route path="/services/:category/:id" element={<ServiceDetails />} />
         <Route path="/business-suite" element={<BusinessSuite />} />
+        <Route path="/guests" element={<GuestList />} />
       </Routes>
     </Router>
   )
