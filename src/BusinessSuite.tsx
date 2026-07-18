@@ -200,7 +200,7 @@ function BusinessSuite() {
           <QuickAction icon="📋" label="Listings" onClick={() => navigate('/listings-management')} />
           <QuickAction icon="🎫" label="Bookings" onClick={() => navigate('/bookings-management')} />
           <QuickAction icon="💳" label="Wallet" onClick={() => navigate('/wallet')} />
-          <QuickAction icon="⚙️" label="Settings" onClick={() => {}} />
+          <QuickAction icon="👥" label="Guests" onClick={() => navigate('/guests')} />
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
