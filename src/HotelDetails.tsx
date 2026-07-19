@@ -16,6 +16,7 @@ const COLORS = {
 
 type ServiceDetail = {
   id: string
+  photo_url: string | null
   title: string
   description: string | null
   destination: string
@@ -60,9 +61,9 @@ function HotelDetails() {
         .maybeSingle()
       setWalletBalance(wallet ? Number(wallet.balance) : 0)
 
-      const { data: svc } = await supabase
+const { data: svc } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, companies(business_name)')
+        .select('id, title, description, destination, price, seats_available, company_id, photo_url, companies(business_name)')
         .eq('id', id)
         .maybeSingle()
 
@@ -196,17 +197,18 @@ function HotelDetails() {
       </div>
 
       <div style={{ padding: '16px' }}>
-        <div style={{
+<div style={{
           height: '180px',
           borderRadius: '16px',
-          background: `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
+          background: service.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: '56px',
-          marginBottom: '16px'
+          marginBottom: '16px',
+          overflow: 'hidden'
         }}>
-          🏨
+          {service.photo_url ? <img src={service.photo_url} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🏨'}
         </div>
 
         <h2 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>{service.title}</h2>
