@@ -23,6 +23,7 @@ const CATEGORY_META: Record<string, { label: string; icon: string; unitLabel: st
 type ServiceItem = {
   id: string
   title: string
+  photo_url: string | null
   description: string | null
   origin: string | null
   destination: string
@@ -47,7 +48,7 @@ function Services() {
     setLoading(true)
     let query = supabase
       .from('services')
-      .select('id, title, description, origin, destination, price, seats_available, companies(business_name)')
+      .select('id, title, description, origin, destination, price, seats_available, photo_url, companies(business_name)')
       .eq('category', category)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -135,10 +136,10 @@ function Services() {
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '10px' }}>
                   <div style={{
                     width: '64px', height: '64px', borderRadius: '12px',
-                    background: `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', flexShrink: 0
+                    background: it.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', flexShrink: 0, overflow: 'hidden'
                   }}>
-                    {meta.icon}
+                    {it.photo_url ? <img src={it.photo_url} alt={it.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : meta.icon}
                   </div>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: '14.5px', fontWeight: 700, color: COLORS.text }}>{it.title}</p>
