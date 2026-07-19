@@ -25,6 +25,7 @@ const CATEGORY_META: Record<string, { label: string; icon: string; unitLabel: st
 type ServiceDetail = {
   id: string
   title: string
+  photo_url: string | null
   description: string | null
   origin: string | null
   destination: string
@@ -74,7 +75,7 @@ function ServiceDetails() {
 
       const { data: svc } = await supabase
         .from('services')
-        .select('id, title, description, origin, destination, departure_time, price, seats_available, company_id, companies(business_name)')
+        .select('id, title, description, origin, destination, departure_time, price, seats_available, company_id, photo_url, companies(business_name)')
         .eq('id', id)
         .maybeSingle()
 
@@ -203,10 +204,10 @@ function ServiceDetails() {
       <div style={{ padding: '16px' }}>
         <div style={{
           height: '180px', borderRadius: '16px',
-          background: `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '56px', marginBottom: '16px'
+          background: service.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '56px', marginBottom: '16px', overflow: 'hidden'
         }}>
-          {meta.icon}
+          {service.photo_url ? <img src={service.photo_url} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : meta.icon}
         </div>
 
         <h2 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>{service.title}</h2>
