@@ -13,6 +13,7 @@ const COLORS = {
 }
 
 type Hotel = {
+  photo_url: string | null
   id: string
   title: string
   description: string | null
@@ -35,7 +36,7 @@ function Hotels() {
     setLoading(true)
     let query = supabase
       .from('services')
-      .select('id, title, description, destination, price, seats_available, companies(business_name)')
+      .select('id, title, description, destination, price, seats_available, photo_url, companies(business_name)')
       .eq('category', 'hotel')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -174,18 +175,19 @@ function Hotels() {
                   boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
                 }}>
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '10px' }}>
-                  <div style={{
+<div style={{
                     width: '64px',
                     height: '64px',
                     borderRadius: '12px',
-                    background: `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
+                    background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '26px',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    overflow: 'hidden'
                   }}>
-                    🏨
+                    {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🏨'}
                   </div>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: '14.5px', fontWeight: 700, color: COLORS.text }}>{h.title}</p>
