@@ -291,11 +291,15 @@ const analytics = [
               background: COLORS.card, borderRadius: '14px', padding: '20px',
               textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer'
             }}>
-            <p style={{ fontSize: '13px' }}>Tap to view all bookings</p>
+          <p style={{ fontSize: '13px' }}>Tap to view all bookings</p>
           </div>
         </div>
+
+        <CompanyBottomNav active="home" navigate={navigate} />
+
       </div>
     )
+  }  
   }
   
 const services = [
@@ -698,6 +702,67 @@ function BottomNav({ active, navigate }: { active: string; navigate: (p: string)
           </span>
         </div>
       ))}
+    </div>
+  )
+}
+
+function CompanyBottomNav({ active, navigate }: { active: string; navigate: (p: string) => void }) {
+  const items = [
+    { key: 'home', icon: 'home', label: 'Home', path: '/home' },
+    { key: 'bookings', icon: 'calendar', label: 'Bookings', path: '/bookings-management' },
+    { key: 'add', icon: 'plus', label: 'Add', path: '/add-listing' },
+    { key: 'wallet', icon: 'wallet', label: 'Wallet', path: '/wallet' },
+    { key: 'menu', icon: 'menu', label: 'Menu', path: '/account' },
+  ]
+
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      maxWidth: '480px',
+      margin: '0 auto',
+      background: COLORS.card,
+      borderTop: `1px solid ${COLORS.border}`,
+      display: 'flex',
+      justifyContent: 'space-around',
+      alignItems: 'center',
+      padding: '10px 0 14px 0',
+      boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
+    }}>
+      {items.map((item) => {
+        if (item.key === 'add') {
+          return (
+            <div
+              key={item.key}
+              onClick={() => navigate(item.path)}
+              style={{
+                width: '48px', height: '48px', borderRadius: '50%',
+                background: COLORS.secondary, display: 'flex', alignItems: 'center',
+                justifyContent: 'center', cursor: 'pointer', marginTop: '-26px',
+                boxShadow: '0 4px 12px rgba(249,115,22,0.4)'
+              }}>
+              <Icon name="plus" size={22} color="white" />
+            </div>
+          )
+        }
+        return (
+          <div
+            key={item.key}
+            onClick={() => navigate(item.path)}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', gap: '3px' }}>
+            <Icon name={item.icon} size={20} color={active === item.key ? COLORS.primary : COLORS.textMuted} />
+            <span style={{
+              fontSize: '10.5px',
+              fontWeight: active === item.key ? 700 : 500,
+              color: active === item.key ? COLORS.primary : COLORS.textMuted
+            }}>
+              {item.label}
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }
