@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -141,12 +142,12 @@ function Home() {
   }
 
   if (accountType === 'company') {
-    const analytics = [
-      { label: 'Total Bookings', value: companyStats.totalBookings.toString(), icon: '📦' },
-      { label: 'Revenue', value: `₦${companyStats.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: '💰' },
-      { label: 'Pending Bookings', value: companyStats.pendingBookings.toString(), icon: '⏳' },
-      { label: 'Completed', value: companyStats.completed.toString(), icon: '✅' },
-      { label: 'Active Listings', value: companyStats.activeListings.toString(), icon: '📋' },
+const analytics = [
+      { label: 'Total Bookings', value: companyStats.totalBookings.toString(), icon: 'box' },
+      { label: 'Revenue', value: `₦${companyStats.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: 'trendingUp' },
+      { label: 'Pending Bookings', value: companyStats.pendingBookings.toString(), icon: 'clock' },
+      { label: 'Completed', value: companyStats.completed.toString(), icon: 'checkCircle' },
+      { label: 'Active Listings', value: companyStats.activeListings.toString(), icon: 'clipboard' },
     ]
 
     return (
@@ -177,7 +178,7 @@ function Home() {
               color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '16px', cursor: 'pointer'
             }}>
-            🚪
+            <Icon name="logOut" size={16} color="white" />
           </div>
         </div>
         <div
@@ -188,7 +189,9 @@ function Home() {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'
           }}>
           <div>
-            <p style={{ fontSize: '13px', fontWeight: 800 }}>🚀 Traveler Business Suite</p>
+            <p style={{ fontSize: '13px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Icon name="trendingUp" size={14} color="white" /> Traveler Business Suite
+            </p>
             <p style={{ fontSize: '11px', color: '#94a3b8' }}>Try the new premium dashboard</p>
           </div>
           <span style={{ fontSize: '18px' }}>→</span>
@@ -202,8 +205,9 @@ function Home() {
             borderRadius: '14px',
             padding: '14px'
           }}>
-            <p style={{ fontSize: '13px', fontWeight: 700, color: companyApproval === 'rejected' ? '#b91c1c' : '#c2410c', marginBottom: '4px' }}>
-              {companyApproval === 'rejected' ? '❌ Application Rejected' : '⏳ Account Pending Approval'}
+       <p style={{ fontSize: '13px', fontWeight: 700, color: companyApproval === 'rejected' ? '#b91c1c' : '#c2410c', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Icon name={companyApproval === 'rejected' ? 'alertCircle' : 'clock'} size={14} color={companyApproval === 'rejected' ? '#b91c1c' : '#c2410c'} />
+              {companyApproval === 'rejected' ? 'Application Rejected' : 'Account Pending Approval'}
             </p>
             <p style={{ fontSize: '12px', color: companyApproval === 'rejected' ? '#991b1b' : '#9a3412' }}>
               {companyApproval === 'rejected'
@@ -226,7 +230,9 @@ function Home() {
                 padding: '16px',
                 boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
               }}>
-                <div style={{ fontSize: '20px', marginBottom: '6px' }}>{a.icon}</div>
+                <div style={{ marginBottom: '8px' }}>
+                  <Icon name={a.icon} size={22} color={COLORS.primary} />
+                </div>
                 <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>{a.value}</p>
                 <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{a.label}</p>
               </div>
@@ -237,25 +243,25 @@ function Home() {
             <div
               onClick={() => navigate('/upload-docs')}
               style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontSize: '26px', marginBottom: '6px' }}>📄</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}><Icon name="fileText" size={24} color={COLORS.primary} /></div>
               <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Upload CAC</p>
             </div>
             <div
               onClick={() => navigate('/add-listing')}
               style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontSize: '26px', marginBottom: '6px' }}>➕</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}><Icon name="plus" size={24} color={COLORS.secondary} /></div>
               <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Add Listing</p>
             </div>
             <div
               onClick={() => navigate('/verify-booking')}
               style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontSize: '26px', marginBottom: '6px' }}>📷</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}><Icon name="camera" size={24} color={COLORS.primary} /></div>
               <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Verify Booking</p>
             </div>
             <div
               onClick={() => navigate('/wallet')}
               style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontSize: '26px', marginBottom: '6px' }}>💳</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}><Icon name="wallet" size={24} color={COLORS.secondary} /></div>
               <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Wallet</p>
             </div>
           </div>
