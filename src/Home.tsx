@@ -19,6 +19,7 @@ function Home() {
   const [accountType, setAccountType] = useState<'personal' | 'company'>('personal')
   const [displayName, setDisplayName] = useState('')
   const [companyApproval, setCompanyApproval] = useState<'pending' | 'approved' | 'rejected'>('pending')
+  const [companyPlan, setCompanyPlan] = useState<'free' | 'business_suite'>('free')
   const [companyStats, setCompanyStats] = useState({
     totalBookings: 0,
     revenue: 0,
@@ -58,9 +59,9 @@ function Home() {
       }
       
       if (isCompany) {
-        const { data: existing } = await supabase
+      const { data: existing } = await supabase
           .from('companies')
-          .select('id, approval_status')
+          .select('id, approval_status, plan')
           .eq('owner_id', data.user.id)
           .maybeSingle()
 
@@ -68,6 +69,7 @@ function Home() {
 
         if (existing) {
           setCompanyApproval(existing.approval_status)
+          setCompanyPlan(existing.plan || 'free')
         } else {
           const { data: created } = await supabase
             .from('companies')
@@ -77,11 +79,12 @@ function Home() {
               business_type: meta.business_type || null,
               approval_status: 'pending'
             })
-            .select('id, approval_status')
+            .select('id, approval_status, plan')
             .single()
           setCompanyApproval(created?.approval_status || 'pending')
+          setCompanyPlan(created?.plan || 'free')
           companyId = created?.id
-        }
+        }  
 
         if (companyId) {
           const { data: allBookings } = await supabase
@@ -260,6 +263,25 @@ if (accountType === 'company') {
               <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Scan or search a ticket code to confirm check-in</p>
             </div>
           </div>
+          {companyPlan === 'business_suite' && (
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>Quick Actions</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: COLORS.primary, fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                  Edit <Icon name="edit" size={14} color={COLORS.primary} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <PremiumAction icon="users" label="Staff Access" onClick={() => navigate('/staff')} />
+                <PremiumAction icon="barChart" label="Analytics" onClick={() => navigate('/reports')} />
+                <PremiumAction icon="userPlus" label="Add Offline Guest" onClick={() => navigate('/add-guest')} />
+                <PremiumAction icon="megaphone" label="Promotions" onClick={() => navigate('/promotions')} />
+                <PremiumAction icon="star" label="Ratings & Reviews" onClick={() => navigate('/reviews')} />
+                <PremiumAction icon="box" label="Manage Inventory" onClick={() => navigate('/inventory')} />
+              </div>
+            </div>
+          )}
+
           <h3
             onClick={() => navigate('/listings-management')}
             style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px', cursor: 'pointer' }}>
@@ -699,8 +721,26 @@ function BottomNav({ active, navigate }: { active: string; navigate: (p: string)
   )
 }
 
+function PremiumAction({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: COLORS.card, borderRadius: '14px', padding: '14px 8px',
+        textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+      }}>
+      <div style={{
+        width: '34px', height: '34px', borderRadius: '10px', background: '#f3e8ff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px'
+      }}>
+        <Icon name={icon} size={17} color="#6B21A8" />
+      </div>
+      <p style={{ fontSize: '11px', fontWeight: 600, color: COLORS.text, lineHeight: '1.3' }}>{label}</p>
+    </div>
+  )
+}
+
 function CompanyBottomNav({ active, navigate }: { active: string; navigate: (p: string) => void }) {
-  const items = [
     { key: 'home', icon: 'home', label: 'Home', path: '/home' },
     { key: 'bookings', icon: 'calendar', label: 'Bookings', path: '/bookings-management' },
     { key: 'add', icon: 'plus', label: 'Add', path: '/add-listing' },
