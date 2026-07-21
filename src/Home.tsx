@@ -171,14 +171,14 @@ if (accountType === 'company') {
             <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Company: {displayName}</p>
           </div>
           <div
-            onClick={handleLogout}
-            title="Logout"
+            onClick={() => navigate('/account')}
+            title="Company Profile"
             style={{
               width: '34px', height: '34px', borderRadius: '50%', background: COLORS.secondary,
               color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '16px', cursor: 'pointer'
+              fontSize: '15px', fontWeight: 800, cursor: 'pointer'
             }}>
-            <Icon name="logOut" size={16} color="white" />
+            {displayName?.charAt(0).toUpperCase() || 'C'}
           </div>
         </div>
         <div
@@ -198,13 +198,16 @@ if (accountType === 'company') {
         </div>
 
         {companyApproval !== 'approved' && (
-          <div style={{
-            background: companyApproval === 'rejected' ? '#fef2f2' : '#fff7ed',
-            border: `1px solid ${companyApproval === 'rejected' ? '#fca5a5' : '#fdba74'}`,
-            margin: '16px',
-            borderRadius: '14px',
-            padding: '14px'
-          }}>
+          <div
+            onClick={() => navigate('/upload-docs')}
+            style={{
+              background: companyApproval === 'rejected' ? '#fef2f2' : '#fff7ed',
+              border: `1px solid ${companyApproval === 'rejected' ? '#fca5a5' : '#fdba74'}`,
+              margin: '16px',
+              borderRadius: '14px',
+              padding: '14px',
+              cursor: 'pointer'
+            }}>
             <p style={{ fontSize: '13px', fontWeight: 700, color: companyApproval === 'rejected' ? '#b91c1c' : '#c2410c', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Icon name={companyApproval === 'rejected' ? 'alertCircle' : 'clock'} size={14} color={companyApproval === 'rejected' ? '#b91c1c' : '#c2410c'} />
               {companyApproval === 'rejected' ? 'Application Rejected' : 'Account Pending Approval'}
@@ -239,33 +242,24 @@ if (accountType === 'company') {
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-            <div
-              onClick={() => navigate('/upload-docs')}
-              style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}><Icon name="fileText" size={24} color={COLORS.primary} /></div>
-              <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Upload CAC</p>
+          <div
+            onClick={() => navigate('/verify-booking')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '12px',
+              background: COLORS.card, borderRadius: '14px', padding: '16px',
+              cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', marginBottom: '24px'
+            }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }}>
+              <Icon name="camera" size={20} color={COLORS.primary} />
             </div>
-            <div
-              onClick={() => navigate('/add-listing')}
-              style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}><Icon name="plus" size={24} color={COLORS.secondary} /></div>
-              <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Add Listing</p>
-            </div>
-            <div
-              onClick={() => navigate('/verify-booking')}
-              style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}><Icon name="camera" size={24} color={COLORS.primary} /></div>
-              <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Verify Booking</p>
-            </div>
-            <div
-              onClick={() => navigate('/wallet')}
-              style={{ background: COLORS.card, borderRadius: '14px', padding: '18px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}><Icon name="wallet" size={24} color={COLORS.secondary} /></div>
-              <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Wallet</p>
+            <div>
+              <p style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.text }}>Verify Booking</p>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Scan or search a ticket code to confirm check-in</p>
             </div>
           </div>
-
           <h3
             onClick={() => navigate('/listings-management')}
             style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px', cursor: 'pointer' }}>
