@@ -201,11 +201,71 @@ const analytics = [
           <div style={{
             background: companyApproval === 'rejected' ? '#fef2f2' : '#fff7ed',
             border: `1px solid ${companyApproval === 'rejected' ? '#fca5a5' : '#fdba74'}`,
+if (accountType === 'company') {
+    const analytics = [
+      { label: 'Total Bookings', value: companyStats.totalBookings.toString(), icon: 'box' },
+      { label: 'Revenue', value: `₦${companyStats.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: 'trendingUp' },
+      { label: 'Pending Bookings', value: companyStats.pendingBookings.toString(), icon: 'clock' },
+      { label: 'Completed', value: companyStats.completed.toString(), icon: 'checkCircle' },
+      { label: 'Active Listings', value: companyStats.activeListings.toString(), icon: 'clipboard' },
+    ]
+
+    return (
+      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
+
+        <div style={{
+          padding: '18px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: COLORS.card,
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+        }}>
+          <div>
+            <h1 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.secondary, letterSpacing: '0.5px' }}>
+              TRAVELER<span style={{ color: COLORS.primary }}>.COM</span>
+            </h1>
+            <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Company: {displayName}</p>
+          </div>
+          <div
+            onClick={handleLogout}
+            title="Logout"
+            style={{
+              width: '34px', height: '34px', borderRadius: '50%', background: COLORS.secondary,
+              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '16px', cursor: 'pointer'
+            }}>
+            <Icon name="logOut" size={16} color="white" />
+          </div>
+        </div>
+        <div
+          onClick={() => navigate('/business-suite')}
+          style={{
+            margin: '16px', padding: '16px', borderRadius: '14px',
+            background: 'linear-gradient(135deg, #0F172A, #1E293B)', color: 'white',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'
+          }}>
+          <div>
+            <p style={{ fontSize: '13px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Icon name="trendingUp" size={14} color="white" /> Traveler Business Suite
+            </p>
+            <p style={{ fontSize: '11px', color: '#94a3b8' }}>Try the new premium dashboard</p>
+          </div>
+          <span style={{ fontSize: '18px' }}>→</span>
+        </div>
+
+        {companyApproval !== 'approved' && (
+          <div style={{
+            background: companyApproval === 'rejected' ? '#fef2f2' : '#fff7ed',
+            border: `1px solid ${companyApproval === 'rejected' ? '#fca5a5' : '#fdba74'}`,
             margin: '16px',
             borderRadius: '14px',
             padding: '14px'
           }}>
-       <p style={{ fontSize: '13px', fontWeight: 700, color: companyApproval === 'rejected' ? '#b91c1c' : '#c2410c', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <p style={{ fontSize: '13px', fontWeight: 700, color: companyApproval === 'rejected' ? '#b91c1c' : '#c2410c', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Icon name={companyApproval === 'rejected' ? 'alertCircle' : 'clock'} size={14} color={companyApproval === 'rejected' ? '#b91c1c' : '#c2410c'} />
               {companyApproval === 'rejected' ? 'Application Rejected' : 'Account Pending Approval'}
             </p>
@@ -291,7 +351,7 @@ const analytics = [
               background: COLORS.card, borderRadius: '14px', padding: '20px',
               textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer'
             }}>
-          <p style={{ fontSize: '13px' }}>Tap to view all bookings</p>
+            <p style={{ fontSize: '13px' }}>Tap to view all bookings</p>
           </div>
         </div>
 
@@ -299,7 +359,6 @@ const analytics = [
 
       </div>
     )
-  }  
   }
   
 const services = [
