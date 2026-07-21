@@ -141,11 +141,6 @@ function Home() {
     )
   }
 
-  if (accountType === 'company') {
-const analytics = [
-      { label: 'Total Bookings', value: companyStats.totalBookings.toString(), icon: 'box' },
-      { label: 'Revenue', value: `₦${companyStats.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: 'trendingUp' },
-
 if (accountType === 'company') {
     const analytics = [
       { label: 'Total Bookings', value: companyStats.totalBookings.toString(), icon: 'box' },
