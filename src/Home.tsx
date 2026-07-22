@@ -13,6 +13,50 @@ const COLORS = {
   border: '#E2E8F0',
 }
 
+const PERIOD_DAYS: Record<'week' | 'month' | 'year', number> = { week: 7, month: 30, year: 365 }
+
+function computePeriodStats(bookings: any[], filter: 'week' | 'month' | 'year') {
+  const days = PERIOD_DAYS[filter]
+  const now = Date.now()
+  const currentStart = now - days * 86400000
+  const previousStart = now - 2 * days * 86400000
+
+  const inRange = (b: any, start: number, end: number) => {
+    const t = new Date(b.created_at).getTime()
+    return t >= start && t < end
+  }
+
+  const build = (list: any[]) => {
+    const totalBookings = list.length
+    const pendingBookings = list.filter((b: any) => !b.checked_in && b.booking_status === 'confirmed').length
+    const completed = list.filter((b: any) => b.checked_in).length
+    const revenue = list
+      .filter((b: any) => b.checked_in)
+      .reduce((sum: number, b: any) => {
+        const rate = Number(b.services?.commission_rate ?? 3)
+        return sum + Number(b.amount_paid) * (1 - rate / 100)
+      }, 0)
+    return { totalBookings, pendingBookings, completed, revenue }
+  }
+
+  const current = build(bookings.filter((b: any) => inRange(b, currentStart, now)))
+  const previous = build(bookings.filter((b: any) => inRange(b, previousStart, currentStart)))
+
+  const pct = (curr: number, prev: number) => {
+    if (prev === 0) return curr > 0 ? 100 : 0
+    return Math.round(((curr - prev) / prev) * 100)
+  }
+
+  return {
+    changes: {
+      totalBookings: pct(current.totalBookings, previous.totalBookings),
+      revenue: pct(current.revenue, previous.revenue),
+      pendingBookings: pct(current.pendingBookings, previous.pendingBookings),
+      completed: pct(current.completed, previous.completed),
+    }
+  }
+}
+
 function Home() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -20,6 +64,8 @@ function Home() {
   const [displayName, setDisplayName] = useState('')
   const [companyApproval, setCompanyApproval] = useState<'pending' | 'approved' | 'rejected'>('pending')
   const [companyPlan, setCompanyPlan] = useState<'free' | 'business_suite'>('free')
+  const [rawBookings, setRawBookings] = useState<any[]>([])
+  const [timeFilter, setTimeFilter] = useState<'week' | 'month' | 'year'>('week')
   const [companyStats, setCompanyStats] = useState({
     totalBookings: 0,
     revenue: 0,
@@ -89,10 +135,11 @@ function Home() {
         if (companyId) {
           const { data: allBookings } = await supabase
             .from('bookings')
-            .select('checked_in, booking_status, amount_paid, services(commission_rate)')
+            .select('checked_in, booking_status, amount_paid, created_at, services(commission_rate)')
             .eq('company_id', companyId)
 
           const bookings = allBookings || []
+          setRawBookings(bookings)
           const totalBookings = bookings.length
           const pendingBookings = bookings.filter((b: any) => !b.checked_in && b.booking_status === 'confirmed').length
           const completed = bookings.filter((b: any) => b.checked_in).length
@@ -145,12 +192,14 @@ function Home() {
   }
 
 if (accountType === 'company') {
+    const periodStats = companyPlan === 'business_suite' ? computePeriodStats(rawBookings, timeFilter) : null
+
     const analytics = [
-      { label: 'Total Bookings', value: companyStats.totalBookings.toString(), icon: 'box' },
-      { label: 'Revenue', value: `₦${companyStats.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: 'trendingUp' },
-      { label: 'Pending Bookings', value: companyStats.pendingBookings.toString(), icon: 'clock' },
-      { label: 'Completed', value: companyStats.completed.toString(), icon: 'checkCircle' },
-      { label: 'Active Listings', value: companyStats.activeListings.toString(), icon: 'clipboard' },
+      { label: 'Total Bookings', value: companyStats.totalBookings.toString(), icon: 'box', statKey: 'totalBookings' },
+      { label: 'Revenue', value: `₦${companyStats.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: 'trendingUp', statKey: 'revenue' },
+      { label: 'Pending Bookings', value: companyStats.pendingBookings.toString(), icon: 'clock', statKey: 'pendingBookings' },
+      { label: 'Completed', value: companyStats.completed.toString(), icon: 'checkCircle', statKey: 'completed' },
+      { label: 'Active Listings', value: companyStats.activeListings.toString(), icon: 'clipboard', statKey: null },
     ]
 
     return (
@@ -244,24 +293,47 @@ if (accountType === 'company') {
 
         <div style={{ padding: '0 16px' }}>
 
-          <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
-            Overview
-          </h3>
-         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-            {analytics.map((a) => (
-              <div key={a.label} style={{
-                background: COLORS.card,
-                borderRadius: '14px',
-                padding: '16px',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
-              }}>
-                <div style={{ marginBottom: '8px' }}>
-                  <Icon name={a.icon} size={22} color={COLORS.primary} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>
+              Overview
+            </h3>
+            {companyPlan === 'business_suite' && (
+              <select
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value as 'week' | 'month' | 'year')}
+                style={{
+                  fontSize: '12px', fontWeight: 600, color: COLORS.primary, background: '#eff6ff',
+                  border: 'none', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer'
+                }}>
+                <option value="week">Last 7 Days</option>
+                <option value="month">Last 30 Days</option>
+                <option value="year">Last 12 Months</option>
+              </select>
+            )}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+            {analytics.map((a) => {
+              const change = a.statKey && periodStats ? periodStats.changes[a.statKey as keyof typeof periodStats.changes] : null
+              return (
+                <div key={a.label} style={{
+                  background: COLORS.card,
+                  borderRadius: '14px',
+                  padding: '16px',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+                }}>
+                  <div style={{ marginBottom: '8px' }}>
+                    <Icon name={a.icon} size={22} color={COLORS.primary} />
+                  </div>
+                  <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>{a.value}</p>
+                  <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{a.label}</p>
+                  {companyPlan === 'business_suite' && change !== null && (
+                    <p style={{ fontSize: '10.5px', fontWeight: 700, marginTop: '6px', color: change >= 0 ? '#16A34A' : '#DC2626' }}>
+                      {change >= 0 ? '↑' : '↓'} {Math.abs(change)}% vs last {timeFilter === 'week' ? '7 days' : timeFilter === 'month' ? '30 days' : '12 months'}
+                    </p>
+                  )}
                 </div>
-                <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>{a.value}</p>
-                <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{a.label}</p>
-              </div>
-            ))}
+              )
+            })}
             <div
               onClick={() => navigate('/verify-booking')}
               style={{
