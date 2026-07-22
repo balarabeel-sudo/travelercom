@@ -746,7 +746,7 @@ function CompanyBottomNav({ active, navigate }: { active: string; navigate: (p: 
     { key: 'bookings', icon: 'calendar', label: 'Bookings', path: '/bookings-management' },
     { key: 'add', icon: 'plus', label: 'Add', path: '/add-listing' },
     { key: 'wallet', icon: 'wallet', label: 'Wallet', path: '/wallet' },
-    { key: 'menu', icon: 'menu', label: 'Menu', path: '/account' },
+    { key: 'menu', icon: 'menu', label: 'Menu', path: '/company-menu' },
   ]
 
   return (
