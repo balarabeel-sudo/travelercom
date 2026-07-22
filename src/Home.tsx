@@ -184,7 +184,41 @@ if (accountType === 'company') {
             {displayName?.charAt(0).toUpperCase() || 'C'}
           </div>
         </div>
-     
+
+        <div style={{
+          margin: '16px', padding: '18px', borderRadius: '16px',
+          background: companyPlan === 'business_suite' ? 'linear-gradient(135deg, #6B21A8, #4C1D95)' : COLORS.card,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px'
+        }}>
+          <div>
+            <p style={{
+              fontSize: '15px', fontWeight: 800,
+              color: companyPlan === 'business_suite' ? 'white' : COLORS.text,
+              display: 'flex', alignItems: 'center', gap: '6px'
+            }}>
+              Welcome back, {displayName}! 👋
+              {companyPlan === 'business_suite' && <Icon name="star" size={14} color="#FBBF24" />}
+            </p>
+            <p style={{
+              fontSize: '12px',
+              color: companyPlan === 'business_suite' ? '#DDD6FE' : COLORS.textMuted
+            }}>
+              Here's what's happening with your business today.
+            </p>
+          </div>
+          {companyPlan === 'business_suite' && (
+            <div
+              onClick={() => navigate('/company-menu')}
+              style={{
+                background: 'white', color: '#6B21A8', fontSize: '12px', fontWeight: 700,
+                padding: '9px 14px', borderRadius: '10px', cursor: 'pointer', whiteSpace: 'nowrap'
+              }}>
+              Manage Plan
+            </div>
+          )}
+        </div>
+
         {companyApproval !== 'approved' && (
           <div
             onClick={() => navigate('/upload-docs')}
