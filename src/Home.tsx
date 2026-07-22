@@ -244,24 +244,19 @@ if (accountType === 'company') {
               <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Booking</p>
             </div>
           </div> 
-          {companyPlan === 'business_suite' && (
+         {companyPlan === 'business_suite' && (
             <div style={{ marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>Quick Actions</h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: COLORS.primary, fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-                  Edit <Icon name="edit" size={14} color={COLORS.primary} />
-                </div>
-              </div>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>Quick Actions</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                 <PremiumAction icon="users" label="Staff Access" onClick={() => navigate('/staff')} />
-                <PremiumAction icon="barChart" label="Analytics" onClick={() => navigate('/reports')} />
-                <PremiumAction icon="userPlus" label="Add Offline Guest" onClick={() => navigate('/add-guest')} />
+                <PremiumAction icon="userPlus" label="Add Guest" onClick={() => navigate('/add-guest')} />
+                <PremiumAction icon="barChart" label="Analytics" onClick={() => navigate('/analytics')} />
+                <PremiumAction icon="box" label="Inventory" onClick={() => navigate('/inventory')} />
                 <PremiumAction icon="megaphone" label="Promotions" onClick={() => navigate('/promotions')} />
-                <PremiumAction icon="star" label="Ratings & Reviews" onClick={() => navigate('/reviews')} />
-                <PremiumAction icon="box" label="Manage Inventory" onClick={() => navigate('/inventory')} />
+                <PremiumAction icon="star" label="Ratings" onClick={() => navigate('/reviews')} />
               </div>
             </div>
-          )}
+          )} 
 
           <h3
             onClick={() => navigate('/listings-management')}
