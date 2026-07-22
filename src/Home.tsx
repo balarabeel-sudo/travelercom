@@ -184,22 +184,7 @@ if (accountType === 'company') {
             {displayName?.charAt(0).toUpperCase() || 'C'}
           </div>
         </div>
-        <div
-          onClick={() => navigate('/business-suite')}
-          style={{
-            margin: '16px', padding: '16px', borderRadius: '14px',
-            background: 'linear-gradient(135deg, #0F172A, #1E293B)', color: 'white',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'
-          }}>
-          <div>
-            <p style={{ fontSize: '13px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Icon name="trendingUp" size={14} color="white" /> Traveler Business Suite
-            </p>
-            <p style={{ fontSize: '11px', color: '#94a3b8' }}>Try the new premium dashboard</p>
-          </div>
-          <span style={{ fontSize: '18px' }}>→</span>
-        </div>
-
+     
         {companyApproval !== 'approved' && (
           <div
             onClick={() => navigate('/upload-docs')}
@@ -228,7 +213,7 @@ if (accountType === 'company') {
           <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
             Overview
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
             {analytics.map((a) => (
               <div key={a.label} style={{
                 background: COLORS.card,
@@ -243,26 +228,22 @@ if (accountType === 'company') {
                 <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{a.label}</p>
               </div>
             ))}
-          </div>
-
-          <div
-            onClick={() => navigate('/verify-booking')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '12px',
-              background: COLORS.card, borderRadius: '14px', padding: '16px',
-              cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', marginBottom: '24px'
-            }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-            }}>
-              <Icon name="camera" size={20} color={COLORS.primary} />
+            <div
+              onClick={() => navigate('/verify-booking')}
+              style={{
+                background: COLORS.card,
+                borderRadius: '14px',
+                padding: '16px',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+                cursor: 'pointer'
+              }}>
+              <div style={{ marginBottom: '8px' }}>
+                <Icon name="camera" size={22} color={COLORS.primary} />
+              </div>
+              <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>Verify</p>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Booking</p>
             </div>
-            <div>
-              <p style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.text }}>Verify Booking</p>
-              <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Scan or search a ticket code to confirm check-in</p>
-            </div>
-          </div>
+          </div> 
           {companyPlan === 'business_suite' && (
             <div style={{ marginBottom: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
