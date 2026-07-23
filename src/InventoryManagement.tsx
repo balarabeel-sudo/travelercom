@@ -30,7 +30,6 @@ type InventoryItem = {
   total_quantity: number
   occupied_quantity: number
   reserved_quantity: number
-  maintenance_quantity: number
   price: number
   service_id: string | null
 }
@@ -42,6 +41,7 @@ export default function InventoryManagement() {
   const [loading, setLoading] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [items, setItems] = useState<InventoryItem[]>([])
+  const [maintenanceCounts, setMaintenanceCounts] = useState<Record<string, number>>({})
   const [services, setServices] = useState<ServiceOption[]>([])
   const [unitLabel, setUnitLabel] = useState('Item')
   const [showForm, setShowForm] = useState(false)
@@ -76,11 +76,28 @@ export default function InventoryManagement() {
 
     const { data: inventoryRows } = await supabase
       .from('inventory_items')
-      .select('id, name, total_quantity, occupied_quantity, reserved_quantity, maintenance_quantity, price, service_id')
+      .select('id, name, total_quantity, occupied_quantity, reserved_quantity, price, service_id')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
 
     setItems(inventoryRows || [])
+
+    const itemIds = (inventoryRows || []).map((i) => i.id)
+    if (itemIds.length > 0) {
+      const { data: unitRows } = await supabase
+        .from('inventory_units')
+        .select('inventory_item_id')
+        .in('inventory_item_id', itemIds)
+
+      const counts: Record<string, number> = {}
+      ;(unitRows || []).forEach((u: any) => {
+        counts[u.inventory_item_id] = (counts[u.inventory_item_id] || 0) + 1
+      })
+      setMaintenanceCounts(counts)
+    } else {
+      setMaintenanceCounts({})
+    }
+
     setLoading(false)
   }
 
@@ -106,7 +123,7 @@ export default function InventoryManagement() {
   }
 
   const available = (item: InventoryItem) =>
-    item.total_quantity - item.occupied_quantity - item.reserved_quantity - item.maintenance_quantity
+    item.total_quantity - item.occupied_quantity - item.reserved_quantity - (maintenanceCounts[item.id] || 0)
 
   if (loading) {
     return (
@@ -121,7 +138,7 @@ export default function InventoryManagement() {
       total: acc.total + item.total_quantity,
       available: acc.available + available(item),
       booked: acc.booked + item.occupied_quantity + item.reserved_quantity,
-      maintenance: acc.maintenance + item.maintenance_quantity,
+      maintenance: acc.maintenance + (maintenanceCounts[item.id] || 0),
     }),
     { total: 0, available: 0, booked: 0, maintenance: 0 }
   )
