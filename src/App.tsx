@@ -20,6 +20,7 @@ import ServiceDetails from './ServiceDetails'
 import BusinessSuite from './BusinessSuite'
 import GuestList from './GuestList'
 import CompanyMenu from './CompanyMenu'
+import InventoryManagement from './InventoryManagement'
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
         <Route path="/business-suite" element={<BusinessSuite />} />
         <Route path="/guests" element={<GuestList />} />
         <Route path="/company-menu" element={<CompanyMenu />} />
+        <Route path="/inventory" element={<InventoryManagement />} />
       </Routes>
     </Router>
   )
