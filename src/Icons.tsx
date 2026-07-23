@@ -35,6 +35,7 @@ function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2 }: {
     moreHorizontal: <><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></>,
     trash: <><path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" /></>,
     minus: <><line x1="5" y1="12" x2="19" y2="12" /></>,
+    calendarX: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /><path d="M8 3v4M16 3v4" /><line x1="9" y1="15" x2="15" y2="19" /><line x1="15" y1="15" x2="9" y2="19" /></>,
   }
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
