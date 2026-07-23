@@ -22,6 +22,7 @@ import GuestList from './GuestList'
 import CompanyMenu from './CompanyMenu'
 import InventoryManagement from './InventoryManagement'
 import InventoryDetail from './InventoryDetail'
+import AddGuest from './AddGuest'
 
 function App() {
   return (
@@ -50,6 +51,7 @@ function App() {
         <Route path="/company-menu" element={<CompanyMenu />} />
         <Route path="/inventory" element={<InventoryManagement />} />
         <Route path="/inventory/:id" element={<InventoryDetail />} />
+        <Route path="/add-guest" element={<AddGuest />} />
       </Routes>
     </Router>
   )
