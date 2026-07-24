@@ -12,6 +12,7 @@ const COLORS = {
   textMuted: '#64748B',
   purple: '#6B21A8',
   green: '#16A34A',
+  red: '#DC2626',
 }
 
 const PREFIX_MAP: Record<string, string> = {
@@ -19,15 +20,16 @@ const PREFIX_MAP: Record<string, string> = {
 }
 
 const DETAIL_PLACEHOLDER: Record<string, string> = {
-  hotel: 'Room type, check-in/check-out dates, no. of nights',
-  bus: 'Route (e.g. Lagos → Abuja), travel date, seat no.',
-  train: 'Route, travel date, coach/seat no.',
-  flight: 'Route, flight date, class (Economy/Business)',
-  tour: 'Tour package, date, no. of participants',
-  event_center: 'Event name, date, ticket tier (VIP/Regular)',
+  hotel: 'Check-in/check-out dates, no. of nights',
+  bus: 'Route (e.g. Lagos → Abuja), travel date',
+  train: 'Route, travel date',
+  flight: 'Route, flight date',
+  tour: 'Tour date, no. of participants',
+  event_center: 'Event date',
 }
 
-type ServiceOption = { id: string; title: string; category: string; commission_rate: number | null }
+type ServiceOption = { id: string; title: string; category: string; commission_rate: number | null; price: number }
+type InvType = { id: string; name: string; price: number; available: number; occupiedQuantity: number }
 
 export default function AddGuest() {
   const navigate = useNavigate()
@@ -42,6 +44,10 @@ export default function AddGuest() {
   const [bookingDetails, setBookingDetails] = useState('')
   const [saving, setSaving] = useState(false)
   const [successCode, setSuccessCode] = useState<string | null>(null)
+
+  const [invTypes, setInvTypes] = useState<InvType[]>([])
+  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null)
+  const [loadingTypes, setLoadingTypes] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -59,7 +65,7 @@ export default function AddGuest() {
 
       const { data: serviceRows } = await supabase
         .from('services')
-        .select('id, title, category, commission_rate')
+        .select('id, title, category, commission_rate, price')
         .eq('company_id', company.id)
 
       setServices(serviceRows || [])
@@ -69,10 +75,60 @@ export default function AddGuest() {
     load()
   }, [navigate])
 
+  useEffect(() => {
+    const loadTypes = async () => {
+      if (!serviceId) { setInvTypes([]); setSelectedTypeId(null); return }
+      setLoadingTypes(true)
+
+      const { data: items } = await supabase
+        .from('inventory_items')
+        .select('id, name, price, total_quantity, occupied_quantity, reserved_quantity')
+        .eq('service_id', serviceId)
+
+      if (items && items.length > 0) {
+        const itemIds = items.map((i) => i.id)
+        const { data: unitRows } = await supabase
+          .from('inventory_units')
+          .select('inventory_item_id')
+          .in('inventory_item_id', itemIds)
+
+        const maintCounts: Record<string, number> = {}
+        ;(unitRows || []).forEach((u: any) => {
+          maintCounts[u.inventory_item_id] = (maintCounts[u.inventory_item_id] || 0) + 1
+        })
+
+        const mapped: InvType[] = items.map((i: any) => ({
+          id: i.id,
+          name: i.name,
+          price: Number(i.price) || 0,
+          available: i.total_quantity - i.occupied_quantity - i.reserved_quantity - (maintCounts[i.id] || 0),
+          occupiedQuantity: i.occupied_quantity,
+        }))
+        setInvTypes(mapped)
+        setSelectedTypeId(null)
+        setAmountPaid('')
+      } else {
+        setInvTypes([])
+        setSelectedTypeId(null)
+      }
+      setLoadingTypes(false)
+    }
+    loadTypes()
+  }, [serviceId])
+
   const selectedService = services.find((s) => s.id === serviceId)
+  const usingTypes = invTypes.length > 0
+  const selectedType = invTypes.find((t) => t.id === selectedTypeId)
+
+  const handleSelectType = (type: InvType) => {
+    if (type.available <= 0) return
+    setSelectedTypeId(type.id)
+    setAmountPaid(String(type.price))
+  }
 
   const handleSave = async () => {
     if (!companyId || !serviceId || !customerName.trim() || !amountPaid) return
+    if (usingTypes && !selectedType) return
     setSaving(true)
 
     const category = selectedService?.category || 'hotel'
@@ -88,6 +144,7 @@ export default function AddGuest() {
     const { error } = await supabase.from('bookings').insert({
       service_id: serviceId,
       company_id: companyId,
+      inventory_item_id: selectedType?.id || null,
       customer_name: customerName.trim(),
       customer_phone: customerPhone.trim() || null,
       quantity: parseInt(quantity, 10) || 1,
@@ -101,15 +158,26 @@ export default function AddGuest() {
       checked_in_at: new Date().toISOString(),
     })
 
-    setSaving(false)
-    if (!error) {
-      setSuccessCode(ticketCode)
-      setCustomerName('')
-      setCustomerPhone('')
-      setQuantity('1')
-      setAmountPaid('')
-      setBookingDetails('')
+    if (error) {
+      setSaving(false)
+      return
     }
+
+    if (selectedType) {
+      await supabase
+        .from('inventory_items')
+        .update({ occupied_quantity: selectedType.occupiedQuantity + 1 })
+        .eq('id', selectedType.id)
+    }
+
+    setSaving(false)
+    setSuccessCode(ticketCode)
+    setCustomerName('')
+    setCustomerPhone('')
+    setQuantity('1')
+    setAmountPaid('')
+    setBookingDetails('')
+    setSelectedTypeId(null)
   }
 
   if (loading) {
@@ -162,7 +230,45 @@ export default function AddGuest() {
               ))}
             </select>
 
-            <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>Customer Name</p>
+            {loadingTypes && (
+              <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '10px' }}>Checking inventory...</p>
+            )}
+
+            {usingTypes && (
+              <>
+                <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '8px' }}>Select Type</p>
+                {invTypes.map((type) => {
+                  const isAvailable = type.available > 0
+                  const isSelected = selectedTypeId === type.id
+                  return (
+                    <div
+                      key={type.id}
+                      onClick={() => handleSelectType(type)}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '12px', borderRadius: '10px', marginBottom: '8px',
+                        border: isSelected ? `2px solid ${COLORS.purple}` : `1px solid ${COLORS.border}`,
+                        cursor: isAvailable ? 'pointer' : 'not-allowed',
+                        opacity: isAvailable ? 1 : 0.5
+                      }}>
+                      <div>
+                        <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{type.name}</p>
+                        <p style={{ fontSize: '12px', color: COLORS.purple, fontWeight: 700 }}>₦{type.price.toLocaleString()}</p>
+                      </div>
+                      <span style={{
+                        fontSize: '10.5px', fontWeight: 700, padding: '4px 8px', borderRadius: '7px',
+                        background: isAvailable ? '#f0fdf4' : '#fef2f2',
+                        color: isAvailable ? COLORS.green : COLORS.red
+                      }}>
+                        {isAvailable ? 'Available' : 'Not Available'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </>
+            )}
+
+            <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px', marginTop: usingTypes ? '10px' : 0 }}>Customer Name</p>
             <input
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
@@ -205,17 +311,19 @@ export default function AddGuest() {
                   onChange={(e) => setAmountPaid(e.target.value.replace(/[^0-9.]/g, ''))}
                   placeholder="18000"
                   inputMode="decimal"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', boxSizing: 'border-box' }}
+                  disabled={usingTypes}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', boxSizing: 'border-box', background: usingTypes ? '#f1f5f9' : 'white' }}
                 />
               </div>
             </div>
 
             <div
-              onClick={saving ? undefined : handleSave}
+              onClick={saving || (usingTypes && !selectedType) ? undefined : handleSave}
               style={{
-                background: COLORS.purple, color: 'white', textAlign: 'center', padding: '12px',
-                borderRadius: '10px', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer',
-                opacity: saving ? 0.6 : 1
+                background: saving || (usingTypes && !selectedType) ? '#94a3b8' : COLORS.purple,
+                color: 'white', textAlign: 'center', padding: '12px',
+                borderRadius: '10px', fontWeight: 700, fontSize: '13.5px',
+                cursor: saving || (usingTypes && !selectedType) ? 'not-allowed' : 'pointer'
               }}>
               {saving ? 'Saving...' : 'Save Guest Booking'}
             </div>
