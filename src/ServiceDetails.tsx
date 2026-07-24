@@ -36,6 +36,14 @@ type ServiceDetail = {
   companies: { business_name: string } | null
 }
 
+type SeatType = {
+  id: string
+  name: string
+  price: number
+  available: number
+  occupiedQuantity: number
+}
+
 function generateTicketCode(prefix: string) {
   const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
   return `${prefix}-${new Date().getFullYear()}-${rand}`
@@ -51,6 +59,9 @@ function ServiceDetails() {
   const [userId, setUserId] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [walletBalance, setWalletBalance] = useState(0)
+
+  const [seatTypes, setSeatTypes] = useState<SeatType[]>([])
+  const [selectedSeatTypeId, setSelectedSeatTypeId] = useState<string | null>(null)
 
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -80,16 +91,54 @@ function ServiceDetails() {
         .maybeSingle()
 
       setService(svc as any)
+
+      // Check if this listing has Inventory seat/ticket types set up (Premium companies only)
+      const { data: items } = await supabase
+        .from('inventory_items')
+        .select('id, name, price, total_quantity, occupied_quantity, reserved_quantity')
+        .eq('service_id', id)
+
+      if (items && items.length > 0) {
+        const itemIds = items.map((i) => i.id)
+        const { data: unitRows } = await supabase
+          .from('inventory_units')
+          .select('inventory_item_id')
+          .in('inventory_item_id', itemIds)
+
+        const maintCounts: Record<string, number> = {}
+        ;(unitRows || []).forEach((u: any) => {
+          maintCounts[u.inventory_item_id] = (maintCounts[u.inventory_item_id] || 0) + 1
+        })
+
+        const mapped: SeatType[] = items.map((i: any) => ({
+          id: i.id,
+          name: i.name,
+          price: Number(i.price) || 0,
+          available: i.total_quantity - i.occupied_quantity - i.reserved_quantity - (maintCounts[i.id] || 0),
+          occupiedQuantity: i.occupied_quantity,
+        }))
+        setSeatTypes(mapped)
+      }
+
       setLoading(false)
     }
     load()
   }, [id, navigate])
 
+  const usingSeatTypes = seatTypes.length > 0
+  const selectedSeat = seatTypes.find((s) => s.id === selectedSeatTypeId)
+  const activePrice = usingSeatTypes ? (selectedSeat?.price ?? 0) : Number(service?.price ?? 0)
+
   const handleBookNow = async () => {
     if (!service) return
     setMessage(null)
 
-    if (walletBalance < service.price) {
+    if (usingSeatTypes && !selectedSeat) {
+      setMessage({ type: 'error', text: `Please select a ${meta.unitLabel.toLowerCase().slice(0, -1)} type first.` })
+      return
+    }
+
+    if (walletBalance < activePrice) {
       setMessage({ type: 'error', text: 'Insufficient wallet balance. Please top up your wallet first.' })
       return
     }
@@ -101,8 +150,9 @@ function ServiceDetails() {
       user_id: userId,
       service_id: service.id,
       company_id: service.company_id,
+      inventory_item_id: selectedSeat?.id || null,
       quantity: 1,
-      amount_paid: service.price,
+      amount_paid: activePrice,
       commission_amount: 0,
       booking_status: 'confirmed',
       ticket_code: code,
@@ -115,7 +165,14 @@ function ServiceDetails() {
       return
     }
 
-    const newBalance = walletBalance - service.price
+    if (selectedSeat) {
+      await supabase
+        .from('inventory_items')
+        .update({ occupied_quantity: selectedSeat.occupiedQuantity + 1 })
+        .eq('id', selectedSeat.id)
+    }
+
+    const newBalance = walletBalance - activePrice
     const { error: walletErr } = await supabase
       .from('wallets')
       .update({ balance: newBalance })
@@ -137,7 +194,7 @@ function ServiceDetails() {
       user_id: userId,
       wallet_id: walletRow?.id,
       transaction_type: 'payment',
-      amount: service.price,
+      amount: activePrice,
       status: 'successful',
     })
 
@@ -225,24 +282,67 @@ function ServiceDetails() {
           </div>
         )}
 
-        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Price</span>
-            <span style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary }}>₦{Number(service.price).toLocaleString()}</span>
-          </div>
-          {service.departure_time && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+        {service.departure_time && (
+          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Departure</span>
               <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{new Date(service.departure_time).toLocaleString()}</span>
             </div>
-          )}
-          {service.seats_available !== null && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '13px', color: COLORS.textMuted }}>{meta.unitLabel} available</span>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{service.seats_available}</span>
+          </div>
+        )}
+
+        {usingSeatTypes ? (
+          <div style={{ marginBottom: '16px' }}>
+            <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Select a {meta.unitLabel.slice(0, -1)} Type</p>
+            {seatTypes.map((seat) => {
+              const isAvailable = seat.available > 0
+              const isSelected = selectedSeatTypeId === seat.id
+              return (
+                <div
+                  key={seat.id}
+                  onClick={() => isAvailable && setSelectedSeatTypeId(seat.id)}
+                  style={{
+                    background: COLORS.card,
+                    borderRadius: '14px',
+                    padding: '14px',
+                    marginBottom: '10px',
+                    border: isSelected ? `2px solid ${COLORS.primary}` : '2px solid transparent',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+                    cursor: isAvailable ? 'pointer' : 'not-allowed',
+                    opacity: isAvailable ? 1 : 0.5,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>{seat.name}</p>
+                    <p style={{ fontSize: '13px', color: COLORS.primary, fontWeight: 700, marginTop: '2px' }}>₦{seat.price.toLocaleString()}</p>
+                  </div>
+                  <span style={{
+                    fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px',
+                    background: isAvailable ? '#f0fdf4' : '#fef2f2',
+                    color: isAvailable ? COLORS.green : COLORS.red
+                  }}>
+                    {isAvailable ? 'Available' : 'Not Available'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Price</span>
+              <span style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary }}>₦{Number(service.price).toLocaleString()}</span>
             </div>
-          )}
-        </div>
+            {service.seats_available !== null && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '13px', color: COLORS.textMuted }}>{meta.unitLabel} available</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{service.seats_available}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -268,13 +368,13 @@ function ServiceDetails() {
 
         <button
           onClick={handleBookNow}
-          disabled={booking}
+          disabled={booking || (usingSeatTypes && !selectedSeat)}
           style={{
-            width: '100%', padding: '15px', background: booking ? '#94a3b8' : COLORS.secondary,
+            width: '100%', padding: '15px', background: booking || (usingSeatTypes && !selectedSeat) ? '#94a3b8' : COLORS.secondary,
             color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px',
             cursor: booking ? 'not-allowed' : 'pointer'
           }}>
-          {booking ? 'Processing...' : `Book Now — ₦${Number(service.price).toLocaleString()}`}
+          {booking ? 'Processing...' : `Book Now — ₦${activePrice.toLocaleString()}`}
         </button>
       </div>
     </div>
