@@ -42,6 +42,7 @@ export default function AddGuest() {
   const [quantity, setQuantity] = useState('1')
   const [amountPaid, setAmountPaid] = useState('')
   const [bookingDetails, setBookingDetails] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('cash')
   const [saving, setSaving] = useState(false)
   const [successCode, setSuccessCode] = useState<string | null>(null)
 
@@ -123,7 +124,21 @@ export default function AddGuest() {
   const handleSelectType = (type: InvType) => {
     if (type.available <= 0) return
     setSelectedTypeId(type.id)
+    setQuantity('1')
     setAmountPaid(String(type.price))
+  }
+
+  const handleQuantityChange = (val: string) => {
+    let clean = val.replace(/[^0-9]/g, '')
+    if (selectedType && clean) {
+      const num = Math.min(parseInt(clean, 10), selectedType.available)
+      clean = String(num)
+    }
+    setQuantity(clean)
+    if (selectedType) {
+      const qty = parseInt(clean, 10) || 0
+      setAmountPaid(String(selectedType.price * qty))
+    }
   }
 
   const handleSave = async () => {
@@ -152,6 +167,7 @@ export default function AddGuest() {
       commission_amount: commission,
       booking_status: 'confirmed',
       booking_source: 'offline',
+      payment_method: paymentMethod,
       booking_details: bookingDetails.trim() || null,
       ticket_code: ticketCode,
       checked_in: true,
@@ -164,9 +180,10 @@ export default function AddGuest() {
     }
 
     if (selectedType) {
+      const qty = parseInt(quantity, 10) || 1
       await supabase
         .from('inventory_items')
-        .update({ occupied_quantity: selectedType.occupiedQuantity + 1 })
+        .update({ occupied_quantity: selectedType.occupiedQuantity + qty })
         .eq('id', selectedType.id)
     }
 
@@ -178,6 +195,7 @@ export default function AddGuest() {
     setAmountPaid('')
     setBookingDetails('')
     setSelectedTypeId(null)
+    setPaymentMethod('cash')
   }
 
   if (loading) {
@@ -294,15 +312,20 @@ export default function AddGuest() {
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '14px', fontSize: '13px', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'none' }}
             />
 
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
               <div style={{ flex: 1 }}>
-                <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>Quantity</p>
+                <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>
+                  {usingTypes ? 'No. of Rooms/Seats' : 'Quantity'}
+                </p>
                 <input
                   value={quantity}
-                  onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ''))}
+                  onChange={(e) => handleQuantityChange(e.target.value)}
                   inputMode="numeric"
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', boxSizing: 'border-box' }}
                 />
+                {usingTypes && selectedType && (
+                  <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '4px' }}>{selectedType.available} available</p>
+                )}
               </div>
               <div style={{ flex: 2 }}>
                 <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>Amount Paid (₦)</p>
@@ -317,13 +340,30 @@ export default function AddGuest() {
               </div>
             </div>
 
+            <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>Payment Method</p>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              {(['cash', 'transfer', 'pos'] as const).map((method) => (
+                <div
+                  key={method}
+                  onClick={() => setPaymentMethod(method)}
+                  style={{
+                    flex: 1, textAlign: 'center', padding: '9px 4px', borderRadius: '10px', cursor: 'pointer',
+                    background: paymentMethod === method ? COLORS.purple : '#f1f5f9',
+                    color: paymentMethod === method ? 'white' : COLORS.textMuted,
+                    fontWeight: 700, fontSize: '12px', textTransform: 'capitalize'
+                  }}>
+                  {method === 'pos' ? 'POS' : method}
+                </div>
+              ))}
+            </div>
+
             <div
-              onClick={saving || (usingTypes && !selectedType) ? undefined : handleSave}
+              onClick={saving || (usingTypes && (!selectedType || !quantity || parseInt(quantity, 10) < 1)) ? undefined : handleSave}
               style={{
-                background: saving || (usingTypes && !selectedType) ? '#94a3b8' : COLORS.purple,
+                background: saving || (usingTypes && (!selectedType || !quantity || parseInt(quantity, 10) < 1)) ? '#94a3b8' : COLORS.purple,
                 color: 'white', textAlign: 'center', padding: '12px',
                 borderRadius: '10px', fontWeight: 700, fontSize: '13.5px',
-                cursor: saving || (usingTypes && !selectedType) ? 'not-allowed' : 'pointer'
+                cursor: saving || (usingTypes && (!selectedType || !quantity)) ? 'not-allowed' : 'pointer'
               }}>
               {saving ? 'Saving...' : 'Save Guest Booking'}
             </div>
