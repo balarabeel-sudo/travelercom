@@ -50,6 +50,11 @@ export default function InventoryManagement() {
   const [price, setPrice] = useState('')
   const [serviceId, setServiceId] = useState('')
   const [saving, setSaving] = useState(false)
+  const [holidays, setHolidays] = useState<{ id: string; date: string; label: string | null }[]>([])
+  const [showHolidayForm, setShowHolidayForm] = useState(false)
+  const [holidayDate, setHolidayDate] = useState('')
+  const [holidayLabel, setHolidayLabel] = useState('')
+  const [savingHoliday, setSavingHoliday] = useState(false)
 
   const load = async () => {
     const { data: userData } = await supabase.auth.getUser()
@@ -63,6 +68,7 @@ export default function InventoryManagement() {
 
     if (!company) { setLoading(false); return }
     setCompanyId(company.id)
+    loadHolidays(company.id)
 
     const { data: serviceRows } = await supabase
       .from('services')
@@ -101,6 +107,15 @@ export default function InventoryManagement() {
     setLoading(false)
   }
 
+  const loadHolidays = async (compId: string) => {
+    const { data } = await supabase
+      .from('company_holidays')
+      .select('id, date, label')
+      .eq('company_id', compId)
+      .order('date', { ascending: true })
+    setHolidays(data || [])
+  }
+
   useEffect(() => { load() }, [])
 
   const handleAdd = async () => {
@@ -120,6 +135,27 @@ export default function InventoryManagement() {
     setShowForm(false)
     setSaving(false)
     load()
+  }
+
+  const addHoliday = async () => {
+    if (!companyId || !holidayDate) return
+    setSavingHoliday(true)
+    await supabase.from('company_holidays').insert({
+      company_id: companyId,
+      date: holidayDate,
+      label: holidayLabel.trim() || null,
+    })
+    setHolidayDate('')
+    setHolidayLabel('')
+    setShowHolidayForm(false)
+    setSavingHoliday(false)
+    loadHolidays(companyId)
+  }
+
+  const deleteHoliday = async (holidayId: string) => {
+    if (!companyId) return
+    await supabase.from('company_holidays').delete().eq('id', holidayId)
+    loadHolidays(companyId)
   }
 
   const available = (item: InventoryItem) =>
@@ -181,6 +217,64 @@ export default function InventoryManagement() {
           <SummaryCard label="Booked" value={totals.booked} color={COLORS.primary} />
           <SummaryCard label="Maintenance" value={totals.maintenance} color={COLORS.amber} />
         </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>Public Holidays</p>
+          <div onClick={() => setShowHolidayForm(!showHolidayForm)} style={{ color: COLORS.purple, fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' }}>
+            + Add Date
+          </div>
+        </div>
+
+        {showHolidayForm && (
+          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+            <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '6px' }}>Date</p>
+            <input
+              value={holidayDate}
+              onChange={(e) => setHolidayDate(e.target.value)}
+              type="date"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }}
+            />
+            <input
+              value={holidayLabel}
+              onChange={(e) => setHolidayLabel(e.target.value)}
+              placeholder="Label, e.g. Sallah, Christmas (optional)"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '12px', fontSize: '13px', boxSizing: 'border-box' }}
+            />
+            <div
+              onClick={savingHoliday ? undefined : addHoliday}
+              style={{
+                background: COLORS.purple, color: 'white', textAlign: 'center', padding: '11px',
+                borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: savingHoliday ? 0.6 : 1
+              }}>
+              {savingHoliday ? 'Saving...' : 'Save Holiday Date'}
+            </div>
+          </div>
+        )}
+
+        {holidays.length === 0 ? (
+          <div style={{ background: COLORS.card, padding: '18px', textAlign: 'center', borderRadius: '14px', color: COLORS.textMuted, fontSize: '12.5px', marginBottom: '24px' }}>
+            No public holiday dates set. Weekday/Weekend pricing will still apply.
+          </div>
+        ) : (
+          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '4px 16px', marginBottom: '24px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+            {holidays.map((h, i) => (
+              <div key={h.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '12px 0', borderBottom: i < holidays.length - 1 ? `1px solid ${COLORS.border}` : 'none'
+              }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>
+                    {new Date(h.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                  {h.label && <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{h.label}</p>}
+                </div>
+                <div onClick={() => deleteHoliday(h.id)} style={{ cursor: 'pointer' }}>
+                  <Icon name="trash" size={16} color="#DC2626" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {showForm && (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
