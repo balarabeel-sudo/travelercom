@@ -30,6 +30,8 @@ type RoomType = {
   id: string
   name: string
   price: number
+  weekendPrice: number | null
+  holidayPrice: number | null
   available: number
   occupiedQuantity: number
 }
@@ -50,6 +52,9 @@ function HotelDetails() {
 
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<string | null>(null)
+  const [holidayDates, setHolidayDates] = useState<string[]>([])
+  const [checkInDate, setCheckInDate] = useState('')
+  const [checkOutDate, setCheckOutDate] = useState('')
 
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -83,7 +88,7 @@ function HotelDetails() {
       // Check if this listing has Inventory room types set up (Premium companies only)
       const { data: items } = await supabase
         .from('inventory_items')
-        .select('id, name, price, total_quantity, occupied_quantity, reserved_quantity')
+        .select('id, name, price, weekend_price, holiday_price, total_quantity, occupied_quantity, reserved_quantity')
         .eq('service_id', id)
 
       if (items && items.length > 0) {
@@ -102,10 +107,20 @@ function HotelDetails() {
           id: i.id,
           name: i.name,
           price: Number(i.price) || 0,
+          weekendPrice: i.weekend_price !== null ? Number(i.weekend_price) : null,
+          holidayPrice: i.holiday_price !== null ? Number(i.holiday_price) : null,
           available: i.total_quantity - i.occupied_quantity - i.reserved_quantity - (maintCounts[i.id] || 0),
           occupiedQuantity: i.occupied_quantity,
         }))
         setRoomTypes(mapped)
+
+        if (svc) {
+          const { data: holidayRows } = await supabase
+            .from('company_holidays')
+            .select('date')
+            .eq('company_id', (svc as any).company_id)
+          setHolidayDates((holidayRows || []).map((h: any) => h.date))
+        }
       }
 
       setLoading(false)
@@ -115,7 +130,36 @@ function HotelDetails() {
 
   const usingRoomTypes = roomTypes.length > 0
   const selectedRoom = roomTypes.find((r) => r.id === selectedRoomTypeId)
-  const activePrice = usingRoomTypes ? (selectedRoom?.price ?? 0) : (service?.price ?? 0)
+
+  const nights = (() => {
+    if (!checkInDate || !checkOutDate) return 0
+    const inD = new Date(checkInDate)
+    const outD = new Date(checkOutDate)
+    const diff = Math.round((outD.getTime() - inD.getTime()) / 86400000)
+    return diff > 0 ? diff : 0
+  })()
+
+  const priceForDate = (dateStr: string): number => {
+    if (!selectedRoom) return 0
+    if (holidayDates.includes(dateStr)) return selectedRoom.holidayPrice ?? selectedRoom.price
+    const day = new Date(dateStr).getDay()
+    if (day === 0 || day === 6) return selectedRoom.weekendPrice ?? selectedRoom.price
+    return selectedRoom.price
+  }
+
+  const calculatedTotal = (() => {
+    if (!usingRoomTypes) return (service?.price ?? 0) * (nights || 1)
+    if (!selectedRoom || nights <= 0) return 0
+    let total = 0
+    const cursor = new Date(checkInDate)
+    for (let i = 0; i < nights; i++) {
+      total += priceForDate(cursor.toISOString().split('T')[0])
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    return total
+  })()
+
+  const activePrice = calculatedTotal
 
   const handleBookNow = async () => {
     if (!service) return
@@ -123,6 +167,11 @@ function HotelDetails() {
 
     if (usingRoomTypes && !selectedRoom) {
       setMessage({ type: 'error', text: 'Please select a room type first.' })
+      return
+    }
+
+    if (!checkInDate || !checkOutDate || nights <= 0) {
+      setMessage({ type: 'error', text: 'Please select valid check-in and check-out dates.' })
       return
     }
 
@@ -145,6 +194,8 @@ function HotelDetails() {
       booking_status: 'confirmed',
       ticket_code: code,
       customer_name: displayName || null,
+      check_in_date: checkInDate,
+      check_out_date: checkOutDate,
     })
 
     if (bookingErr) {
@@ -335,6 +386,38 @@ function HotelDetails() {
         )}
 
         <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+          <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Check-in / Check-out</p>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: nights > 0 ? '10px' : 0 }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>Check-in</p>
+              <input
+                type="date"
+                value={checkInDate}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setCheckInDate(e.target.value)}
+                style={{ width: '100%', padding: '9px 10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, fontSize: '12.5px', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>Check-out</p>
+              <input
+                type="date"
+                value={checkOutDate}
+                min={checkInDate || new Date().toISOString().split('T')[0]}
+                onChange={(e) => setCheckOutDate(e.target.value)}
+                style={{ width: '100%', padding: '9px 10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, fontSize: '12.5px', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+          {nights > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '10px', borderTop: `1px solid ${COLORS.border}` }}>
+              <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>{nights} night{nights > 1 ? 's' : ''} × applicable rate</span>
+              <span style={{ fontSize: '14px', fontWeight: 800, color: COLORS.primary }}>₦{calculatedTotal.toLocaleString()}</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '12px', color: COLORS.textMuted }}>Your wallet balance</span>
             <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>₦{walletBalance.toLocaleString()}</span>
@@ -360,11 +443,11 @@ function HotelDetails() {
 
         <button
           onClick={handleBookNow}
-          disabled={booking || (usingRoomTypes && !selectedRoom)}
+          disabled={booking || (usingRoomTypes && !selectedRoom) || nights <= 0}
           style={{
             width: '100%',
             padding: '15px',
-            background: booking || (usingRoomTypes && !selectedRoom) ? '#94a3b8' : COLORS.secondary,
+            background: booking || (usingRoomTypes && !selectedRoom) || nights <= 0 ? '#94a3b8' : COLORS.secondary,
             color: 'white',
             border: 'none',
             borderRadius: '12px',
