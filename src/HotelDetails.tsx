@@ -33,7 +33,6 @@ type RoomType = {
   weekendPrice: number | null
   holidayPrice: number | null
   available: number
-  occupiedQuantity: number
 }
 
 function generateTicketCode(prefix: string) {
@@ -59,6 +58,7 @@ function HotelDetails() {
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [ticketCode, setTicketCode] = useState('')
+  const [assignedUnitNumber, setAssignedUnitNumber] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -88,19 +88,21 @@ function HotelDetails() {
       // Check if this listing has Inventory room types set up (Premium companies only)
       const { data: items } = await supabase
         .from('inventory_items')
-        .select('id, name, price, weekend_price, holiday_price, total_quantity, occupied_quantity, reserved_quantity')
+        .select('id, name, price, weekend_price, holiday_price')
         .eq('service_id', id)
 
       if (items && items.length > 0) {
         const itemIds = items.map((i) => i.id)
         const { data: unitRows } = await supabase
           .from('inventory_units')
-          .select('inventory_item_id')
+          .select('inventory_item_id, status')
           .in('inventory_item_id', itemIds)
 
-        const maintCounts: Record<string, number> = {}
+        const availCounts: Record<string, number> = {}
         ;(unitRows || []).forEach((u: any) => {
-          maintCounts[u.inventory_item_id] = (maintCounts[u.inventory_item_id] || 0) + 1
+          if (u.status === 'available') {
+            availCounts[u.inventory_item_id] = (availCounts[u.inventory_item_id] || 0) + 1
+          }
         })
 
         const mapped: RoomType[] = items.map((i: any) => ({
@@ -109,8 +111,7 @@ function HotelDetails() {
           price: Number(i.price) || 0,
           weekendPrice: i.weekend_price !== null ? Number(i.weekend_price) : null,
           holidayPrice: i.holiday_price !== null ? Number(i.holiday_price) : null,
-          available: i.total_quantity - i.occupied_quantity - i.reserved_quantity - (maintCounts[i.id] || 0),
-          occupiedQuantity: i.occupied_quantity,
+          available: availCounts[i.id] || 0,
         }))
         setRoomTypes(mapped)
 
@@ -183,7 +184,29 @@ function HotelDetails() {
     setBooking(true)
     const code = generateTicketCode('HTL')
 
-    const { error: bookingErr } = await supabase.from('bookings').insert({
+    let assignedUnitId: string | null = null
+    let assignedNumber = ''
+
+    if (selectedRoom) {
+      const { data: freeUnit } = await supabase
+        .from('inventory_units')
+        .select('id, unit_number')
+        .eq('inventory_item_id', selectedRoom.id)
+        .eq('status', 'available')
+        .order('unit_number', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (!freeUnit) {
+        setBooking(false)
+        setMessage({ type: 'error', text: 'Sorry, this room type just sold out. Please pick another type.' })
+        return
+      }
+      assignedUnitId = freeUnit.id
+      assignedNumber = freeUnit.unit_number
+    }
+
+    const { data: newBooking, error: bookingErr } = await supabase.from('bookings').insert({
       user_id: userId,
       service_id: service.id,
       company_id: service.company_id,
@@ -196,7 +219,8 @@ function HotelDetails() {
       customer_name: displayName || null,
       check_in_date: checkInDate,
       check_out_date: checkOutDate,
-    })
+      assigned_unit_number: assignedNumber || null,
+    }).select('id').single()
 
     if (bookingErr) {
       setBooking(false)
@@ -204,11 +228,11 @@ function HotelDetails() {
       return
     }
 
-    if (selectedRoom) {
+    if (assignedUnitId) {
       await supabase
-        .from('inventory_items')
-        .update({ occupied_quantity: selectedRoom.occupiedQuantity + 1 })
-        .eq('id', selectedRoom.id)
+        .from('inventory_units')
+        .update({ status: 'occupied', booking_id: newBooking?.id || null })
+        .eq('id', assignedUnitId)
     }
 
     const newBalance = walletBalance - activePrice
@@ -239,6 +263,7 @@ function HotelDetails() {
 
     setBooking(false)
     setWalletBalance(newBalance)
+    setAssignedUnitNumber(assignedNumber)
     setTicketCode(code)
     setMessage({ type: 'success', text: 'Booking confirmed!' })
   }
@@ -273,6 +298,12 @@ function HotelDetails() {
           <div style={{ background: COLORS.bg, borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
             <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>YOUR TICKET CODE</p>
             <p style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, letterSpacing: '1px' }}>{ticketCode}</p>
+            {assignedUnitNumber && (
+              <>
+                <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '12px', marginBottom: '4px' }}>YOUR ROOM</p>
+                <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.primary }}>Room {assignedUnitNumber}</p>
+              </>
+            )}
           </div>
 
           <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '20px' }}>
