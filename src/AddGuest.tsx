@@ -29,7 +29,7 @@ const DETAIL_PLACEHOLDER: Record<string, string> = {
 }
 
 type ServiceOption = { id: string; title: string; category: string; commission_rate: number | null; price: number }
-type InvType = { id: string; name: string; price: number; available: number; occupiedQuantity: number }
+type InvType = { id: string; name: string; price: number; available: number }
 
 export default function AddGuest() {
   const navigate = useNavigate()
@@ -45,6 +45,7 @@ export default function AddGuest() {
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [saving, setSaving] = useState(false)
   const [successCode, setSuccessCode] = useState<string | null>(null)
+  const [assignedUnitNumbers, setAssignedUnitNumbers] = useState<string>('')
 
   const [invTypes, setInvTypes] = useState<InvType[]>([])
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null)
@@ -83,27 +84,28 @@ export default function AddGuest() {
 
       const { data: items } = await supabase
         .from('inventory_items')
-        .select('id, name, price, total_quantity, occupied_quantity, reserved_quantity')
+        .select('id, name, price')
         .eq('service_id', serviceId)
 
       if (items && items.length > 0) {
         const itemIds = items.map((i) => i.id)
         const { data: unitRows } = await supabase
           .from('inventory_units')
-          .select('inventory_item_id')
+          .select('inventory_item_id, status')
           .in('inventory_item_id', itemIds)
 
-        const maintCounts: Record<string, number> = {}
+        const availCounts: Record<string, number> = {}
         ;(unitRows || []).forEach((u: any) => {
-          maintCounts[u.inventory_item_id] = (maintCounts[u.inventory_item_id] || 0) + 1
+          if (u.status === 'available') {
+            availCounts[u.inventory_item_id] = (availCounts[u.inventory_item_id] || 0) + 1
+          }
         })
 
         const mapped: InvType[] = items.map((i: any) => ({
           id: i.id,
           name: i.name,
           price: Number(i.price) || 0,
-          available: i.total_quantity - i.occupied_quantity - i.reserved_quantity - (maintCounts[i.id] || 0),
-          occupiedQuantity: i.occupied_quantity,
+          available: availCounts[i.id] || 0,
         }))
         setInvTypes(mapped)
         setSelectedTypeId(null)
@@ -155,14 +157,32 @@ export default function AddGuest() {
     const rate = Number(selectedService?.commission_rate ?? 3)
     const amount = parseFloat(amountPaid)
     const commission = amount * (rate / 100)
+    const qty = parseInt(quantity, 10) || 1
 
-    const { error } = await supabase.from('bookings').insert({
+    let assignedUnits: { id: string; unit_number: string }[] = []
+    if (selectedType) {
+      const { data: freeUnits } = await supabase
+        .from('inventory_units')
+        .select('id, unit_number')
+        .eq('inventory_item_id', selectedType.id)
+        .eq('status', 'available')
+        .order('unit_number', { ascending: true })
+        .limit(qty)
+
+      if (!freeUnits || freeUnits.length < qty) {
+        setSaving(false)
+        return
+      }
+      assignedUnits = freeUnits
+    }
+
+    const { data: newBooking, error } = await supabase.from('bookings').insert({
       service_id: serviceId,
       company_id: companyId,
       inventory_item_id: selectedType?.id || null,
       customer_name: customerName.trim(),
       customer_phone: customerPhone.trim() || null,
-      quantity: parseInt(quantity, 10) || 1,
+      quantity: qty,
       amount_paid: amount,
       commission_amount: commission,
       booking_status: 'confirmed',
@@ -172,23 +192,24 @@ export default function AddGuest() {
       ticket_code: ticketCode,
       checked_in: true,
       checked_in_at: new Date().toISOString(),
-    })
+      assigned_unit_number: assignedUnits.map((u) => u.unit_number).join(', ') || null,
+    }).select('id').single()
 
     if (error) {
       setSaving(false)
       return
     }
 
-    if (selectedType) {
-      const qty = parseInt(quantity, 10) || 1
+    if (assignedUnits.length > 0) {
       await supabase
-        .from('inventory_items')
-        .update({ occupied_quantity: selectedType.occupiedQuantity + qty })
-        .eq('id', selectedType.id)
+        .from('inventory_units')
+        .update({ status: 'occupied', booking_id: newBooking?.id || null })
+        .in('id', assignedUnits.map((u) => u.id))
     }
 
     setSaving(false)
     setSuccessCode(ticketCode)
+    setAssignedUnitNumbers(assignedUnits.map((u) => u.unit_number).join(', '))
     setCustomerName('')
     setCustomerPhone('')
     setQuantity('1')
@@ -227,6 +248,9 @@ export default function AddGuest() {
           }}>
             <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.green, marginBottom: '4px' }}>✅ Guest booking saved</p>
             <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{successCode}</p>
+            {assignedUnitNumbers && (
+              <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.purple, marginTop: '4px' }}>Assigned: {assignedUnitNumbers}</p>
+            )}
             <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '4px' }}>Now visible in booking history alongside online bookings</p>
           </div>
         )}
