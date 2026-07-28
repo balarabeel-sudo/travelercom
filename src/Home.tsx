@@ -225,7 +225,7 @@ if (accountType === 'company') {
             <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Company: {displayName}</p>
           </div>
           <div
-            onClick={() => navigate('/account')}
+         onClick={() => navigate('/company-profile')}  
             title="Company Profile"
             style={{
               width: '34px', height: '34px', borderRadius: '50%', background: COLORS.secondary,
