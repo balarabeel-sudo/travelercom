@@ -24,6 +24,7 @@ import InventoryManagement from './InventoryManagement'
 import InventoryDetail from './InventoryDetail'
 import Analytics from './Analytics'
 import Promotions from './Promotions'
+import Ratings from './Ratings'
 import AddGuest from './AddGuest'
 
 function App() {
@@ -55,6 +56,7 @@ function App() {
         <Route path="/inventory/:id" element={<InventoryDetail />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/promotions" element={<Promotions />} />
+        <Route path="/reviews" element={<Ratings />} /> 
         <Route path="/add-guest" element={<AddGuest />} />
       </Routes>
     </Router>
