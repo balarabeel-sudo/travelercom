@@ -21,7 +21,7 @@ export default function CompanyMenu() {
   }
 
   const items = [
-    { icon: 'user', label: 'Company Profile', action: () => navigate('/account') },
+    { icon: 'user', label: 'Company Profile', action: () => navigate('/company-profile') },
     { icon: 'bell', label: 'Notifications', action: () => navigate('/notifications') },
     { icon: 'helpCircle', label: 'Help & Support', action: () => navigate('/support') },
     { icon: 'settings', label: 'Settings', action: () => navigate('/settings') },
