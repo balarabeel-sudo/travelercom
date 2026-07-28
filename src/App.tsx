@@ -53,7 +53,6 @@ function App() {
         <Route path="/inventory" element={<InventoryManagement />} />
         <Route path="/inventory/:id" element={<InventoryDetail />} />
         <Route path="/analytics" element={<Analytics />} />
-      </Routes>
         <Route path="/add-guest" element={<AddGuest />} />
       </Routes>
     </Router>
