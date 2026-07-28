@@ -54,6 +54,7 @@ function HotelDetails() {
   const [holidayDates, setHolidayDates] = useState<string[]>([])
   const [checkInDate, setCheckInDate] = useState('')
   const [checkOutDate, setCheckOutDate] = useState('')
+  const [activePromo, setActivePromo] = useState<{ title: string; discount_type: string; discount_value: number } | null>(null)
 
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -84,6 +85,18 @@ function HotelDetails() {
         .maybeSingle()
 
       setService(svc as any)
+
+      const today = new Date().toISOString().split('T')[0]
+      const { data: promoRows } = await supabase
+        .from('promotions')
+        .select('title, discount_type, discount_value, start_date, end_date')
+        .eq('service_id', id)
+        .eq('active', true)
+
+      const validPromo = (promoRows || []).find((p: any) =>
+        (!p.start_date || p.start_date <= today) && (!p.end_date || p.end_date >= today)
+      )
+      if (validPromo) setActivePromo(validPromo as any)
 
       // Check if this listing has Inventory room types set up (Premium companies only)
       const { data: items } = await supabase
@@ -160,7 +173,15 @@ function HotelDetails() {
     return total
   })()
 
-  const activePrice = calculatedTotal
+  const discountedTotal = (() => {
+    if (!activePromo || calculatedTotal <= 0) return calculatedTotal
+    if (activePromo.discount_type === 'percentage') {
+      return Math.max(0, calculatedTotal * (1 - activePromo.discount_value / 100))
+    }
+    return Math.max(0, calculatedTotal - activePromo.discount_value)
+  })()
+
+  const activePrice = discountedTotal
 
   const handleBookNow = async () => {
     if (!service) return
@@ -440,10 +461,26 @@ function HotelDetails() {
               />
             </div>
           </div>
+          {activePromo && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px', background: '#F5F3FF',
+              border: '1px solid #DDD6FE', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px'
+            }}>
+              <span style={{ fontSize: '13px' }}>🏷️</span>
+              <p style={{ fontSize: '11.5px', fontWeight: 700, color: '#6B21A8' }}>
+                {activePromo.title} — {activePromo.discount_type === 'percentage' ? `${activePromo.discount_value}% OFF` : `₦${activePromo.discount_value.toLocaleString()} OFF`}
+              </p>
+            </div>
+          )}
           {nights > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '10px', borderTop: `1px solid ${COLORS.border}` }}>
               <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>{nights} night{nights > 1 ? 's' : ''} × applicable rate</span>
-              <span style={{ fontSize: '14px', fontWeight: 800, color: COLORS.primary }}>₦{calculatedTotal.toLocaleString()}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {activePromo && (
+                  <span style={{ fontSize: '11.5px', color: COLORS.textMuted, textDecoration: 'line-through' }}>₦{calculatedTotal.toLocaleString()}</span>
+                )}
+                <span style={{ fontSize: '14px', fontWeight: 800, color: COLORS.primary }}>₦{discountedTotal.toLocaleString()}</span>
+              </span>
             </div>
           )}
         </div>
