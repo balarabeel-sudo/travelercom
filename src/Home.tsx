@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { releaseExpiredUnits } from './inventoryUtils'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -116,6 +117,7 @@ function Home() {
         if (existing) {
           setCompanyApproval(existing.approval_status)
           setCompanyPlan(existing.plan || 'free')
+          releaseExpiredUnits(companyId)
         } else {
           const { data: created } = await supabase
             .from('companies')
