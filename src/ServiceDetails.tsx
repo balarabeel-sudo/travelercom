@@ -66,6 +66,7 @@ function ServiceDetails() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [ticketCode, setTicketCode] = useState('')
   const [assignedUnitNumber, setAssignedUnitNumber] = useState('')
+  const [activePromo, setActivePromo] = useState<{ title: string; discount_type: string; discount_value: number } | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -91,6 +92,18 @@ function ServiceDetails() {
         .maybeSingle()
 
       setService(svc as any)
+
+      const today = new Date().toISOString().split('T')[0]
+      const { data: promoRows } = await supabase
+        .from('promotions')
+        .select('title, discount_type, discount_value, start_date, end_date')
+        .eq('service_id', id)
+        .eq('active', true)
+
+      const validPromo = (promoRows || []).find((p: any) =>
+        (!p.start_date || p.start_date <= today) && (!p.end_date || p.end_date >= today)
+      )
+      if (validPromo) setActivePromo(validPromo as any)
 
       // Check if this listing has Inventory seat/ticket types set up (Premium companies only)
       const { data: items } = await supabase
@@ -128,7 +141,14 @@ function ServiceDetails() {
 
   const usingSeatTypes = seatTypes.length > 0
   const selectedSeat = seatTypes.find((s) => s.id === selectedSeatTypeId)
-  const activePrice = usingSeatTypes ? (selectedSeat?.price ?? 0) : Number(service?.price ?? 0)
+  const baseSeatPrice = usingSeatTypes ? (selectedSeat?.price ?? 0) : Number(service?.price ?? 0)
+  const activePrice = (() => {
+    if (!activePromo || baseSeatPrice <= 0) return baseSeatPrice
+    if (activePromo.discount_type === 'percentage') {
+      return Math.max(0, baseSeatPrice * (1 - activePromo.discount_value / 100))
+    }
+    return Math.max(0, baseSeatPrice - activePromo.discount_value)
+  })()
 
   const handleBookNow = async () => {
     if (!service) return
@@ -319,6 +339,18 @@ function ServiceDetails() {
               <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Departure</span>
               <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{new Date(service.departure_time).toLocaleString()}</span>
             </div>
+          </div>
+        )}
+
+        {activePromo && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '6px', background: '#F5F3FF',
+            border: '1px solid #DDD6FE', borderRadius: '8px', padding: '8px 10px', marginBottom: '16px'
+          }}>
+            <span style={{ fontSize: '13px' }}>🏷️</span>
+            <p style={{ fontSize: '11.5px', fontWeight: 700, color: '#6B21A8' }}>
+              {activePromo.title} — {activePromo.discount_type === 'percentage' ? `${activePromo.discount_value}% OFF` : `₦${activePromo.discount_value.toLocaleString()} OFF`}
+            </p>
           </div>
         )}
 
