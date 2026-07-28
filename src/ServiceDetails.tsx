@@ -41,7 +41,6 @@ type SeatType = {
   name: string
   price: number
   available: number
-  occupiedQuantity: number
 }
 
 function generateTicketCode(prefix: string) {
@@ -66,6 +65,7 @@ function ServiceDetails() {
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [ticketCode, setTicketCode] = useState('')
+  const [assignedUnitNumber, setAssignedUnitNumber] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -95,27 +95,28 @@ function ServiceDetails() {
       // Check if this listing has Inventory seat/ticket types set up (Premium companies only)
       const { data: items } = await supabase
         .from('inventory_items')
-        .select('id, name, price, total_quantity, occupied_quantity, reserved_quantity')
+        .select('id, name, price')
         .eq('service_id', id)
 
       if (items && items.length > 0) {
         const itemIds = items.map((i) => i.id)
         const { data: unitRows } = await supabase
           .from('inventory_units')
-          .select('inventory_item_id')
+          .select('inventory_item_id, status')
           .in('inventory_item_id', itemIds)
 
-        const maintCounts: Record<string, number> = {}
+        const availCounts: Record<string, number> = {}
         ;(unitRows || []).forEach((u: any) => {
-          maintCounts[u.inventory_item_id] = (maintCounts[u.inventory_item_id] || 0) + 1
+          if (u.status === 'available') {
+            availCounts[u.inventory_item_id] = (availCounts[u.inventory_item_id] || 0) + 1
+          }
         })
 
         const mapped: SeatType[] = items.map((i: any) => ({
           id: i.id,
           name: i.name,
           price: Number(i.price) || 0,
-          available: i.total_quantity - i.occupied_quantity - i.reserved_quantity - (maintCounts[i.id] || 0),
-          occupiedQuantity: i.occupied_quantity,
+          available: availCounts[i.id] || 0,
         }))
         setSeatTypes(mapped)
       }
@@ -146,7 +147,29 @@ function ServiceDetails() {
     setBooking(true)
     const code = generateTicketCode(meta.prefix)
 
-    const { error: bookingErr } = await supabase.from('bookings').insert({
+    let assignedUnitId: string | null = null
+    let assignedNumber = ''
+
+    if (selectedSeat) {
+      const { data: freeUnit } = await supabase
+        .from('inventory_units')
+        .select('id, unit_number')
+        .eq('inventory_item_id', selectedSeat.id)
+        .eq('status', 'available')
+        .order('unit_number', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (!freeUnit) {
+        setBooking(false)
+        setMessage({ type: 'error', text: 'Sorry, this type just sold out. Please pick another.' })
+        return
+      }
+      assignedUnitId = freeUnit.id
+      assignedNumber = freeUnit.unit_number
+    }
+
+    const { data: newBooking, error: bookingErr } = await supabase.from('bookings').insert({
       user_id: userId,
       service_id: service.id,
       company_id: service.company_id,
@@ -157,7 +180,8 @@ function ServiceDetails() {
       booking_status: 'confirmed',
       ticket_code: code,
       customer_name: displayName || null,
-    })
+      assigned_unit_number: assignedNumber || null,
+    }).select('id').single()
 
     if (bookingErr) {
       setBooking(false)
@@ -165,11 +189,11 @@ function ServiceDetails() {
       return
     }
 
-    if (selectedSeat) {
+    if (assignedUnitId) {
       await supabase
-        .from('inventory_items')
-        .update({ occupied_quantity: selectedSeat.occupiedQuantity + 1 })
-        .eq('id', selectedSeat.id)
+        .from('inventory_units')
+        .update({ status: 'occupied', booking_id: newBooking?.id || null })
+        .eq('id', assignedUnitId)
     }
 
     const newBalance = walletBalance - activePrice
@@ -200,6 +224,7 @@ function ServiceDetails() {
 
     setBooking(false)
     setWalletBalance(newBalance)
+    setAssignedUnitNumber(assignedNumber)
     setTicketCode(code)
     setMessage({ type: 'success', text: 'Booking confirmed!' })
   }
@@ -234,6 +259,12 @@ function ServiceDetails() {
           <div style={{ background: COLORS.bg, borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
             <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>YOUR TICKET CODE</p>
             <p style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, letterSpacing: '1px' }}>{ticketCode}</p>
+            {assignedUnitNumber && (
+              <>
+                <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '12px', marginBottom: '4px' }}>YOUR {meta.unitLabel.slice(0, -1).toUpperCase()}</p>
+                <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.primary }}>{meta.unitLabel.slice(0, -1)} {assignedUnitNumber}</p>
+              </>
+            )}
           </div>
 
           <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '20px' }}>
