@@ -22,6 +22,7 @@ import GuestList from './GuestList'
 import CompanyMenu from './CompanyMenu'
 import InventoryManagement from './InventoryManagement'
 import InventoryDetail from './InventoryDetail'
+import Analytics from './Analytics'
 import AddGuest from './AddGuest'
 
 function App() {
@@ -51,6 +52,8 @@ function App() {
         <Route path="/company-menu" element={<CompanyMenu />} />
         <Route path="/inventory" element={<InventoryManagement />} />
         <Route path="/inventory/:id" element={<InventoryDetail />} />
+        <Route path="/analytics" element={<Analytics />} />
+      </Routes>
         <Route path="/add-guest" element={<AddGuest />} />
       </Routes>
     </Router>
