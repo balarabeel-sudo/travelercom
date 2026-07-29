@@ -51,6 +51,9 @@ function HotelDetails() {
 
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<string | null>(null)
+  const [unitOptions, setUnitOptions] = useState<{ id: string; unit_number: string }[]>([])
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
+  const [loadingUnits, setLoadingUnits] = useState(false)
   const [holidayDates, setHolidayDates] = useState<string[]>([])
   const [checkInDate, setCheckInDate] = useState('')
   const [checkOutDate, setCheckOutDate] = useState('')
@@ -145,6 +148,23 @@ function HotelDetails() {
   const usingRoomTypes = roomTypes.length > 0
   const selectedRoom = roomTypes.find((r) => r.id === selectedRoomTypeId)
 
+  useEffect(() => {
+    const fetchUnits = async () => {
+      if (!selectedRoomTypeId) { setUnitOptions([]); setSelectedUnitId(null); return }
+      setLoadingUnits(true)
+      const { data } = await supabase
+        .from('inventory_units')
+        .select('id, unit_number')
+        .eq('inventory_item_id', selectedRoomTypeId)
+        .eq('status', 'available')
+        .order('unit_number', { ascending: true })
+      setUnitOptions(data || [])
+      setSelectedUnitId(data && data.length > 0 ? data[0].id : null)
+      setLoadingUnits(false)
+    }
+    fetchUnits()
+  }, [selectedRoomTypeId])
+
   const nights = (() => {
     if (!checkInDate || !checkOutDate) return 0
     const inD = new Date(checkInDate)
@@ -187,8 +207,8 @@ function HotelDetails() {
     if (!service) return
     setMessage(null)
 
-    if (usingRoomTypes && !selectedRoom) {
-      setMessage({ type: 'error', text: 'Please select a room type first.' })
+    if (usingRoomTypes && !selectedUnitId) {
+      setMessage({ type: 'error', text: 'This room type just sold out. Please pick another type.' })
       return
     }
 
@@ -208,23 +228,31 @@ function HotelDetails() {
     let assignedUnitId: string | null = null
     let assignedNumber = ''
 
-    if (selectedRoom) {
-      const { data: freeUnit } = await supabase
+    if (selectedRoom && selectedUnitId) {
+      const chosen = unitOptions.find((u) => u.id === selectedUnitId)
+      const { data: claimed } = await supabase
         .from('inventory_units')
-        .select('id, unit_number')
-        .eq('inventory_item_id', selectedRoom.id)
+        .update({ status: 'occupied' })
+        .eq('id', selectedUnitId)
         .eq('status', 'available')
-        .order('unit_number', { ascending: true })
-        .limit(1)
+        .select('id, unit_number')
         .maybeSingle()
 
-      if (!freeUnit) {
+      if (!claimed) {
         setBooking(false)
-        setMessage({ type: 'error', text: 'Sorry, this room type just sold out. Please pick another type.' })
+        const { data: refreshed } = await supabase
+          .from('inventory_units')
+          .select('id, unit_number')
+          .eq('inventory_item_id', selectedRoom.id)
+          .eq('status', 'available')
+          .order('unit_number', { ascending: true })
+        setUnitOptions(refreshed || [])
+        setSelectedUnitId(refreshed && refreshed.length > 0 ? refreshed[0].id : null)
+        setMessage({ type: 'error', text: `Room ${chosen?.unit_number || ''} was just taken. Please pick another available number below.` })
         return
       }
-      assignedUnitId = freeUnit.id
-      assignedNumber = freeUnit.unit_number
+      assignedUnitId = claimed.id
+      assignedNumber = claimed.unit_number
     }
 
     const { data: newBooking, error: bookingErr } = await supabase.from('bookings').insert({
@@ -244,6 +272,9 @@ function HotelDetails() {
     }).select('id').single()
 
     if (bookingErr) {
+      if (assignedUnitId) {
+        await supabase.from('inventory_units').update({ status: 'available' }).eq('id', assignedUnitId)
+      }
       setBooking(false)
       setMessage({ type: 'error', text: 'Booking failed: ' + bookingErr.message })
       return
@@ -252,7 +283,7 @@ function HotelDetails() {
     if (assignedUnitId) {
       await supabase
         .from('inventory_units')
-        .update({ status: 'occupied', booking_id: newBooking?.id || null })
+        .update({ booking_id: newBooking?.id || null })
         .eq('id', assignedUnitId)
     }
 
@@ -421,6 +452,34 @@ function HotelDetails() {
                 </div>
               )
             })}
+
+            {selectedRoom && (
+              <div style={{ marginTop: '4px' }}>
+                <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, marginBottom: '8px' }}>Pick a Room Number</p>
+                {loadingUnits ? (
+                  <p style={{ fontSize: '12px', color: COLORS.textMuted }}>Loading available rooms...</p>
+                ) : unitOptions.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: COLORS.red }}>No rooms available for this type right now.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {unitOptions.map((u) => (
+                      <div
+                        key={u.id}
+                        onClick={() => setSelectedUnitId(u.id)}
+                        style={{
+                          minWidth: '44px', padding: '9px 6px', textAlign: 'center', borderRadius: '9px', cursor: 'pointer',
+                          background: selectedUnitId === u.id ? COLORS.primary : COLORS.card,
+                          color: selectedUnitId === u.id ? 'white' : COLORS.text,
+                          border: `1.5px solid ${selectedUnitId === u.id ? COLORS.primary : COLORS.border}`,
+                          fontWeight: 700, fontSize: '13px'
+                        }}>
+                        {u.unit_number}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
@@ -511,11 +570,11 @@ function HotelDetails() {
 
         <button
           onClick={handleBookNow}
-          disabled={booking || (usingRoomTypes && !selectedRoom) || nights <= 0}
+          disabled={booking || (usingRoomTypes && !selectedUnitId) || nights <= 0}
           style={{
             width: '100%',
             padding: '15px',
-            background: booking || (usingRoomTypes && !selectedRoom) || nights <= 0 ? '#94a3b8' : COLORS.secondary,
+            background: booking || (usingRoomTypes && !selectedUnitId) || nights <= 0 ? '#94a3b8' : COLORS.secondary,
             color: 'white',
             border: 'none',
             borderRadius: '12px',
