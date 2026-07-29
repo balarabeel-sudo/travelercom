@@ -50,6 +50,9 @@ export default function AddGuest() {
   const [invTypes, setInvTypes] = useState<InvType[]>([])
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null)
   const [loadingTypes, setLoadingTypes] = useState(false)
+  const [activePromo, setActivePromo] = useState<{ title: string; discount_type: string; discount_value: number } | null>(null)
+  const [unitOptions, setUnitOptions] = useState<{ id: string; unit_number: string }[]>([])
+  const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([])
 
   useEffect(() => {
     const load = async () => {
@@ -79,8 +82,19 @@ export default function AddGuest() {
 
   useEffect(() => {
     const loadTypes = async () => {
-      if (!serviceId) { setInvTypes([]); setSelectedTypeId(null); return }
+      if (!serviceId) { setInvTypes([]); setSelectedTypeId(null); setActivePromo(null); return }
       setLoadingTypes(true)
+
+      const today = new Date().toISOString().split('T')[0]
+      const { data: promoRows } = await supabase
+        .from('promotions')
+        .select('title, discount_type, discount_value, start_date, end_date')
+        .eq('service_id', serviceId)
+        .eq('active', true)
+      const validPromo = (promoRows || []).find((p: any) =>
+        (!p.start_date || p.start_date <= today) && (!p.end_date || p.end_date >= today)
+      )
+      setActivePromo((validPromo as any) || null)
 
       const { data: items } = await supabase
         .from('inventory_items')
@@ -123,11 +137,43 @@ export default function AddGuest() {
   const usingTypes = invTypes.length > 0
   const selectedType = invTypes.find((t) => t.id === selectedTypeId)
 
+  const applyDiscount = (amount: number) => {
+    if (!activePromo || amount <= 0) return amount
+    if (activePromo.discount_type === 'percentage') {
+      return Math.max(0, amount * (1 - activePromo.discount_value / 100))
+    }
+    return Math.max(0, amount - activePromo.discount_value)
+  }
+
+  useEffect(() => {
+    const fetchUnits = async () => {
+      if (!selectedTypeId) { setUnitOptions([]); setSelectedUnitIds([]); return }
+      const { data } = await supabase
+        .from('inventory_units')
+        .select('id, unit_number')
+        .eq('inventory_item_id', selectedTypeId)
+        .eq('status', 'available')
+        .order('unit_number', { ascending: true })
+      setUnitOptions(data || [])
+      setSelectedUnitIds([])
+    }
+    fetchUnits()
+  }, [selectedTypeId])
+
+  const toggleUnit = (unitId: string) => {
+    setSelectedUnitIds((prev) => {
+      if (prev.includes(unitId)) return prev.filter((id) => id !== unitId)
+      const qty = parseInt(quantity, 10) || 1
+      if (prev.length >= qty) return prev
+      return [...prev, unitId]
+    })
+  }
+
   const handleSelectType = (type: InvType) => {
     if (type.available <= 0) return
     setSelectedTypeId(type.id)
     setQuantity('1')
-    setAmountPaid(String(type.price))
+    setAmountPaid(String(Math.round(applyDiscount(type.price))))
   }
 
   const handleQuantityChange = (val: string) => {
@@ -137,9 +183,10 @@ export default function AddGuest() {
       clean = String(num)
     }
     setQuantity(clean)
+    setSelectedUnitIds([])
     if (selectedType) {
       const qty = parseInt(clean, 10) || 0
-      setAmountPaid(String(selectedType.price * qty))
+      setAmountPaid(String(Math.round(applyDiscount(selectedType.price * qty))))
     }
   }
 
