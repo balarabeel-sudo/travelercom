@@ -61,6 +61,9 @@ function ServiceDetails() {
 
   const [seatTypes, setSeatTypes] = useState<SeatType[]>([])
   const [selectedSeatTypeId, setSelectedSeatTypeId] = useState<string | null>(null)
+  const [unitOptions, setUnitOptions] = useState<{ id: string; unit_number: string }[]>([])
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
+  const [loadingUnits, setLoadingUnits] = useState(false)
 
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -142,6 +145,23 @@ function ServiceDetails() {
   const usingSeatTypes = seatTypes.length > 0
   const selectedSeat = seatTypes.find((s) => s.id === selectedSeatTypeId)
   const baseSeatPrice = usingSeatTypes ? (selectedSeat?.price ?? 0) : Number(service?.price ?? 0)
+
+  useEffect(() => {
+    const fetchUnits = async () => {
+      if (!selectedSeatTypeId) { setUnitOptions([]); setSelectedUnitId(null); return }
+      setLoadingUnits(true)
+      const { data } = await supabase
+        .from('inventory_units')
+        .select('id, unit_number')
+        .eq('inventory_item_id', selectedSeatTypeId)
+        .eq('status', 'available')
+        .order('unit_number', { ascending: true })
+      setUnitOptions(data || [])
+      setSelectedUnitId(data && data.length > 0 ? data[0].id : null)
+      setLoadingUnits(false)
+    }
+    fetchUnits()
+  }, [selectedSeatTypeId])
   const activePrice = (() => {
     if (!activePromo || baseSeatPrice <= 0) return baseSeatPrice
     if (activePromo.discount_type === 'percentage') {
@@ -154,8 +174,8 @@ function ServiceDetails() {
     if (!service) return
     setMessage(null)
 
-    if (usingSeatTypes && !selectedSeat) {
-      setMessage({ type: 'error', text: `Please select a ${meta.unitLabel.toLowerCase().slice(0, -1)} type first.` })
+    if (usingSeatTypes && !selectedUnitId) {
+      setMessage({ type: 'error', text: `This ${meta.unitLabel.toLowerCase().slice(0, -1)} type just sold out. Please pick another.` })
       return
     }
 
@@ -170,23 +190,31 @@ function ServiceDetails() {
     let assignedUnitId: string | null = null
     let assignedNumber = ''
 
-    if (selectedSeat) {
-      const { data: freeUnit } = await supabase
+    if (selectedSeat && selectedUnitId) {
+      const chosen = unitOptions.find((u) => u.id === selectedUnitId)
+      const { data: claimed } = await supabase
         .from('inventory_units')
-        .select('id, unit_number')
-        .eq('inventory_item_id', selectedSeat.id)
+        .update({ status: 'occupied' })
+        .eq('id', selectedUnitId)
         .eq('status', 'available')
-        .order('unit_number', { ascending: true })
-        .limit(1)
+        .select('id, unit_number')
         .maybeSingle()
 
-      if (!freeUnit) {
+      if (!claimed) {
         setBooking(false)
-        setMessage({ type: 'error', text: 'Sorry, this type just sold out. Please pick another.' })
+        const { data: refreshed } = await supabase
+          .from('inventory_units')
+          .select('id, unit_number')
+          .eq('inventory_item_id', selectedSeat.id)
+          .eq('status', 'available')
+          .order('unit_number', { ascending: true })
+        setUnitOptions(refreshed || [])
+        setSelectedUnitId(refreshed && refreshed.length > 0 ? refreshed[0].id : null)
+        setMessage({ type: 'error', text: `${meta.unitLabel.slice(0, -1)} ${chosen?.unit_number || ''} was just taken. Please pick another available option.` })
         return
       }
-      assignedUnitId = freeUnit.id
-      assignedNumber = freeUnit.unit_number
+      assignedUnitId = claimed.id
+      assignedNumber = claimed.unit_number
     }
 
     const { data: newBooking, error: bookingErr } = await supabase.from('bookings').insert({
@@ -204,6 +232,9 @@ function ServiceDetails() {
     }).select('id').single()
 
     if (bookingErr) {
+      if (assignedUnitId) {
+        await supabase.from('inventory_units').update({ status: 'available' }).eq('id', assignedUnitId)
+      }
       setBooking(false)
       setMessage({ type: 'error', text: 'Booking failed: ' + bookingErr.message })
       return
@@ -212,7 +243,7 @@ function ServiceDetails() {
     if (assignedUnitId) {
       await supabase
         .from('inventory_units')
-        .update({ status: 'occupied', booking_id: newBooking?.id || null })
+        .update({ booking_id: newBooking?.id || null })
         .eq('id', assignedUnitId)
     }
 
@@ -391,6 +422,34 @@ function ServiceDetails() {
                 </div>
               )
             })}
+
+            {selectedSeat && (
+              <div style={{ marginTop: '4px' }}>
+                <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, marginBottom: '8px' }}>Pick a {meta.unitLabel.slice(0, -1)} Number</p>
+                {loadingUnits ? (
+                  <p style={{ fontSize: '12px', color: COLORS.textMuted }}>Loading available options...</p>
+                ) : unitOptions.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: COLORS.red }}>None available for this type right now.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {unitOptions.map((u) => (
+                      <div
+                        key={u.id}
+                        onClick={() => setSelectedUnitId(u.id)}
+                        style={{
+                          minWidth: '44px', padding: '9px 6px', textAlign: 'center', borderRadius: '9px', cursor: 'pointer',
+                          background: selectedUnitId === u.id ? COLORS.primary : COLORS.card,
+                          color: selectedUnitId === u.id ? 'white' : COLORS.text,
+                          border: `1.5px solid ${selectedUnitId === u.id ? COLORS.primary : COLORS.border}`,
+                          fontWeight: 700, fontSize: '13px'
+                        }}>
+                        {u.unit_number}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
@@ -431,9 +490,9 @@ function ServiceDetails() {
 
         <button
           onClick={handleBookNow}
-          disabled={booking || (usingSeatTypes && !selectedSeat)}
+          disabled={booking || (usingSeatTypes && !selectedUnitId)}
           style={{
-            width: '100%', padding: '15px', background: booking || (usingSeatTypes && !selectedSeat) ? '#94a3b8' : COLORS.secondary,
+            width: '100%', padding: '15px', background: booking || (usingSeatTypes && !selectedUnitId) ? '#94a3b8' : COLORS.secondary,
             color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px',
             cursor: booking ? 'not-allowed' : 'pointer'
           }}>
