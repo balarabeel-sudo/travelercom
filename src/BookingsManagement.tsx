@@ -19,11 +19,18 @@ type Booking = {
   id: string
   ticket_code: string
   customer_name: string | null
+  customer_phone: string | null
   booking_status: string
   checked_in: boolean
   amount_paid: number
   created_at: string
+  check_in_date: string | null
+  check_out_date: string | null
+  payment_method: string | null
+  booking_source: string | null
+  assigned_unit_number: string | null
   services: { title: string; category: string } | null
+  inventory_items: { name: string } | null
 }
 
 type FilterTab = 'all' | 'pending' | 'completed' | 'cancelled'
@@ -34,6 +41,7 @@ function BookingsManagement() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterTab>('all')
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -56,7 +64,7 @@ function BookingsManagement() {
 
       const { data } = await supabase
         .from('bookings')
-        .select('id, ticket_code, customer_name, booking_status, checked_in, amount_paid, created_at, services(title, category)')
+        .select('id, ticket_code, customer_name, customer_phone, booking_status, checked_in, amount_paid, created_at, check_in_date, check_out_date, payment_method, booking_source, assigned_unit_number, services(title, category), inventory_items(name)')
         .eq('company_id', company.id)
         .order('created_at', { ascending: false })
 
@@ -176,17 +184,23 @@ function BookingsManagement() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {filtered.map((b) => {
               const badge = statusBadge(b)
+              const tab = getTab(b)
+              const roomType = b.inventory_items?.name || b.services?.title || '—'
               return (
-                <div key={b.id} style={{
-                  background: COLORS.card,
-                  borderRadius: '14px',
-                  padding: '14px',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
-                }}>
+                <div
+                  key={b.id}
+                  onClick={() => tab === 'completed' && setSelectedBooking(b)}
+                  style={{
+                    background: COLORS.card,
+                    borderRadius: '14px',
+                    padding: '14px',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+                    cursor: tab === 'completed' ? 'pointer' : 'default'
+                  }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                     <div>
                       <p style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.text }}>{b.customer_name || 'Unknown Customer'}</p>
-                      <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{b.services?.title || '—'}</p>
+                      <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{roomType}</p>
                     </div>
                     <span style={{
                       fontSize: '10.5px',
@@ -199,19 +213,85 @@ function BookingsManagement() {
                       {badge.text}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <p style={{ fontSize: '11px', color: COLORS.textMuted, fontFamily: 'monospace' }}>{b.ticket_code}</p>
-                      <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{new Date(b.created_at).toLocaleDateString()}</p>
+
+                  {tab === 'pending' ? (
+                    <p style={{ fontSize: '11px', color: COLORS.textMuted }}>
+                      Booked {new Date(b.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <p style={{ fontSize: '11px', color: COLORS.textMuted, fontFamily: 'monospace' }}>{b.ticket_code}</p>
+                        <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{new Date(b.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.primary }}>₦{Number(b.amount_paid).toLocaleString()}</p>
                     </div>
-                    <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.primary }}>₦{Number(b.amount_paid).toLocaleString()}</p>
-                  </div>
+                  )}
                 </div>
               )
             })}
           </div>
         )}
       </div>
+
+      {selectedBooking && (
+        <div
+          onClick={() => setSelectedBooking(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 50
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: COLORS.card, borderRadius: '20px 20px 0 0', padding: '20px',
+              width: '100%', maxWidth: '480px', boxSizing: 'border-box'
+            }}>
+            <div style={{ width: '36px', height: '4px', background: COLORS.border, borderRadius: '2px', margin: '0 auto 16px' }} />
+
+            <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '2px' }}>{selectedBooking.customer_name || 'Unknown Customer'}</p>
+            {selectedBooking.customer_phone && (
+              <p style={{ fontSize: '12.5px', color: COLORS.textMuted, marginBottom: '14px' }}>{selectedBooking.customer_phone}</p>
+            )}
+
+            <DetailRow label="Ticket Code" value={selectedBooking.ticket_code} mono />
+            <DetailRow label="Listing" value={selectedBooking.services?.title || '—'} />
+            {selectedBooking.inventory_items?.name && (
+              <DetailRow label="Room / Seat" value={`${selectedBooking.inventory_items.name}${selectedBooking.assigned_unit_number ? ` #${selectedBooking.assigned_unit_number}` : ''}`} />
+            )}
+            {(selectedBooking.check_in_date || selectedBooking.check_out_date) && (
+              <DetailRow
+                label="Dates"
+                value={`${selectedBooking.check_in_date ? new Date(selectedBooking.check_in_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'} → ${selectedBooking.check_out_date ? new Date(selectedBooking.check_out_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}`}
+              />
+            )}
+            <DetailRow label="Amount Paid" value={`₦${Number(selectedBooking.amount_paid).toLocaleString()}`} />
+            <DetailRow label="Source" value={selectedBooking.booking_source === 'offline' ? 'Offline (Add Guest)' : 'Online'} />
+            {selectedBooking.payment_method && (
+              <DetailRow label="Payment Method" value={selectedBooking.payment_method.toUpperCase()} />
+            )}
+            <DetailRow label="Booked On" value={new Date(selectedBooking.created_at).toLocaleString()} />
+
+            <div
+              onClick={() => setSelectedBooking(null)}
+              style={{
+                marginTop: '16px', background: COLORS.primary, color: 'white', textAlign: 'center',
+                padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer'
+              }}>
+              Close
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: `1px solid ${COLORS.border}` }}>
+      <p style={{ fontSize: '12px', color: COLORS.textMuted }}>{label}</p>
+      <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, fontFamily: mono ? 'monospace' : 'inherit' }}>{value}</p>
     </div>
   )
 }
