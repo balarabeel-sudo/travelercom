@@ -48,6 +48,7 @@ export default function CompanyStorefront() {
   const [company, setCompany] = useState<Company | null>(null)
   const [services, setServices] = useState<ServiceRow[]>([])
   const [serviceRatings, setServiceRatings] = useState<Record<string, { avg: number; count: number }>>({})
+  const [activePromos, setActivePromos] = useState<Record<string, { discount_type: string; discount_value: number }>>({})
   const [totalRating, setTotalRating] = useState({ avg: 0, count: 0 })
   const [guestsServed, setGuestsServed] = useState(0)
   const [tab, setTab] = useState<'listings' | 'gallery' | 'reviews' | 'about'>('listings')
@@ -71,6 +72,20 @@ export default function CompanyStorefront() {
         .eq('status', 'active')
 
       setServices(serviceRows || [])
+
+      const today = new Date().toISOString().split('T')[0]
+      const { data: promoRows } = await supabase
+        .from('promotions')
+        .select('service_id, discount_type, discount_value, start_date, end_date')
+        .eq('company_id', comp.id)
+        .eq('active', true)
+
+      const promoMap: Record<string, { discount_type: string; discount_value: number }> = {}
+      ;(promoRows || []).forEach((p: any) => {
+        const valid = (!p.start_date || p.start_date <= today) && (!p.end_date || p.end_date >= today)
+        if (valid) promoMap[p.service_id] = { discount_type: p.discount_type, discount_value: p.discount_value }
+      })
+      setActivePromos(promoMap)
 
       const { count } = await supabase
         .from('bookings')
@@ -229,10 +244,19 @@ export default function CompanyStorefront() {
           ) : (
             services.map((s) => {
               const r = serviceRatings[s.id]
+              const promo = activePromos[s.id]
               return (
                 <div key={s.id} style={{ background: COLORS.card, borderRadius: '14px', overflow: 'hidden', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex' }}>
-                  <div style={{ width: '96px', height: '96px', flexShrink: 0, background: s.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '96px', height: '96px', flexShrink: 0, position: 'relative', background: s.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {s.photo_url ? <img src={s.photo_url} alt={s.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '26px' }}>🏨</span>}
+                    {promo && (
+                      <div style={{
+                        position: 'absolute', top: '5px', left: '5px', background: COLORS.purple, color: 'white',
+                        fontSize: '9px', fontWeight: 800, padding: '3px 6px', borderRadius: '6px'
+                      }}>
+                        {promo.discount_type === 'percentage' ? `${promo.discount_value}%` : `₦${promo.discount_value.toLocaleString()}`} OFF
+                      </div>
+                    )}
                   </div>
                   <div style={{ flex: 1, padding: '10px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
