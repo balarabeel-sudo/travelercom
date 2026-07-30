@@ -26,6 +26,7 @@ import Analytics from './Analytics'
 import Promotions from './Promotions'
 import Ratings from './Ratings'
 import CompanyProfile from './CompanyProfile'
+import CompanyStorefront from './CompanyStorefront'
 import AddGuest from './AddGuest'
 
 function App() {
@@ -59,6 +60,7 @@ function App() {
         <Route path="/promotions" element={<Promotions />} />
         <Route path="/reviews" element={<Ratings />} />
         <Route path="/company-profile" element={<CompanyProfile />} />
+        <Route path="/company/:id" element={<CompanyStorefront />} />
         <Route path="/add-guest" element={<AddGuest />} />
       </Routes>
     </Router>
