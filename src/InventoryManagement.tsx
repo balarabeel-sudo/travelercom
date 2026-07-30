@@ -2,52 +2,40 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { releaseExpiredUnits } from './inventoryUtils'
 
 const COLORS = {
   bg: '#F8FAFC',
   card: '#FFFFFF',
   border: '#E2E8F0',
   primary: '#0EA5E9',
+  purple: '#6B21A8',
+  purpleLight: '#A855F7',
   text: '#0F172A',
   textMuted: '#64748B',
-  purple: '#6B21A8',
   green: '#16A34A',
+  red: '#DC2626',
   amber: '#D97706',
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  hotel: 'Room',
-  bus: 'Seat',
-  train: 'Seat',
-  flight: 'Seat',
-  tour: 'Slot',
-  event_center: 'Ticket',
 }
 
 type InventoryItem = {
   id: string
   name: string
   total_quantity: number
-  occupied_quantity: number
-  reserved_quantity: number
   price: number
   service_id: string | null
+  services: { photo_url: string | null } | null
 }
 
-type ServiceOption = { id: string; title: string; category: string }
+type ServiceOption = { id: string; title: string }
 
 export default function InventoryManagement() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [items, setItems] = useState<InventoryItem[]>([])
-  const [maintenanceCounts, setMaintenanceCounts] = useState<Record<string, number>>({})
+  const [statusCounts, setStatusCounts] = useState<Record<string, { available: number; occupied: number; reserved: number; maintenance: number }>>({})
   const [services, setServices] = useState<ServiceOption[]>([])
-  const [unitLabel, setUnitLabel] = useState('Item')
-  const [showForm, setShowForm] = useState(false)
-  const [name, setName] = useState('')
-  const [quantity, setQuantity] = useState('')
-  const [price, setPrice] = useState('')
   const [serviceId, setServiceId] = useState('')
   const [saving, setSaving] = useState(false)
   const [holidays, setHolidays] = useState<{ id: string; date: string; label: string | null }[]>([])
@@ -55,6 +43,10 @@ export default function InventoryManagement() {
   const [holidayDate, setHolidayDate] = useState('')
   const [holidayLabel, setHolidayLabel] = useState('')
   const [savingHoliday, setSavingHoliday] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [name, setName] = useState('')
+  const [quantity, setQuantity] = useState('')
+  const [price, setPrice] = useState('')
 
   const load = async () => {
     const { data: userData } = await supabase.auth.getUser()
@@ -69,39 +61,40 @@ export default function InventoryManagement() {
     if (!company) { setLoading(false); return }
     setCompanyId(company.id)
     loadHolidays(company.id)
+    releaseExpiredUnits(company.id).catch(() => {})
 
     const { data: serviceRows } = await supabase
       .from('services')
-      .select('id, title, category')
+      .select('id, title')
       .eq('company_id', company.id)
 
     setServices(serviceRows || [])
-    if (serviceRows && serviceRows.length > 0) {
-      setUnitLabel(CATEGORY_LABELS[serviceRows[0].category] || 'Item')
-    }
+    if (serviceRows && serviceRows.length > 0) setServiceId(serviceRows[0].id)
 
     const { data: inventoryRows } = await supabase
       .from('inventory_items')
-      .select('id, name, total_quantity, occupied_quantity, reserved_quantity, price, service_id')
+      .select('id, name, total_quantity, price, service_id, services(photo_url)')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
 
-    setItems(inventoryRows || [])
+    setItems((inventoryRows || []) as any)
 
     const itemIds = (inventoryRows || []).map((i) => i.id)
     if (itemIds.length > 0) {
       const { data: unitRows } = await supabase
         .from('inventory_units')
-        .select('inventory_item_id')
+        .select('inventory_item_id, status')
         .in('inventory_item_id', itemIds)
 
-      const counts: Record<string, number> = {}
+      const counts: Record<string, { available: number; occupied: number; reserved: number; maintenance: number }> = {}
       ;(unitRows || []).forEach((u: any) => {
-        counts[u.inventory_item_id] = (counts[u.inventory_item_id] || 0) + 1
+        if (!counts[u.inventory_item_id]) counts[u.inventory_item_id] = { available: 0, occupied: 0, reserved: 0, maintenance: 0 }
+        const s = u.status as 'available' | 'occupied' | 'reserved' | 'maintenance'
+        counts[u.inventory_item_id][s] = (counts[u.inventory_item_id][s] || 0) + 1
       })
-      setMaintenanceCounts(counts)
+      setStatusCounts(counts)
     } else {
-      setMaintenanceCounts({})
+      setStatusCounts({})
     }
 
     setLoading(false)
@@ -121,17 +114,27 @@ export default function InventoryManagement() {
   const handleAdd = async () => {
     if (!companyId || !name.trim() || !quantity) return
     setSaving(true)
-    await supabase.from('inventory_items').insert({
+    const qty = parseInt(quantity, 10)
+    const { data: newItem } = await supabase.from('inventory_items').insert({
       company_id: companyId,
       service_id: serviceId || null,
       name: name.trim(),
-      total_quantity: parseInt(quantity, 10),
+      total_quantity: qty,
       price: price ? parseFloat(price) : 0,
-    })
+    }).select('id').single()
+
+    if (newItem) {
+      const unitRows = Array.from({ length: qty }, (_, i) => ({
+        inventory_item_id: newItem.id,
+        unit_number: (i + 1).toString(),
+        status: 'available',
+      }))
+      await supabase.from('inventory_units').insert(unitRows)
+    }
+
     setName('')
     setQuantity('')
     setPrice('')
-    setServiceId('')
     setShowForm(false)
     setSaving(false)
     load()
@@ -140,11 +143,7 @@ export default function InventoryManagement() {
   const addHoliday = async () => {
     if (!companyId || !holidayDate) return
     setSavingHoliday(true)
-    await supabase.from('company_holidays').insert({
-      company_id: companyId,
-      date: holidayDate,
-      label: holidayLabel.trim() || null,
-    })
+    await supabase.from('company_holidays').insert({ company_id: companyId, date: holidayDate, label: holidayLabel.trim() || null })
     setHolidayDate('')
     setHolidayLabel('')
     setShowHolidayForm(false)
@@ -158,8 +157,7 @@ export default function InventoryManagement() {
     loadHolidays(companyId)
   }
 
-  const available = (item: InventoryItem) =>
-    item.total_quantity - item.occupied_quantity - item.reserved_quantity - (maintenanceCounts[item.id] || 0)
+  const available = (item: InventoryItem) => Math.max(0, statusCounts[item.id]?.available ?? 0)
 
   if (loading) {
     return (
@@ -170,28 +168,24 @@ export default function InventoryManagement() {
   }
 
   const totals = items.reduce(
-    (acc, item) => ({
-      total: acc.total + item.total_quantity,
-      available: acc.available + available(item),
-      booked: acc.booked + item.occupied_quantity + item.reserved_quantity,
-      maintenance: acc.maintenance + (maintenanceCounts[item.id] || 0),
-    }),
+    (acc, item) => {
+      const s = statusCounts[item.id] || { available: 0, occupied: 0, reserved: 0, maintenance: 0 }
+      return {
+        total: acc.total + item.total_quantity,
+        available: acc.available + Math.max(0, s.available),
+        booked: acc.booked + s.occupied + s.reserved,
+        maintenance: acc.maintenance + s.maintenance,
+      }
+    },
     { total: 0, available: 0, booked: 0, maintenance: 0 }
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
+    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
 
       <div style={{
-        padding: '18px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: COLORS.card,
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+        padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: COLORS.card, position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}>
@@ -201,181 +195,143 @@ export default function InventoryManagement() {
         </div>
         <div
           onClick={() => setShowForm(!showForm)}
-          style={{
-            width: '34px', height: '34px', borderRadius: '10px', background: COLORS.purple,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-          }}>
-          <Icon name="plus" size={18} color="white" />
+          style={{ width: '38px', height: '38px', borderRadius: '12px', background: COLORS.purple, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <Icon name="plus" size={19} color="white" />
         </div>
       </div>
 
       <div style={{ padding: '16px' }}>
-        <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>Inventory Overview</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '24px' }}>
-          <SummaryCard label="Total" value={totals.total} color={COLORS.text} />
-          <SummaryCard label="Available" value={totals.available} color={COLORS.green} />
-          <SummaryCard label="Booked" value={totals.booked} color={COLORS.primary} />
-          <SummaryCard label="Maintenance" value={totals.maintenance} color={COLORS.amber} />
+
+        <div style={{
+          background: `linear-gradient(135deg, ${COLORS.purple}, #4C1D95)`, borderRadius: '18px',
+          padding: '20px', marginBottom: '18px', color: 'white'
+        }}>
+          <p style={{ fontSize: '17px', fontWeight: 800, marginBottom: '6px' }}>Inventory Overview</p>
+          <p style={{ fontSize: '12px', color: '#DDD6FE', lineHeight: 1.5 }}>Track and manage your room inventory in real-time.</p>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>Public Holidays</p>
-          <div onClick={() => setShowHolidayForm(!showHolidayForm)} style={{ color: COLORS.purple, fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' }}>
-            + Add Date
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
+          <OverviewCard icon="box" iconBg="#F3E8FF" iconColor={COLORS.purple} label="Total Rooms" value={totals.total} sub="All rooms in inventory" />
+          <OverviewCard icon="checkCircle" iconBg="#DCFCE7" iconColor={COLORS.green} label="Available" value={totals.available} valueColor={COLORS.green} sub="Ready for booking" />
+          <OverviewCard icon="calendar" iconBg="#DBEAFE" iconColor={COLORS.primary} label="Booked" value={totals.booked} valueColor={COLORS.primary} sub="Currently booked" />
+          <OverviewCard icon="edit" iconBg="#FFEDD5" iconColor={COLORS.amber} label="Maintenance" value={totals.maintenance} valueColor={COLORS.amber} sub="Under maintenance" />
         </div>
 
-        {showHolidayForm && (
-          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-            <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '6px' }}>Date</p>
-            <input
-              value={holidayDate}
-              onChange={(e) => setHolidayDate(e.target.value)}
-              type="date"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }}
-            />
-            <input
-              value={holidayLabel}
-              onChange={(e) => setHolidayLabel(e.target.value)}
-              placeholder="Label, e.g. Sallah, Christmas (optional)"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '12px', fontSize: '13px', boxSizing: 'border-box' }}
-            />
-            <div
-              onClick={savingHoliday ? undefined : addHoliday}
-              style={{
-                background: COLORS.purple, color: 'white', textAlign: 'center', padding: '11px',
-                borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: savingHoliday ? 0.6 : 1
-              }}>
-              {savingHoliday ? 'Saving...' : 'Save Holiday Date'}
+        <div style={{ background: COLORS.card, borderRadius: '16px', padding: '16px', marginBottom: '18px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#F3E8FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon name="calendar" size={17} color={COLORS.purple} />
             </div>
-          </div>
-        )}
-
-        {holidays.length === 0 ? (
-          <div style={{ background: COLORS.card, padding: '18px', textAlign: 'center', borderRadius: '14px', color: COLORS.textMuted, fontSize: '12.5px', marginBottom: '24px' }}>
-            No public holiday dates set. Weekday/Weekend pricing will still apply.
-          </div>
-        ) : (
-          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '4px 16px', marginBottom: '24px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-            {holidays.map((h, i) => (
-              <div key={h.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '12px 0', borderBottom: i < holidays.length - 1 ? `1px solid ${COLORS.border}` : 'none'
-              }}>
-                <div>
-                  <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>
-                    {new Date(h.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                  </p>
-                  {h.label && <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{h.label}</p>}
-                </div>
-                <div onClick={() => deleteHoliday(h.id)} style={{ cursor: 'pointer' }}>
-                  <Icon name="trash" size={16} color="#DC2626" />
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>Public Holidays</p>
+                <div onClick={() => setShowHolidayForm(!showHolidayForm)} style={{ display: 'flex', alignItems: 'center', gap: '4px', border: `1.5px solid ${COLORS.purple}`, color: COLORS.purple, fontSize: '11.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px', cursor: 'pointer' }}>
+                  <Icon name="plus" size={11} color={COLORS.purple} /> Add Date
                 </div>
               </div>
-            ))}
+              <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '3px' }}>Set public holiday dates for special pricing and availability rules.</p>
+            </div>
           </div>
-        )}
+
+          {showHolidayForm && (
+            <div style={{ background: COLORS.bg, borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
+              <input value={holidayDate} onChange={(e) => setHolidayDate(e.target.value)} type="date" style={{ width: '100%', padding: '9px 10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, marginBottom: '8px', fontSize: '12.5px', boxSizing: 'border-box' }} />
+              <input value={holidayLabel} onChange={(e) => setHolidayLabel(e.target.value)} placeholder="Label, e.g. Sallah (optional)" style={{ width: '100%', padding: '9px 10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '12.5px', boxSizing: 'border-box' }} />
+              <div onClick={savingHoliday ? undefined : addHoliday} style={{ background: COLORS.purple, color: 'white', textAlign: 'center', padding: '9px', borderRadius: '9px', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer', opacity: savingHoliday ? 0.6 : 1 }}>
+                {savingHoliday ? 'Saving...' : 'Save Holiday Date'}
+              </div>
+            </div>
+          )}
+
+          {holidays.length === 0 ? (
+            <div style={{ background: '#F5F3FF', borderRadius: '10px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px' }}>ℹ️</span>
+              <p style={{ fontSize: '11.5px', color: COLORS.purple }}>No public holiday dates set. Weekday/Weekend pricing will still apply.</p>
+            </div>
+          ) : (
+            holidays.map((h) => (
+              <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${COLORS.border}` }}>
+                <div>
+                  <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>{new Date(h.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                  {h.label && <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{h.label}</p>}
+                </div>
+                <div onClick={() => deleteHoliday(h.id)} style={{ cursor: 'pointer' }}>
+                  <Icon name="trash" size={15} color={COLORS.red} />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
 
         {showForm && (
-          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-            <p style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', color: COLORS.text }}>Add {unitLabel} Type</p>
-
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={`e.g. Executive ${unitLabel}, Suite`}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }}
-            />
-
-            <input
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ''))}
-              placeholder={`Total ${unitLabel.toLowerCase()}s, e.g. 50`}
-              inputMode="numeric"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }}
-            />
-
-            <input
-              value={price}
-              onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-              placeholder="Price (₦, optional for now)"
-              inputMode="decimal"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }}
-            />
-
+          <div style={{ background: COLORS.card, borderRadius: '16px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+            <p style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', color: COLORS.text }}>Add Room Type</p>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Executive Room, Suite" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
+            <input value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ''))} placeholder="Total rooms, e.g. 10" inputMode="numeric" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
+            <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="Price (₦)" inputMode="decimal" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
             {services.length > 0 && (
-              <select
-                value={serviceId}
-                onChange={(e) => setServiceId(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '12px', fontSize: '13px' }}>
+              <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '12px', fontSize: '13px' }}>
                 <option value="">Link to a listing (optional)</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>{s.title}</option>
-                ))}
+                {services.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
               </select>
             )}
-
-            <div
-              onClick={saving ? undefined : handleAdd}
-              style={{
-                background: COLORS.purple, color: 'white', textAlign: 'center', padding: '11px',
-                borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
-                opacity: saving ? 0.6 : 1
-              }}>
-              {saving ? 'Saving...' : `Save ${unitLabel} Type`}
+            <div onClick={saving ? undefined : handleAdd} style={{ background: COLORS.purple, color: 'white', textAlign: 'center', padding: '11px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
+              {saving ? 'Saving...' : 'Save Room Type'}
             </div>
           </div>
         )}
 
-        <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>{unitLabel} Types</p>
+        <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>Room Types</p>
 
         {items.length === 0 ? (
           <div style={{ background: COLORS.card, padding: '32px 20px', textAlign: 'center', borderRadius: '14px', color: COLORS.textMuted }}>
-            No {unitLabel.toLowerCase()} types yet. Tap + to add your first one.
+            No room types yet. Tap + to add your first one.
           </div>
         ) : (
-          items.map((item) => (
-            <div key={item.id} style={{
-              background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '12px',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                <div>
-                  <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>{item.name}</p>
-                  {item.price > 0 && (
-                    <p style={{ fontSize: '12px', color: COLORS.textMuted }}>₦{item.price.toLocaleString()}</p>
-                  )}
+          items.map((item) => {
+            const avail = available(item)
+            const photo = item.services?.photo_url
+            return (
+              <div key={item.id} style={{ background: COLORS.card, borderRadius: '16px', padding: '12px', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex', gap: '12px' }}>
+                <div style={{ width: '68px', height: '68px', borderRadius: '12px', flexShrink: 0, overflow: 'hidden', background: photo ? undefined : `linear-gradient(135deg, #F97316, #0EA5E9)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {photo ? <img src={photo} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '22px' }}>🛏️</span>}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <p style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.text }}>{item.name}</p>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.green, background: '#DCFCE7', padding: '3px 8px', borderRadius: '7px', whiteSpace: 'nowrap' }}>Active</span>
+                  </div>
+                  <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.purple, marginTop: '2px' }}>₦{Number(item.price).toLocaleString()}</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                    <p style={{ fontSize: '11px', color: COLORS.textMuted }}>
+                      Total <span style={{ fontWeight: 700, color: COLORS.text }}>{item.total_quantity}</span>
+                      {'  '}· Available <span style={{ fontWeight: 700, color: avail === 0 ? COLORS.red : COLORS.green }}>{avail}</span>
+                    </p>
+                    <div onClick={() => navigate(`/inventory/${item.id}`)} style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#F5F3FF', color: COLORS.purple, fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px', cursor: 'pointer' }}>
+                      Manage <Icon name="chevronRight" size={12} color={COLORS.purple} />
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <p style={{ fontSize: '12px', color: COLORS.textMuted }}>
-                  Total: <span style={{ fontWeight: 700, color: COLORS.text }}>{item.total_quantity}</span>
-                  {'  ·  '}
-                  Available: <span style={{ fontWeight: 700, color: available(item) === 0 ? '#DC2626' : COLORS.green }}>{available(item)}</span>
-                </p>
-                <div
-                  onClick={() => navigate(`/inventory/${item.id}`)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '4px',
-                    color: COLORS.purple, fontSize: '12.5px', fontWeight: 700, cursor: 'pointer'
-                  }}>
-                  Manage <Icon name="chevronRight" size={14} color={COLORS.purple} />
-                </div>
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </div>
   )
 }
 
-function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
+function OverviewCard({ icon, iconBg, iconColor, label, value, valueColor, sub }: {
+  icon: string; iconBg: string; iconColor: string; label: string; value: number; valueColor?: string; sub: string
+}) {
   return (
     <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-      <p style={{ fontSize: '20px', fontWeight: 800, color }}>{value}</p>
-      <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{label}</p>
+      <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+        <Icon name={icon} size={16} color={iconColor} />
+      </div>
+      <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '2px' }}>{label}</p>
+      <p style={{ fontSize: '20px', fontWeight: 800, color: valueColor || COLORS.text }}>{value}</p>
+      <p style={{ fontSize: '10px', color: COLORS.textMuted, marginTop: '2px' }}>{sub}</p>
     </div>
   )
 }
