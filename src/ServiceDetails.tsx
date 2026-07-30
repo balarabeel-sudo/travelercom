@@ -344,9 +344,19 @@ function ServiceDetails() {
         <div style={{
           height: '180px', borderRadius: '16px',
           background: service.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '56px', marginBottom: '16px', overflow: 'hidden'
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '56px', marginBottom: '16px', overflow: 'hidden',
+          position: 'relative'
         }}>
           {service.photo_url ? <img src={service.photo_url} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : meta.icon}
+          {activePromo && (
+            <div style={{
+              position: 'absolute', top: '12px', left: '12px', background: '#6B21A8', color: 'white',
+              fontSize: '11.5px', fontWeight: 800, padding: '5px 11px', borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
+            }}>
+              {activePromo.discount_type === 'percentage' ? `${activePromo.discount_value}% OFF` : `₦${activePromo.discount_value.toLocaleString()} OFF`}
+            </div>
+          )}
         </div>
 
         <h2 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>{service.title}</h2>
