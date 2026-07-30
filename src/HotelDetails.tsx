@@ -397,17 +397,25 @@ function HotelDetails() {
           justifyContent: 'center',
           fontSize: '56px',
           marginBottom: '16px',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          position: 'relative'
         }}>
           {service.photo_url ? <img src={service.photo_url} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🏨'}
+          {activePromo && (
+            <div style={{
+              position: 'absolute', top: '12px', left: '12px', background: '#6B21A8', color: 'white',
+              fontSize: '11.5px', fontWeight: 800, padding: '5px 11px', borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
+            }}>
+              {activePromo.discount_type === 'percentage' ? `${activePromo.discount_value}% OFF` : `₦${activePromo.discount_value.toLocaleString()} OFF`}
+            </div>
+          )}
         </div>
 
         <h2 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>{service.title}</h2>
         <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '2px' }}>{service.destination}</p>
-         <p
-          onClick={() => navigate(`/company/${service.company_id}`)}
-          style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 600, marginBottom: '16px', cursor: 'pointer' }}>
-          {service.companies?.business_name || 'Traveler.com Partner'} →
+        <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '16px' }}>
+          {service.companies?.business_name || 'Traveler.com Partner'}
         </p>
 
         {service.description && (
