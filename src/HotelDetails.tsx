@@ -404,8 +404,10 @@ function HotelDetails() {
 
         <h2 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>{service.title}</h2>
         <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '2px' }}>{service.destination}</p>
-        <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '16px' }}>
-          {service.companies?.business_name || 'Traveler.com Partner'}
+         <p
+          onClick={() => navigate(`/company/${service.company_id}`)}
+          style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 600, marginBottom: '16px', cursor: 'pointer' }}>
+          {service.companies?.business_name || 'Traveler.com Partner'} →
         </p>
 
         {service.description && (
