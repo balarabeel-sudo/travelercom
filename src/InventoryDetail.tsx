@@ -41,6 +41,8 @@ export default function InventoryDetail() {
   const [units, setUnits] = useState<Unit[]>([])
   const [unitLabel, setUnitLabel] = useState('Room')
   const [tab, setTab] = useState<'stock' | 'pricing' | 'maintenance' | 'availability'>('stock')
+  const [sortDesc, setSortDesc] = useState(false)
+  const [showTip, setShowTip] = useState(true)
 
   const [weekdayInput, setWeekdayInput] = useState('')
   const [weekendInput, setWeekendInput] = useState('')
@@ -190,8 +192,21 @@ export default function InventoryDetail() {
     )
   }
 
+  const sortedUnits = [...units].sort((a, b) => {
+    const na = parseInt(a.unit_number, 10) || 0
+    const nb = parseInt(b.unit_number, 10) || 0
+    return sortDesc ? nb - na : na - nb
+  })
+
+  const statusStyle: Record<string, { bg: string; color: string; label: string }> = {
+    available: { bg: '#DCFCE7', color: COLORS.green, label: 'Available' },
+    occupied: { bg: '#DBEAFE', color: COLORS.primary, label: 'Occupied' },
+    reserved: { bg: '#F5F3FF', color: COLORS.purple, label: 'Reserved' },
+    maintenance: { bg: '#FFEDD5', color: COLORS.amber, label: 'Maintenance' },
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
+    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '80px' }}>
 
       <div style={{
         padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '14px',
@@ -200,12 +215,15 @@ export default function InventoryDetail() {
         <div onClick={() => navigate('/inventory')} style={{ cursor: 'pointer', display: 'flex' }}>
           <Icon name="arrowLeft" size={22} color={COLORS.text} />
         </div>
-        <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>{item.name}</h1>
+        <div>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>{item.name}</h1>
+          <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Manage your {unitLabel.toLowerCase()} inventory</p>
+        </div>
       </div>
 
       <div style={{ padding: '16px' }}>
         <div style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
-          <TabButton label={`🛏 ${unitLabel}s`} active={tab === 'stock'} onClick={() => setTab('stock')} />
+          <TabButton label={`🛏 Items`} active={tab === 'stock'} onClick={() => setTab('stock')} />
           <TabButton label="💵 Pricing" active={tab === 'pricing'} onClick={() => setTab('pricing')} />
           <TabButton label="🔧 Maintenance" active={tab === 'maintenance'} onClick={() => setTab('maintenance')} />
           <TabButton label="📅 Availability" active={tab === 'availability'} onClick={() => setTab('availability')} />
@@ -213,72 +231,114 @@ export default function InventoryDetail() {
 
         {tab === 'stock' && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-              <StatCard label={`Total ${unitLabel}s`} value={units.length} color={COLORS.text} />
-              <StatCard label="Available" value={availableUnits.length} color={COLORS.green} />
-              <StatCard label="Occupied" value={occupiedCount} color={COLORS.primary} />
-              <StatCard label="Maintenance" value={maintenanceUnits.length} color={COLORS.amber} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
+              <StatCard icon="clipboard" iconBg="#F3E8FF" iconColor={COLORS.purple} value={units.length} label={`Total ${unitLabel}s`} sub={`All items in this ${unitLabel.toLowerCase()} type`} />
+              <StatCard icon="checkCircle" iconBg="#DCFCE7" iconColor={COLORS.green} value={availableUnits.length} label="Available" sub="Ready for booking" />
+              <StatCard icon="users" iconBg="#DBEAFE" iconColor={COLORS.primary} value={occupiedCount} label="Occupied" sub="Currently in use" />
+              <StatCard icon="edit" iconBg="#FFEDD5" iconColor={COLORS.amber} value={maintenanceUnits.length} label="Maintenance" sub="Under maintenance" />
             </div>
 
-            <p style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', color: COLORS.text }}>Total {unitLabel}s</p>
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: COLORS.card, borderRadius: '12px', padding: '12px 14px', marginBottom: '18px',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
-            }}>
-              <p style={{ fontSize: '13.5px', fontWeight: 600, color: COLORS.text }}>Adjust total {unitLabel.toLowerCase()}s</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div onClick={removeRoom} style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                  <Icon name="minus" size={14} color={COLORS.red} />
+            <div style={{ background: COLORS.card, borderRadius: '16px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div>
+                  <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>Total {unitLabel}s</p>
+                  <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>Adjust the total number of {unitLabel.toLowerCase()}s for this type.</p>
                 </div>
-                <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, minWidth: '20px', textAlign: 'center' }}>{units.length}</p>
-                <div onClick={addRoom} style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                  <Icon name="plus" size={14} color={COLORS.green} />
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>Reserved {unitLabel}s</p>
-              <div onClick={() => setShowReserveForm(!showReserveForm)} style={{ color: COLORS.purple, fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' }}>
-                + Reserve
-              </div>
-            </div>
-
-            {showReserveForm && (
-              <div style={{ background: COLORS.card, borderRadius: '12px', padding: '14px', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-                <select
-                  value={reserveUnitId}
-                  onChange={(e) => setReserveUnitId(e.target.value)}
-                  style={{ width: '100%', padding: '9px 10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px' }}>
-                  <option value="">Select {unitLabel.toLowerCase()} number</option>
-                  {availableUnits.map((u) => (
-                    <option key={u.id} value={u.id}>{unitLabel} {u.unit_number}</option>
-                  ))}
-                </select>
-                <div
-                  onClick={savingReserve || !reserveUnitId ? undefined : addReservation}
-                  style={{ background: COLORS.purple, color: 'white', textAlign: 'center', padding: '10px', borderRadius: '9px', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer', opacity: !reserveUnitId ? 0.6 : 1 }}>
-                  {savingReserve ? 'Saving...' : 'Confirm Reservation'}
-                </div>
-              </div>
-            )}
-
-            {reservedUnits.length === 0 ? (
-              <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '4px' }}>No {unitLabel.toLowerCase()}s reserved right now.</p>
-            ) : (
-              reservedUnits.map((u) => (
-                <div key={u.id} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  background: COLORS.card, borderRadius: '12px', padding: '12px 14px', marginBottom: '8px',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
-                }}>
-                  <p style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.text }}>{unitLabel} {u.unit_number}</p>
-                  <div onClick={() => releaseReservation(u.id)} style={{ background: '#f0fdf4', color: COLORS.green, fontSize: '11.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px', cursor: 'pointer' }}>
-                    Release
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                  <div onClick={removeRoom} style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <Icon name="minus" size={14} color={COLORS.red} />
+                  </div>
+                  <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, minWidth: '16px', textAlign: 'center' }}>{units.length}</p>
+                  <div onClick={addRoom} style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <Icon name="plus" size={14} color={COLORS.green} />
                   </div>
                 </div>
-              ))
+              </div>
+              <div style={{ background: '#F5F3FF', borderRadius: '10px', padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px' }}>ℹ️</span>
+                <p style={{ fontSize: '11px', color: COLORS.purple }}>Changing the total will affect availability.</p>
+              </div>
+            </div>
+
+            <div style={{ background: COLORS.card, borderRadius: '16px', padding: '16px', marginBottom: '18px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div>
+                  <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>Reserved {unitLabel}s</p>
+                  <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>{unitLabel}s temporarily blocked or reserved.</p>
+                </div>
+                <div onClick={() => setShowReserveForm(!showReserveForm)} style={{ display: 'flex', alignItems: 'center', gap: '4px', border: `1.5px solid ${COLORS.purple}`, color: COLORS.purple, fontSize: '11.5px', fontWeight: 700, padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}>
+                  <Icon name="plus" size={11} color={COLORS.purple} /> Reserve
+                </div>
+              </div>
+
+              {showReserveForm && (
+                <div style={{ background: COLORS.bg, borderRadius: '10px', padding: '12px', marginBottom: '10px' }}>
+                  <select value={reserveUnitId} onChange={(e) => setReserveUnitId(e.target.value)} style={{ width: '100%', padding: '9px 10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px' }}>
+                    <option value="">Select {unitLabel.toLowerCase()} number</option>
+                    {availableUnits.map((u) => <option key={u.id} value={u.id}>{unitLabel} {u.unit_number}</option>)}
+                  </select>
+                  <div onClick={savingReserve || !reserveUnitId ? undefined : addReservation} style={{ background: COLORS.purple, color: 'white', textAlign: 'center', padding: '10px', borderRadius: '9px', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer', opacity: !reserveUnitId ? 0.6 : 1 }}>
+                    {savingReserve ? 'Saving...' : 'Confirm Reservation'}
+                  </div>
+                </div>
+              )}
+
+              {reservedUnits.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+                    <Icon name="calendar" size={20} color={COLORS.purple} />
+                  </div>
+                  <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>No reserved {unitLabel.toLowerCase()}s</p>
+                  <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '2px' }}>You don't have any reserved {unitLabel.toLowerCase()}s right now.</p>
+                </div>
+              ) : (
+                reservedUnits.map((u) => (
+                  <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: `1px solid ${COLORS.border}` }}>
+                    <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{unitLabel} {u.unit_number}</p>
+                    <div onClick={() => releaseReservation(u.id)} style={{ background: '#f0fdf4', color: COLORS.green, fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px', cursor: 'pointer' }}>Release</div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text }}>{unitLabel} Items ({units.length})</p>
+              <div onClick={() => setSortDesc(!sortDesc)} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: COLORS.purple, fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                Sort {sortDesc ? '↓' : '↑'}
+              </div>
+            </div>
+
+            {sortedUnits.length === 0 ? (
+              <div style={{ background: COLORS.card, padding: '24px 20px', textAlign: 'center', borderRadius: '14px', color: COLORS.textMuted, fontSize: '12.5px' }}>
+                No {unitLabel.toLowerCase()}s yet.
+              </div>
+            ) : (
+              sortedUnits.map((u) => {
+                const st = statusStyle[u.status]
+                return (
+                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                    <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: st.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: '15px' }}>🛏️</span>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: '13.5px', fontWeight: 800, color: st.color }}>{u.unit_number}</p>
+                      <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{item.name}</p>
+                    </div>
+                    <span style={{ fontSize: '10.5px', fontWeight: 700, color: st.color, background: st.bg, padding: '4px 10px', borderRadius: '8px', whiteSpace: 'nowrap' }}>{st.label}</span>
+                  </div>
+                )
+              })
+            )}
+
+            {showTip && (
+              <div style={{ background: '#f0fdf4', borderRadius: '14px', padding: '14px', marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '18px' }}>🛡️</span>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Keep your inventory updated</p>
+                  <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>Accurate inventory helps you avoid double bookings and improve guest experience.</p>
+                </div>
+                <div onClick={() => setShowTip(false)} style={{ cursor: 'pointer', color: COLORS.textMuted, fontSize: '14px' }}>✕</div>
+              </div>
             )}
           </>
         )}
@@ -304,24 +364,15 @@ export default function InventoryDetail() {
           <>
             <div
               onClick={() => setShowMaintForm(!showMaintForm)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                background: COLORS.purple, color: 'white', padding: '11px', borderRadius: '10px',
-                fontWeight: 700, fontSize: '13px', cursor: 'pointer', marginBottom: '14px'
-              }}>
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: COLORS.purple, color: 'white', padding: '11px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', marginBottom: '14px' }}>
               <Icon name="plus" size={15} color="white" /> Mark a {unitLabel} Under Maintenance
             </div>
 
             {showMaintForm && (
               <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-                <select
-                  value={maintUnitId}
-                  onChange={(e) => setMaintUnitId(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px' }}>
+                <select value={maintUnitId} onChange={(e) => setMaintUnitId(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px' }}>
                   <option value="">Select {unitLabel.toLowerCase()} number</option>
-                  {availableUnits.map((u) => (
-                    <option key={u.id} value={u.id}>{unitLabel} {u.unit_number}</option>
-                  ))}
+                  {availableUnits.map((u) => <option key={u.id} value={u.id}>{unitLabel} {u.unit_number}</option>)}
                 </select>
                 <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason, e.g. Air Conditioner Repair" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
                 <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '6px' }}>Expected Completion</p>
@@ -382,6 +433,18 @@ export default function InventoryDetail() {
           </>
         )}
       </div>
+
+      {tab === 'stock' && (
+        <div
+          onClick={load}
+          style={{
+            position: 'fixed', bottom: '20px', left: '20px', width: '48px', height: '48px', borderRadius: '50%',
+            background: COLORS.purple, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', boxShadow: '0 4px 12px rgba(107,33,168,0.4)'
+          }}>
+          <span style={{ color: 'white', fontSize: '18px' }}>⟳</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -400,11 +463,17 @@ function TabButton({ label, active, onClick }: { label: string; active: boolean;
   )
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatCard({ icon, iconBg, iconColor, value, label, sub }: {
+  icon: string; iconBg: string; iconColor: string; value: number; label: string; sub: string
+}) {
   return (
     <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-      <p style={{ fontSize: '20px', fontWeight: 800, color }}>{value}</p>
-      <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{label}</p>
+      <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+        <Icon name={icon} size={16} color={iconColor} />
+      </div>
+      <p style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text }}>{value}</p>
+      <p style={{ fontSize: '11px', color: COLORS.textMuted, fontWeight: 600 }}>{label}</p>
+      <p style={{ fontSize: '10px', color: COLORS.textMuted, marginTop: '1px' }}>{sub}</p>
     </div>
   )
 }
