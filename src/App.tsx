@@ -27,6 +27,8 @@ import Promotions from './Promotions'
 import Ratings from './Ratings'
 import CompanyProfile from './CompanyProfile'
 import CompanyStorefront from './CompanyStorefront'
+import PrivacyPolicy from './PrivacyPolicy'
+import Terms from './Terms'
 import AddGuest from './AddGuest'
 
 function App() {
@@ -61,6 +63,8 @@ function App() {
         <Route path="/reviews" element={<Ratings />} />
         <Route path="/company-profile" element={<CompanyProfile />} />
         <Route path="/company/:id" element={<CompanyStorefront />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/add-guest" element={<AddGuest />} />
       </Routes>
     </Router>
