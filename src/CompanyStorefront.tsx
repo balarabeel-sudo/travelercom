@@ -31,6 +31,7 @@ type Company = {
   address: string | null
   city: string | null
   business_type: string | null
+  cover_photo_url: string | null
 }
 
 type ServiceRow = {
@@ -67,7 +68,7 @@ export default function CompanyStorefront() {
     const load = async () => {
       const { data: comp } = await supabase
         .from('companies')
-        .select('id, business_name, approval_status, plan, description, phone, email, address, city, business_type')
+        .select('id, business_name, approval_status, plan, description, phone, email, address, city, business_type, cover_photo_url')
         .eq('id', id)
         .maybeSingle()
 
@@ -161,7 +162,13 @@ export default function CompanyStorefront() {
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
 
-      <div style={{ position: 'relative', height: '160px', background: `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})` }}>
+      <div style={{
+        position: 'relative', height: '160px', overflow: 'hidden',
+        background: company.cover_photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`
+      }}>
+        {company.cover_photo_url && (
+          <img src={company.cover_photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        )}
         <div
           onClick={() => navigate(-1)}
           style={{
