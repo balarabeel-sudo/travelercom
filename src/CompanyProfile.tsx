@@ -27,6 +27,7 @@ type Company = {
   email: string | null
   address: string | null
   city: string | null
+  cover_photo_url: string | null
 }
 
 type ServiceRow = { id: string; title: string; price: number; photo_url: string | null; category: string }
@@ -49,6 +50,7 @@ export default function CompanyProfile() {
   const [address, setAddress] = useState('')
   const [city, setCity] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
 
   const load = async () => {
     const { data: userData } = await supabase.auth.getUser()
@@ -56,7 +58,7 @@ export default function CompanyProfile() {
 
     const { data: comp } = await supabase
       .from('companies')
-      .select('id, business_name, business_type, approval_status, plan, description, phone, email, address, city')
+      .select('id, business_name, business_type, approval_status, plan, description, phone, email, address, city, cover_photo_url')
       .eq('owner_id', userData.user.id)
       .maybeSingle()
 
@@ -97,6 +99,21 @@ export default function CompanyProfile() {
   }
 
   useEffect(() => { load() }, [])
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !company) return
+    setUploadingCover(true)
+    const fileExt = file.name.split('.').pop()
+    const filePath = `covers/${company.id}-${Date.now()}.${fileExt}`
+    const { error: uploadError } = await supabase.storage.from('listing-photos').upload(filePath, file)
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage.from('listing-photos').getPublicUrl(filePath)
+      await supabase.from('companies').update({ cover_photo_url: urlData.publicUrl }).eq('id', company.id)
+      load()
+    }
+    setUploadingCover(false)
+  }
 
   const saveProfile = async () => {
     if (!company) return
@@ -148,6 +165,27 @@ export default function CompanyProfile() {
       </div>
 
       <div style={{ padding: '16px' }}>
+
+        <div style={{
+          height: '140px', borderRadius: '16px', marginBottom: '16px', position: 'relative', overflow: 'hidden',
+          background: company.cover_photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`
+        }}>
+          {company.cover_photo_url && (
+            <img src={company.cover_photo_url} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          )}
+          <label style={{
+            position: 'absolute', bottom: '10px', right: '10px', width: '36px', height: '36px', borderRadius: '50%',
+            background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+          }}>
+            <Icon name="edit" size={16} color="white" />
+            <input type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} disabled={uploadingCover} />
+          </label>
+          {uploadingCover && (
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '12px', fontWeight: 700 }}>
+              Uploading...
+            </div>
+          )}
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
           <div style={{
