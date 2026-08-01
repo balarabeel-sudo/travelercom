@@ -29,6 +29,7 @@ import CompanyProfile from './CompanyProfile'
 import CompanyStorefront from './CompanyStorefront'
 import PrivacyPolicy from './PrivacyPolicy'
 import Terms from './Terms'
+import About from './About'
 import AddGuest from './AddGuest'
 
 function App() {
@@ -65,6 +66,7 @@ function App() {
         <Route path="/company/:id" element={<CompanyStorefront />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/about" element={<About />} />
         <Route path="/add-guest" element={<AddGuest />} />
       </Routes>
     </Router>
