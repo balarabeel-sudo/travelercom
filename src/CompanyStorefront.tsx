@@ -39,6 +39,15 @@ type ServiceRow = {
   price: number
   photo_url: string | null
   category: string
+  amenities: string[] | null
+}
+
+const AMENITY_ICON: Record<string, string> = {
+  WiFi: '📶', Parking: '🅿️', Restaurant: '🍽️', Pool: '🏊', Gym: '🏋️',
+  'Airport Pickup': '✈️', 'Conference Hall': '🏢', Laundry: '🧺', AC: '❄️', Breakfast: '☕',
+  Meals: '🍱', 'Charging Port': '🔌', 'Reclining Seats': '💺', Toilet: '🚻',
+  'Guide Included': '🧭', 'Transport Included': '🚐', 'Meals Included': '🍱', Insurance: '🛡️',
+  Catering: '🍽️', 'Sound System': '🔊', Seating: '🪑',
 }
 
 export default function CompanyStorefront() {
@@ -67,7 +76,7 @@ export default function CompanyStorefront() {
 
       const { data: serviceRows } = await supabase
         .from('services')
-        .select('id, title, price, photo_url, category')
+        .select('id, title, price, photo_url, category, amenities')
         .eq('company_id', comp.id)
         .eq('status', 'active')
 
@@ -331,6 +340,24 @@ export default function CompanyStorefront() {
             )}
           </div>
         )}
+
+        {(() => {
+          const uniqueAmenities = Array.from(new Set(services.flatMap((s) => s.amenities || [])))
+          if (uniqueAmenities.length === 0) return null
+          return (
+            <div style={{ background: COLORS.card, borderRadius: '16px', padding: '18px', marginTop: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+              <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>Top Amenities</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '14px' }}>
+                {uniqueAmenities.map((a) => (
+                  <div key={a} style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '20px', marginBottom: '4px' }}>{AMENITY_ICON[a] || '✓'}</p>
+                    <p style={{ fontSize: '10px', color: COLORS.textMuted }}>{a}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       <div style={{
