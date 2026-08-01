@@ -23,7 +23,16 @@ type ServiceDetail = {
   price: number
   seats_available: number | null
   company_id: string
+  amenities: string[] | null
   companies: { business_name: string } | null
+}
+
+const AMENITY_ICON: Record<string, string> = {
+  WiFi: '📶', Parking: '🅿️', Restaurant: '🍽️', Pool: '🏊', Gym: '🏋️',
+  'Airport Pickup': '✈️', 'Conference Hall': '🏢', Laundry: '🧺', AC: '❄️', Breakfast: '☕',
+  Meals: '🍱', 'Charging Port': '🔌', 'Reclining Seats': '💺', Toilet: '🚻',
+  'Guide Included': '🧭', 'Transport Included': '🚐', 'Meals Included': '🍱', Insurance: '🛡️',
+  Catering: '🍽️', 'Sound System': '🔊', Seating: '🪑',
 }
 
 type RoomType = {
@@ -83,7 +92,7 @@ function HotelDetails() {
 
       const { data: svc } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, companies(business_name)')
+        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, companies(business_name)')
         .eq('id', id)
         .maybeSingle()
 
@@ -413,17 +422,29 @@ function HotelDetails() {
         </div>
 
         <h2 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>{service.title}</h2>
-      <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '2px' }}>{service.destination}</p>
-        
-          <p
-          onClick={() => navigate(`/company/${service.company_id}`)}
-          style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 600, marginBottom: '16px', cursor: 'pointer' }}>
-          {service.companies?.business_name || 'Traveler.com Partner'} →
+        <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '2px' }}>{service.destination}</p>
+        <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '16px' }}>
+          {service.companies?.business_name || 'Traveler.com Partner'}
         </p>
+
         {service.description && (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '6px' }}>About this place</p>
             <p style={{ fontSize: '13px', color: COLORS.textMuted, lineHeight: 1.5 }}>{service.description}</p>
+          </div>
+        )}
+
+        {service.amenities && service.amenities.length > 0 && (
+          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Amenities</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {service.amenities.map((a) => (
+                <div key={a} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ fontSize: '14px' }}>{AMENITY_ICON[a] || '✓'}</span>
+                  <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{a}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
