@@ -13,6 +13,14 @@ const COMMISSION_BY_CATEGORY: Record<string, number> = {
 const CATEGORY_LABELS: Record<string, string> = {
   hotel: '🏨 Hotel', bus: '🚌 Bus', train: '🚆 Railway', flight: '✈️ Flight', tour: '🗺️ Tour', event_center: '🎪 Event Center',
 }
+const AMENITY_ICON: Record<string, string> = {
+  WiFi: '📶', Parking: '🅿️', Restaurant: '🍽️', Pool: '🏊', Gym: '🏋️',
+  'Airport Pickup': '✈️', 'Conference Hall': '🏢', Laundry: '🧺', AC: '❄️', Breakfast: '☕',
+  Meals: '🍱', 'Charging Port': '🔌', 'Reclining Seats': '💺', Toilet: '🚻',
+  'Guide Included': '🧭', 'Transport Included': '🚐', 'Meals Included': '🍱', Insurance: '🛡️',
+  Catering: '🍽️', 'Sound System': '🔊', Seating: '🪑',
+}
+const AMENITIES_LIST = Object.keys(AMENITY_ICON)
 
 function AddListing() {
   const navigate = useNavigate()
@@ -30,6 +38,7 @@ function AddListing() {
   const [quantity, setQuantity] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState('')
+  const [amenities, setAmenities] = useState<string[]>([])
 
   const [submitting, setSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -55,6 +64,10 @@ function AddListing() {
   const isTransport = category === 'bus' || category === 'train' || category === 'flight'
   const quantityLabel = category === 'hotel' ? 'Rooms Available' : isTransport ? 'Seats Available' : 'Slots Available'
   const destinationLabel = category === 'hotel' || category === 'event_center' ? 'City' : isTransport ? 'Destination' : 'Location'
+
+  const toggleAmenity = (a: string) => {
+    setAmenities((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a])
+  }
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -108,6 +121,7 @@ function AddListing() {
       seats_available: quantity ? parseInt(quantity, 10) : null,
       status: 'active',
       photo_url: photoUrl,
+      amenities: amenities.length > 0 ? amenities : null,
     })
 
     setSubmitting(false)
@@ -213,6 +227,31 @@ function AddListing() {
 
           <Field label={quantityLabel}>
             <input type="number" placeholder="e.g. 20" value={quantity} onChange={(e) => setQuantity(e.target.value)} style={inputStyle} />
+          </Field>
+
+          <Field label="Amenities">
+            <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+              {AMENITIES_LIST.map((a) => {
+                const active = amenities.includes(a)
+                return (
+                  <span
+                    key={a}
+                    onClick={() => toggleAmenity(a)}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '20px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: `1px solid ${active ? COLORS.primary : COLORS.border}`,
+                      background: active ? COLORS.primary : COLORS.bg,
+                      color: active ? 'white' : COLORS.textMuted,
+                    }}>
+                    {AMENITY_ICON[a]} {a}
+                  </span>
+                )
+              })}
+            </div>
           </Field>
 
           <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '14px' }}>
