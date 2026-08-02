@@ -22,6 +22,14 @@ const CATEGORY_META: Record<string, { label: string; icon: string; unitLabel: st
   event_center: { label: 'Event Center', icon: '🎪', unitLabel: 'Capacity', isTransport: false, prefix: 'EVT' },
 }
 
+const AMENITY_ICON: Record<string, string> = {
+  WiFi: '📶', Parking: '🅿️', Restaurant: '🍽️', Pool: '🏊', Gym: '🏋️',
+  'Airport Pickup': '✈️', 'Conference Hall': '🏢', Laundry: '🧺', AC: '❄️', Breakfast: '☕',
+  Meals: '🍱', 'Charging Port': '🔌', 'Reclining Seats': '💺', Toilet: '🚻',
+  'Guide Included': '🧭', 'Transport Included': '🚐', 'Meals Included': '🍱', Insurance: '🛡️',
+  Catering: '🍽️', 'Sound System': '🔊', Seating: '🪑',
+}
+
 type ServiceDetail = {
   id: string
   title: string
@@ -32,6 +40,7 @@ type ServiceDetail = {
   departure_time: string | null
   price: number
   seats_available: number | null
+  amenities: string[] | null
   company_id: string
   companies: { business_name: string } | null
 }
@@ -46,6 +55,25 @@ type SeatType = {
 function generateTicketCode(prefix: string) {
   const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
   return `${prefix}-${new Date().getFullYear()}-${rand}`
+}
+
+const ID_TYPES = ['NIN', "Voter's Card (PVC)", "Driver's License", 'School ID'] as const
+
+function isIdFormatValid(idType: string, idNumber: string): boolean {
+  const v = idNumber.trim()
+  if (!v) return false
+  switch (idType) {
+    case 'NIN':
+      return /^\d{11}$/.test(v)
+    case "Voter's Card (PVC)":
+      return /^[A-Za-z0-9]{19}$/.test(v)
+    case "Driver's License":
+      return /^[A-Za-z0-9]{8,12}$/.test(v)
+    case 'School ID':
+      return v.length >= 4
+    default:
+      return false
+  }
 }
 
 function ServiceDetails() {
@@ -70,6 +98,8 @@ function ServiceDetails() {
   const [ticketCode, setTicketCode] = useState('')
   const [assignedUnitNumber, setAssignedUnitNumber] = useState('')
   const [activePromo, setActivePromo] = useState<{ title: string; discount_type: string; discount_value: number } | null>(null)
+  const [idType, setIdType] = useState<string>(ID_TYPES[0])
+  const [idNumber, setIdNumber] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -90,7 +120,7 @@ function ServiceDetails() {
 
       const { data: svc } = await supabase
         .from('services')
-        .select('id, title, description, origin, destination, departure_time, price, seats_available, company_id, photo_url, companies(business_name)')
+        .select('id, title, description, origin, destination, departure_time, price, seats_available, amenities, company_id, photo_url, companies(business_name)')
         .eq('id', id)
         .maybeSingle()
 
@@ -179,6 +209,11 @@ function ServiceDetails() {
       return
     }
 
+    if (meta.isTransport && !isIdFormatValid(idType, idNumber)) {
+      setMessage({ type: 'error', text: `Please enter a valid ${idType} number before booking.` })
+      return
+    }
+
     if (walletBalance < activePrice) {
       setMessage({ type: 'error', text: 'Insufficient wallet balance. Please top up your wallet first.' })
       return
@@ -229,6 +264,8 @@ function ServiceDetails() {
       ticket_code: code,
       customer_name: displayName || null,
       assigned_unit_number: assignedNumber || null,
+      id_type: meta.isTransport ? idType : null,
+      id_number: meta.isTransport ? idNumber.trim() : null,
     }).select('id').single()
 
     if (bookingErr) {
@@ -245,6 +282,12 @@ function ServiceDetails() {
         .from('inventory_units')
         .update({ booking_id: newBooking?.id || null })
         .eq('id', assignedUnitId)
+    } else if (!usingSeatTypes && service.seats_available !== null && service.seats_available > 0) {
+      await supabase
+        .from('services')
+        .update({ seats_available: service.seats_available - 1 })
+        .eq('id', service.id)
+      setService({ ...service, seats_available: service.seats_available - 1 })
     }
 
     const newBalance = walletBalance - activePrice
@@ -363,8 +406,10 @@ function ServiceDetails() {
         <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '2px' }}>
           {meta.isTransport && service.origin ? `${service.origin} → ${service.destination}` : service.destination}
         </p>
-        <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '16px' }}>
-          {service.companies?.business_name || 'Traveler.com Partner'}
+        <p
+          onClick={() => navigate(`/company/${service.company_id}`)}
+          style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, marginBottom: '16px', cursor: 'pointer' }}>
+          {service.companies?.business_name || 'Traveler.com Partner'} →
         </p>
 
         {service.description && (
@@ -379,6 +424,20 @@ function ServiceDetails() {
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Departure</span>
               <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{new Date(service.departure_time).toLocaleString()}</span>
+            </div>
+          </div>
+        )}
+
+        {service.amenities && service.amenities.length > 0 && (
+          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Amenities</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {service.amenities.map((a) => (
+                <div key={a} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ fontSize: '14px' }}>{AMENITY_ICON[a] || '✓'}</span>
+                  <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{a}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -476,6 +535,33 @@ function ServiceDetails() {
           </div>
         )}
 
+        {meta.isTransport && (
+          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Identity Verification</p>
+            <select
+              value={idType}
+              onChange={(e) => { setIdType(e.target.value); setIdNumber('') }}
+              style={{ width: '100%', padding: '11px', border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '13.5px', marginBottom: '8px', boxSizing: 'border-box' as const }}>
+              {ID_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <input
+              type="text"
+              placeholder={`Enter your ${idType} number`}
+              value={idNumber}
+              onChange={(e) => setIdNumber(e.target.value)}
+              style={{ width: '100%', padding: '11px', border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '13.5px', boxSizing: 'border-box' as const }}
+            />
+            {idNumber.trim().length > 0 && (
+              <p style={{ fontSize: '11.5px', fontWeight: 700, marginTop: '6px', color: isIdFormatValid(idType, idNumber) ? COLORS.green : COLORS.red }}>
+                {isIdFormatValid(idType, idNumber) ? '✅ Format valid' : '❌ Format invalid — check the number'}
+              </p>
+            )}
+            <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '6px' }}>
+              This checks the number format only — it does not confirm the ID with a government database.
+            </p>
+          </div>
+        )}
+
         <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '12px', color: COLORS.textMuted }}>Your wallet balance</span>
@@ -500,9 +586,10 @@ function ServiceDetails() {
 
         <button
           onClick={handleBookNow}
-          disabled={booking || (usingSeatTypes && !selectedUnitId)}
+          disabled={booking || (usingSeatTypes && !selectedUnitId) || (meta.isTransport && !isIdFormatValid(idType, idNumber))}
           style={{
-            width: '100%', padding: '15px', background: booking || (usingSeatTypes && !selectedUnitId) ? '#94a3b8' : COLORS.secondary,
+            width: '100%', padding: '15px',
+            background: booking || (usingSeatTypes && !selectedUnitId) || (meta.isTransport && !isIdFormatValid(idType, idNumber)) ? '#94a3b8' : COLORS.secondary,
             color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px',
             cursor: booking ? 'not-allowed' : 'pointer'
           }}>
