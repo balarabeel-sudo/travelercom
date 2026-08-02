@@ -12,6 +12,14 @@ const COLORS = {
   border: '#E2E8F0',
 }
 
+const AMENITY_ICON: Record<string, string> = {
+  WiFi: '📶', Parking: '🅿️', Restaurant: '🍽️', Pool: '🏊', Gym: '🏋️',
+  'Airport Pickup': '✈️', 'Conference Hall': '🏢', Laundry: '🧺', AC: '❄️', Breakfast: '☕',
+  Meals: '🍱', 'Charging Port': '🔌', 'Reclining Seats': '💺', Toilet: '🚻',
+  'Guide Included': '🧭', 'Transport Included': '🚐', 'Meals Included': '🍱', Insurance: '🛡️',
+  Catering: '🍽️', 'Sound System': '🔊', Seating: '🪑',
+}
+
 type Hotel = {
   photo_url: string | null
   id: string
@@ -20,6 +28,7 @@ type Hotel = {
   destination: string
   price: number
   seats_available: number | null
+  amenities: string[] | null
   companies: { business_name: string } | null
 }
 
@@ -36,7 +45,7 @@ function Hotels() {
     setLoading(true)
     let query = supabase
       .from('services')
-      .select('id, title, description, destination, price, seats_available, photo_url, companies(business_name)')
+      .select('id, title, description, destination, price, seats_available, amenities, photo_url, companies(business_name)')
       .eq('category', 'hotel')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -202,6 +211,31 @@ function Hotels() {
                   <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '10px' }}>
                     {h.description}
                   </p>
+                )}
+
+                {h.amenities && h.amenities.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '6px', marginBottom: '10px' }}>
+                    {h.amenities.slice(0, 4).map((a) => (
+                      <span
+                        key={a}
+                        style={{
+                          padding: '4px 9px',
+                          borderRadius: '20px',
+                          fontSize: '10.5px',
+                          fontWeight: 700,
+                          background: COLORS.bg,
+                          border: `1px solid ${COLORS.border}`,
+                          color: COLORS.textMuted,
+                        }}>
+                        {AMENITY_ICON[a] || '✓'} {a}
+                      </span>
+                    ))}
+                    {h.amenities.length > 4 && (
+                      <span style={{ fontSize: '10.5px', color: COLORS.textMuted, alignSelf: 'center' }}>
+                        +{h.amenities.length - 4} more
+                      </span>
+                    )}
+                  </div>
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
