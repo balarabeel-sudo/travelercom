@@ -294,6 +294,12 @@ function HotelDetails() {
         .from('inventory_units')
         .update({ booking_id: newBooking?.id || null })
         .eq('id', assignedUnitId)
+    } else if (!usingRoomTypes && service.seats_available !== null && service.seats_available > 0) {
+      await supabase
+        .from('services')
+        .update({ seats_available: service.seats_available - 1 })
+        .eq('id', service.id)
+      setService({ ...service, seats_available: service.seats_available - 1 })
     }
 
     const newBalance = walletBalance - activePrice
@@ -423,8 +429,10 @@ function HotelDetails() {
 
         <h2 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>{service.title}</h2>
         <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '2px' }}>{service.destination}</p>
-        <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '16px' }}>
-          {service.companies?.business_name || 'Traveler.com Partner'}
+        <p
+          onClick={() => navigate(`/company/${service.company_id}`)}
+          style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, marginBottom: '16px', cursor: 'pointer' }}>
+          {service.companies?.business_name || 'Traveler.com Partner'} →
         </p>
 
         {service.description && (
