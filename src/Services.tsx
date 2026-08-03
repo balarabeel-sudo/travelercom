@@ -196,7 +196,7 @@ function Services() {
                     )}
                   </div>
                   <button
-                    onClick={() => navigate(`/services/${category}/${it.id}`)}
+                    onClick={() => navigate(category === 'flight' ? `/flight/${it.id}` : `/services/${category}/${it.id}`)}
                     style={{ padding: '9px 16px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12.5px', cursor: 'pointer' }}>
                     View Details
                   </button>
