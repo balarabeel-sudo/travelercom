@@ -97,7 +97,7 @@ function ServiceDetails() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [ticketCode, setTicketCode] = useState('')
   const [assignedUnitNumber, setAssignedUnitNumber] = useState('')
-  const [activePromo, setActivePromo] = useState<{ title: string; discount_type: string; discount_value: number } | null>(null)
+  const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
   const [idType, setIdType] = useState<string>(ID_TYPES[0])
   const [idNumber, setIdNumber] = useState('')
 
@@ -129,14 +129,24 @@ function ServiceDetails() {
       const today = new Date().toISOString().split('T')[0]
       const { data: promoRows } = await supabase
         .from('promotions')
-        .select('title, discount_type, discount_value, start_date, end_date')
+        .select('id, title, discount_type, discount_value, start_date, end_date, usage_limit')
         .eq('service_id', id)
         .eq('active', true)
 
       const validPromo = (promoRows || []).find((p: any) =>
         (!p.start_date || p.start_date <= today) && (!p.end_date || p.end_date >= today)
       )
-      if (validPromo) setActivePromo(validPromo as any)
+      if (validPromo) {
+        if (validPromo.usage_limit) {
+          const { count } = await supabase
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('promotion_id', validPromo.id)
+          if ((count || 0) < validPromo.usage_limit) setActivePromo(validPromo as any)
+        } else {
+          setActivePromo(validPromo as any)
+        }
+      }
 
       // Check if this listing has Inventory seat/ticket types set up (Premium companies only)
       const { data: items } = await supabase
@@ -264,6 +274,7 @@ function ServiceDetails() {
       ticket_code: code,
       customer_name: displayName || null,
       assigned_unit_number: assignedNumber || null,
+      promotion_id: activePromo?.id || null,
       id_type: meta.isTransport ? idType : null,
       id_number: meta.isTransport ? idNumber.trim() : null,
     }).select('id').single()
