@@ -34,6 +34,8 @@ import Notifications from './Notifications'
 import Support from './Support'
 import Settings from './Settings'
 import AddGuest from './AddGuest'
+import FlightDetails from './FlightDetails'
+import MyBookings from './MyBookings'
 
 function App() {
   return (
@@ -74,6 +76,8 @@ function App() {
        <Route path="/support" element={<Support />} />
        <Route path="/settings" element={<Settings />} />
         <Route path="/add-guest" element={<AddGuest />} />
+        <Route path="/flight/:id" element={<FlightDetails />} />
+        <Route path="/my-bookings" element={<MyBookings />} />
       </Routes>
     </Router>
   )
