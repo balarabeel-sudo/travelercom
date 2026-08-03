@@ -66,7 +66,7 @@ function HotelDetails() {
   const [holidayDates, setHolidayDates] = useState<string[]>([])
   const [checkInDate, setCheckInDate] = useState('')
   const [checkOutDate, setCheckOutDate] = useState('')
-  const [activePromo, setActivePromo] = useState<{ title: string; discount_type: string; discount_value: number } | null>(null)
+  const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
 
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -101,14 +101,24 @@ function HotelDetails() {
       const today = new Date().toISOString().split('T')[0]
       const { data: promoRows } = await supabase
         .from('promotions')
-        .select('title, discount_type, discount_value, start_date, end_date')
+        .select('id, title, discount_type, discount_value, start_date, end_date, usage_limit')
         .eq('service_id', id)
         .eq('active', true)
 
       const validPromo = (promoRows || []).find((p: any) =>
         (!p.start_date || p.start_date <= today) && (!p.end_date || p.end_date >= today)
       )
-      if (validPromo) setActivePromo(validPromo as any)
+      if (validPromo) {
+        if (validPromo.usage_limit) {
+          const { count } = await supabase
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('promotion_id', validPromo.id)
+          if ((count || 0) < validPromo.usage_limit) setActivePromo(validPromo as any)
+        } else {
+          setActivePromo(validPromo as any)
+        }
+      }
 
       // Check if this listing has Inventory room types set up (Premium companies only)
       const { data: items } = await supabase
@@ -277,6 +287,7 @@ function HotelDetails() {
       customer_name: displayName || null,
       check_in_date: checkInDate,
       check_out_date: checkOutDate,
+      promotion_id: activePromo?.id || null,
       assigned_unit_number: assignedNumber || null,
     }).select('id').single()
 
