@@ -46,7 +46,7 @@ export default function AddGuest() {
   const [showTypePicker, setShowTypePicker] = useState(false)
   const [loadingTypes, setLoadingTypes] = useState(false)
 
-  const [activePromo, setActivePromo] = useState<{ title: string; discount_type: string; discount_value: number } | null>(null)
+  const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
   const [holidayDates, setHolidayDates] = useState<string[]>([])
 
   const [customerName, setCustomerName] = useState('')
@@ -137,11 +137,19 @@ export default function AddGuest() {
       const today = new Date().toISOString().split('T')[0]
       const { data: promoRows } = await supabase
         .from('promotions')
-        .select('title, discount_type, discount_value, start_date, end_date')
+        .select('id, title, discount_type, discount_value, start_date, end_date, usage_limit')
         .eq('service_id', serviceId)
         .eq('active', true)
       const validPromo = (promoRows || []).find((p: any) => (!p.start_date || p.start_date <= today) && (!p.end_date || p.end_date >= today))
-      setActivePromo(validPromo ? (validPromo as any) : null)
+      if (validPromo && validPromo.usage_limit) {
+        const { count } = await supabase
+          .from('bookings')
+          .select('id', { count: 'exact', head: true })
+          .eq('promotion_id', validPromo.id)
+        setActivePromo((count || 0) < validPromo.usage_limit ? (validPromo as any) : null)
+      } else {
+        setActivePromo(validPromo ? (validPromo as any) : null)
+      }
 
       if (companyId) {
         const { data: holidayRows } = await supabase.from('company_holidays').select('date').eq('company_id', companyId)
@@ -248,6 +256,7 @@ export default function AddGuest() {
       ticket_code: ticketCode,
       checked_in: true,
       checked_in_at: new Date().toISOString(),
+      promotion_id: activePromo?.id || null,
       assigned_unit_number: assignedNumber || null,
     }).select('id').single()
 
