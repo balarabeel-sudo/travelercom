@@ -89,18 +89,13 @@ export default function Promotions() {
 
     const { data: bookingRows } = await supabase
       .from('bookings')
-      .select('service_id, created_at, checked_in')
+      .select('promotion_id')
       .eq('company_id', company.id)
-      .eq('checked_in', true)
+      .not('promotion_id', 'is', null)
 
     const counts: Record<string, number> = {}
-    ;(promoRows || []).forEach((p: any) => {
-      const matching = (bookingRows || []).filter((b: any) =>
-        b.service_id === p.service_id &&
-        (!p.start_date || b.created_at.split('T')[0] >= p.start_date) &&
-        (!p.end_date || b.created_at.split('T')[0] <= p.end_date)
-      )
-      counts[p.id] = matching.length
+    ;(bookingRows || []).forEach((b: any) => {
+      if (b.promotion_id) counts[b.promotion_id] = (counts[b.promotion_id] || 0) + 1
     })
     setUsageCounts(counts)
 
