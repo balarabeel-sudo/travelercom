@@ -68,7 +68,7 @@ function FlightDetails() {
   const [service, setService] = useState<FlightService | null>(null)
   const [userId, setUserId] = useState('')
   const [walletBalance, setWalletBalance] = useState(0)
-  const [activePromo, setActivePromo] = useState<{ title: string; discount_type: string; discount_value: number } | null>(null)
+  const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
   const [booking, setBooking] = useState(false)
 
@@ -121,13 +121,23 @@ function FlightDetails() {
       const today = new Date().toISOString().split('T')[0]
       const { data: promoRows } = await supabase
         .from('promotions')
-        .select('title, discount_type, discount_value, start_date, end_date')
+        .select('id, title, discount_type, discount_value, start_date, end_date, usage_limit')
         .eq('service_id', id)
         .eq('active', true)
       const validPromo = (promoRows || []).find((p: any) =>
         (!p.start_date || p.start_date <= today) && (!p.end_date || p.end_date >= today)
       )
-      if (validPromo) setActivePromo(validPromo as any)
+      if (validPromo) {
+        if (validPromo.usage_limit) {
+          const { count } = await supabase
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('promotion_id', validPromo.id)
+          if ((count || 0) < validPromo.usage_limit) setActivePromo(validPromo as any)
+        } else {
+          setActivePromo(validPromo as any)
+        }
+      }
 
       const { data: items } = await supabase
         .from('inventory_items')
@@ -229,6 +239,7 @@ function FlightDetails() {
       ticket_code: code,
       customer_name: fullName || null,
       assigned_unit_number: assignedNumber || null,
+      promotion_id: activePromo?.id || null,
       id_type: idType,
       id_number: idNumber.trim(),
     }).select('id').single()
