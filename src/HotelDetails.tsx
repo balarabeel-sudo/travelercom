@@ -24,7 +24,7 @@ type ServiceDetail = {
   seats_available: number | null
   company_id: string
   amenities: string[] | null
-  companies: { business_name: string } | null
+  companies: { business_name: string; allow_unit_selection: boolean | null } | null
 }
 
 const AMENITY_ICON: Record<string, string> = {
@@ -92,7 +92,7 @@ function HotelDetails() {
 
       const { data: svc } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, companies(business_name)')
+        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, companies(business_name, allow_unit_selection)')
         .eq('id', id)
         .maybeSingle()
 
@@ -249,13 +249,8 @@ function HotelDetails() {
 
     if (selectedRoom && selectedUnitId) {
       const chosen = unitOptions.find((u) => u.id === selectedUnitId)
-      const { data: claimed } = await supabase
-        .from('inventory_units')
-        .update({ status: 'occupied' })
-        .eq('id', selectedUnitId)
-        .eq('status', 'available')
-        .select('id, unit_number')
-        .maybeSingle()
+      const { data: claimedRows } = await supabase.rpc('claim_inventory_unit', { p_unit_id: selectedUnitId })
+      const claimed = claimedRows && claimedRows.length > 0 ? claimedRows[0] : null
 
       if (!claimed) {
         setBooking(false)
@@ -306,11 +301,10 @@ function HotelDetails() {
         .update({ booking_id: newBooking?.id || null })
         .eq('id', assignedUnitId)
     } else if (!usingRoomTypes && service.seats_available !== null && service.seats_available > 0) {
-      await supabase
-        .from('services')
-        .update({ seats_available: service.seats_available - 1 })
-        .eq('id', service.id)
-      setService({ ...service, seats_available: service.seats_available - 1 })
+      const { data: newCount, error: decErr } = await supabase.rpc('decrement_seats', { p_service_id: service.id })
+      if (!decErr && newCount !== null) {
+        setService({ ...service, seats_available: newCount })
+      }
     }
 
     const newBalance = walletBalance - activePrice
@@ -505,33 +499,44 @@ function HotelDetails() {
               )
             })}
 
-            {selectedRoom && (
+            {selectedRoom && (() => {
+              const allowPicking = service.companies?.allow_unit_selection ?? true
+              return (
               <div style={{ marginTop: '4px' }}>
-                <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, marginBottom: '8px' }}>Pick a Room Number</p>
-                {loadingUnits ? (
-                  <p style={{ fontSize: '12px', color: COLORS.textMuted }}>Loading available rooms...</p>
-                ) : unitOptions.length === 0 ? (
-                  <p style={{ fontSize: '12px', color: COLORS.red }}>No rooms available for this type right now.</p>
-                ) : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {unitOptions.map((u) => (
-                      <div
-                        key={u.id}
-                        onClick={() => setSelectedUnitId(u.id)}
-                        style={{
-                          minWidth: '44px', padding: '9px 6px', textAlign: 'center', borderRadius: '9px', cursor: 'pointer',
-                          background: selectedUnitId === u.id ? COLORS.primary : COLORS.card,
-                          color: selectedUnitId === u.id ? 'white' : COLORS.text,
-                          border: `1.5px solid ${selectedUnitId === u.id ? COLORS.primary : COLORS.border}`,
-                          fontWeight: 700, fontSize: '13px'
-                        }}>
-                        {u.unit_number}
+                {allowPicking ? (
+                  <>
+                    <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, marginBottom: '8px' }}>Pick a Room Number</p>
+                    {loadingUnits ? (
+                      <p style={{ fontSize: '12px', color: COLORS.textMuted }}>Loading available rooms...</p>
+                    ) : unitOptions.length === 0 ? (
+                      <p style={{ fontSize: '12px', color: COLORS.red }}>No rooms available for this type right now.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {unitOptions.map((u) => (
+                          <div
+                            key={u.id}
+                            onClick={() => setSelectedUnitId(u.id)}
+                            style={{
+                              minWidth: '44px', padding: '9px 6px', textAlign: 'center', borderRadius: '9px', cursor: 'pointer',
+                              background: selectedUnitId === u.id ? COLORS.primary : COLORS.card,
+                              color: selectedUnitId === u.id ? 'white' : COLORS.text,
+                              border: `1.5px solid ${selectedUnitId === u.id ? COLORS.primary : COLORS.border}`,
+                              fontWeight: 700, fontSize: '13px'
+                            }}>
+                            {u.unit_number}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
+                ) : (
+                  <p style={{ fontSize: '12px', color: COLORS.textMuted, fontStyle: 'italic' as const }}>
+                    {loadingUnits ? 'Checking availability...' : unitOptions.length === 0 ? 'No rooms available for this type right now.' : 'A room will be assigned automatically at booking.'}
+                  </p>
                 )}
               </div>
-            )}
+              )
+            })()}
           </div>
         ) : (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
