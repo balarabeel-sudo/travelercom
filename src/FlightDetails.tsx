@@ -52,7 +52,7 @@ type FlightService = {
   price: number
   seats_available: number | null
   company_id: string
-  companies: { business_name: string } | null
+  companies: { business_name: string; allow_unit_selection: boolean | null } | null
 }
 
 type SeatType = { id: string; name: string; price: number; available: number }
@@ -113,7 +113,7 @@ function FlightDetails() {
 
       const { data: svc } = await supabase
         .from('services')
-        .select('id, title, origin, destination, departure_time, price, seats_available, company_id, photo_url, companies(business_name)')
+        .select('id, title, origin, destination, departure_time, price, seats_available, company_id, photo_url, companies(business_name, allow_unit_selection)')
         .eq('id', id)
         .maybeSingle()
       setService(svc as any)
@@ -210,13 +210,8 @@ function FlightDetails() {
 
     if (selectedSeat && selectedUnitId) {
       const chosen = unitOptions.find((u) => u.id === selectedUnitId)
-      const { data: claimed } = await supabase
-        .from('inventory_units')
-        .update({ status: 'occupied' })
-        .eq('id', selectedUnitId)
-        .eq('status', 'available')
-        .select('id, unit_number')
-        .maybeSingle()
+      const { data: claimedRows } = await supabase.rpc('claim_inventory_unit', { p_unit_id: selectedUnitId })
+      const claimed = claimedRows && claimedRows.length > 0 ? claimedRows[0] : null
 
       if (!claimed) {
         setBooking(false)
@@ -254,8 +249,10 @@ function FlightDetails() {
     if (assignedUnitId) {
       await supabase.from('inventory_units').update({ booking_id: newBooking?.id || null }).eq('id', assignedUnitId)
     } else if (!usingSeatTypes && service.seats_available !== null && service.seats_available > 0) {
-      await supabase.from('services').update({ seats_available: service.seats_available - 1 }).eq('id', service.id)
-      setService({ ...service, seats_available: service.seats_available - 1 })
+      const { data: newCount, error: decErr } = await supabase.rpc('decrement_seats', { p_service_id: service.id })
+      if (!decErr && newCount !== null) {
+        setService({ ...service, seats_available: newCount })
+      }
     }
 
     const newBalance = walletBalance - total
@@ -423,7 +420,16 @@ function FlightDetails() {
                     </span>
                   ))}
                 </div>
-                {selectedSeatTypeId && (
+                {selectedSeatTypeId && (() => {
+                  const allowPicking = service.companies?.allow_unit_selection ?? true
+                  if (!allowPicking) {
+                    return (
+                      <p style={{ fontSize: '12px', color: COLORS.textMuted, fontStyle: 'italic' as const }}>
+                        {unitOptions.length === 0 ? 'No seats available in this class.' : 'A seat will be assigned automatically at booking.'}
+                      </p>
+                    )
+                  }
+                  return (
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
                     {unitOptions.map((u) => (
                       <span key={u.id} onClick={() => setSelectedUnitId(u.id)}
@@ -436,7 +442,8 @@ function FlightDetails() {
                     ))}
                     {unitOptions.length === 0 && <p style={{ fontSize: '12px', color: COLORS.textMuted }}>No seats available in this class.</p>}
                   </div>
-                )}
+                  )
+                })()}
               </div>
             )}
 
