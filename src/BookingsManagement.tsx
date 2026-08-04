@@ -42,6 +42,7 @@ function BookingsManagement() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterTab>('all')
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -108,6 +109,19 @@ function BookingsManagement() {
     if (tab === 'completed') return { text: 'Completed', bg: '#f0fdf4', color: COLORS.green }
     if (tab === 'cancelled') return { text: 'Cancelled', bg: '#fef2f2', color: COLORS.red }
     return { text: 'Pending', bg: '#fff7ed', color: COLORS.orange }
+  }
+
+  const handleCancelBooking = async () => {
+    if (!selectedBooking) return
+    setCancelling(true)
+    const { error } = await supabase.rpc('cancel_booking', { p_booking_id: selectedBooking.id })
+    setCancelling(false)
+    if (error) {
+      alert('Failed to cancel: ' + error.message)
+      return
+    }
+    setBookings((prev) => prev.map((b) => b.id === selectedBooking.id ? { ...b, booking_status: 'cancelled' } : b))
+    setSelectedBooking(null)
   }
 
   return (
@@ -189,13 +203,13 @@ function BookingsManagement() {
               return (
                 <div
                   key={b.id}
-                  onClick={() => tab === 'completed' && setSelectedBooking(b)}
+                  onClick={() => setSelectedBooking(b)}
                   style={{
                     background: COLORS.card,
                     borderRadius: '14px',
                     padding: '14px',
                     boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-                    cursor: tab === 'completed' ? 'pointer' : 'default'
+                    cursor: 'pointer'
                   }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                     <div>
@@ -272,10 +286,22 @@ function BookingsManagement() {
             )}
             <DetailRow label="Booked On" value={new Date(selectedBooking.created_at).toLocaleString()} />
 
+            {getTab(selectedBooking) === 'pending' && (
+              <div
+                onClick={() => !cancelling && confirm('Cancel this booking and refund the customer?') && handleCancelBooking()}
+                style={{
+                  marginTop: '14px', background: cancelling ? '#94a3b8' : '#fef2f2', color: COLORS.red, textAlign: 'center',
+                  padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: cancelling ? 'not-allowed' : 'pointer',
+                  border: `1px solid ${COLORS.red}`
+                }}>
+                {cancelling ? 'Cancelling...' : 'Cancel Booking & Refund Customer'}
+              </div>
+            )}
+
             <div
               onClick={() => setSelectedBooking(null)}
               style={{
-                marginTop: '16px', background: COLORS.primary, color: 'white', textAlign: 'center',
+                marginTop: '10px', background: COLORS.primary, color: 'white', textAlign: 'center',
                 padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer'
               }}>
               Close
