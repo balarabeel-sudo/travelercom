@@ -78,6 +78,7 @@ function App() {
         <Route path="/add-guest" element={<AddGuest />} />
         <Route path="/flight/:id" element={<FlightDetails />} />
         <Route path="/my-bookings" element={<MyBookings />} />
+        <Route path="/bookings" element={<MyBookings />} />
       </Routes>
     </Router>
   )
