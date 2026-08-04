@@ -49,6 +49,13 @@ function MyBookings() {
   const [loading, setLoading] = useState(true)
   const [bookings, setBookings] = useState<BookingRow[]>([])
   const [filter, setFilter] = useState<'all' | 'confirmed' | 'completed' | 'cancelled'>('all')
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 15000)
+    return () => clearInterval(tick)
+  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -106,6 +113,22 @@ function MyBookings() {
           const status = (b.booking_status || 'pending').toLowerCase()
           const style = STATUS_STYLE[status] || { bg: '#F1F5F9', color: COLORS.textMuted }
           const category = b.services?.category || 'hotel'
+          const bookedAt = b.created_at ? new Date(b.created_at).getTime() : 0
+          const minutesSince = (now - bookedAt) / 60000
+          const canCancel = status === 'confirmed' && minutesSince < 15
+
+          const handleCancel = async () => {
+            if (!confirm('Cancel this booking? Your payment will be refunded to your wallet.')) return
+            setCancellingId(b.id)
+            const { error } = await supabase.rpc('cancel_booking', { p_booking_id: b.id })
+            setCancellingId(null)
+            if (error) {
+              alert('Failed to cancel: ' + error.message)
+              return
+            }
+            setBookings((prev) => prev.map((x) => x.id === b.id ? { ...x, booking_status: 'cancelled' } : x))
+          }
+
           return (
             <div key={b.id} style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
@@ -136,6 +159,19 @@ function MyBookings() {
                 </div>
                 <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.secondary }}>₦{Number(b.amount_paid).toLocaleString()}</p>
               </div>
+
+              {canCancel && (
+                <div
+                  onClick={() => cancellingId !== b.id && handleCancel()}
+                  style={{
+                    marginTop: '10px', textAlign: 'center' as const, padding: '10px', borderRadius: '10px',
+                    border: `1px solid ${COLORS.red}`, color: COLORS.red, fontSize: '12px', fontWeight: 700,
+                    cursor: cancellingId === b.id ? 'not-allowed' : 'pointer',
+                    background: cancellingId === b.id ? '#f1f5f9' : 'white',
+                  }}>
+                  {cancellingId === b.id ? 'Cancelling...' : `Cancel Booking (${Math.max(0, Math.ceil(15 - minutesSince))} min left)`}
+                </div>
+              )}
             </div>
           )
         })}
