@@ -24,10 +24,21 @@ type InventoryItem = {
   total_quantity: number
   price: number
   service_id: string | null
-  services: { photo_url: string | null } | null
+  image_url: string | null
+  services: { photo_url: string | null; category: string | null } | null
 }
 
-type ServiceOption = { id: string; title: string }
+type ServiceOption = { id: string; title: string; category: string | null }
+
+const CATEGORY_LABELS: Record<string, { plural: string; singular: string; unitPlural: string; icon: string; placeholder: string }> = {
+  hotel: { plural: 'Room Types', singular: 'Room Type', unitPlural: 'Rooms', icon: '🛏️', placeholder: 'e.g. Executive Room, Suite' },
+  bus: { plural: 'Seat Types', singular: 'Seat Type', unitPlural: 'Seats', icon: '💺', placeholder: 'e.g. Economy, VIP' },
+  train: { plural: 'Seat Types', singular: 'Seat Type', unitPlural: 'Seats', icon: '💺', placeholder: 'e.g. Economy, First Class' },
+  flight: { plural: 'Seat Classes', singular: 'Seat Class', unitPlural: 'Seats', icon: '✈️', placeholder: 'e.g. Economy, Business, First Class' },
+  tour: { plural: 'Slot Types', singular: 'Slot Type', unitPlural: 'Slots', icon: '🗺️', placeholder: 'e.g. Standard Group, Private Tour' },
+  event_center: { plural: 'Package Types', singular: 'Package Type', unitPlural: 'Slots', icon: '🎪', placeholder: 'e.g. Standard Hall, VIP Hall' },
+}
+const DEFAULT_LABELS = { plural: 'Inventory Types', singular: 'Type', unitPlural: 'Units', icon: '📦', placeholder: 'e.g. Standard, Premium' }
 
 export default function InventoryManagement() {
   const navigate = useNavigate()
@@ -47,6 +58,8 @@ export default function InventoryManagement() {
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('')
   const [price, setPrice] = useState('')
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState('')
 
   const load = async () => {
     const { data: userData } = await supabase.auth.getUser()
@@ -65,7 +78,7 @@ export default function InventoryManagement() {
 
     const { data: serviceRows } = await supabase
       .from('services')
-      .select('id, title')
+      .select('id, title, category')
       .eq('company_id', company.id)
 
     setServices(serviceRows || [])
@@ -73,7 +86,7 @@ export default function InventoryManagement() {
 
     const { data: inventoryRows } = await supabase
       .from('inventory_items')
-      .select('id, name, total_quantity, price, service_id, services(photo_url)')
+      .select('id, name, total_quantity, price, service_id, image_url, services(photo_url, category)')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
 
@@ -115,12 +128,25 @@ export default function InventoryManagement() {
     if (!companyId || !name.trim() || !quantity) return
     setSaving(true)
     const qty = parseInt(quantity, 10)
+
+    let imageUrl: string | null = null
+    if (photoFile) {
+      const fileExt = photoFile.name.split('.').pop()
+      const fileName = `${companyId}/${Date.now()}.${fileExt}`
+      const { error: uploadErr } = await supabase.storage.from('listing-photos').upload(fileName, photoFile)
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage.from('listing-photos').getPublicUrl(fileName)
+        imageUrl = urlData.publicUrl
+      }
+    }
+
     const { data: newItem } = await supabase.from('inventory_items').insert({
       company_id: companyId,
       service_id: serviceId || null,
       name: name.trim(),
       total_quantity: qty,
       price: price ? parseFloat(price) : 0,
+      image_url: imageUrl,
     }).select('id').single()
 
     if (newItem) {
@@ -135,6 +161,8 @@ export default function InventoryManagement() {
     setName('')
     setQuantity('')
     setPrice('')
+    setPhotoFile(null)
+    setPhotoPreview('')
     setShowForm(false)
     setSaving(false)
     load()
@@ -158,6 +186,16 @@ export default function InventoryManagement() {
   }
 
   const available = (item: InventoryItem) => Math.max(0, statusCounts[item.id]?.available ?? 0)
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoFile(file)
+    setPhotoPreview(URL.createObjectURL(file))
+  }
+
+  const selectedCategory = services.find((s) => s.id === serviceId)?.category || null
+  const formLabels = (selectedCategory && CATEGORY_LABELS[selectedCategory]) || DEFAULT_LABELS
 
   if (loading) {
     return (
@@ -207,11 +245,11 @@ export default function InventoryManagement() {
           padding: '20px', marginBottom: '18px', color: 'white'
         }}>
           <p style={{ fontSize: '17px', fontWeight: 800, marginBottom: '6px' }}>Inventory Overview</p>
-          <p style={{ fontSize: '12px', color: '#DDD6FE', lineHeight: 1.5 }}>Track and manage your room inventory in real-time.</p>
+          <p style={{ fontSize: '12px', color: '#DDD6FE', lineHeight: 1.5 }}>Track and manage your inventory in real-time.</p>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
-          <OverviewCard icon="box" iconBg="#F3E8FF" iconColor={COLORS.purple} label="Total Rooms" value={totals.total} sub="All rooms in inventory" />
+          <OverviewCard icon="box" iconBg="#F3E8FF" iconColor={COLORS.purple} label="Total Units" value={totals.total} sub="All units in inventory" />
           <OverviewCard icon="checkCircle" iconBg="#DCFCE7" iconColor={COLORS.green} label="Available" value={totals.available} valueColor={COLORS.green} sub="Ready for booking" />
           <OverviewCard icon="calendar" iconBg="#DBEAFE" iconColor={COLORS.primary} label="Booked" value={totals.booked} valueColor={COLORS.primary} sub="Currently booked" />
           <OverviewCard icon="edit" iconBg="#FFEDD5" iconColor={COLORS.amber} label="Maintenance" value={totals.maintenance} valueColor={COLORS.amber} sub="Under maintenance" />
@@ -265,36 +303,49 @@ export default function InventoryManagement() {
 
         {showForm && (
           <div style={{ background: COLORS.card, borderRadius: '16px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-            <p style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', color: COLORS.text }}>Add Room Type</p>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Executive Room, Suite" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
-            <input value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ''))} placeholder="Total rooms, e.g. 10" inputMode="numeric" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
-            <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="Price (₦)" inputMode="decimal" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
+            <p style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', color: COLORS.text }}>Add {formLabels.singular}</p>
+
             {services.length > 0 && (
-              <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '12px', fontSize: '13px' }}>
+              <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px' }}>
                 <option value="">Link to a listing (optional)</option>
                 {services.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
               </select>
             )}
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', border: `1.5px dashed ${COLORS.border}`, borderRadius: '10px', padding: '10px 12px', marginBottom: '10px', cursor: 'pointer' }}>
+              {photoPreview ? (
+                <img src={photoPreview} alt="preview" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: '20px' }}>{formLabels.icon}</span>
+              )}
+              <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>{photoPreview ? 'Change photo' : `Tap to add a ${formLabels.singular.toLowerCase()} photo (optional)`}</span>
+              <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
+            </label>
+
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={formLabels.placeholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
+            <input value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ''))} placeholder={`Total ${formLabels.unitPlural.toLowerCase()}, e.g. 10`} inputMode="numeric" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
+            <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="Price (₦)" inputMode="decimal" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '12px', fontSize: '13px', boxSizing: 'border-box' }} />
             <div onClick={saving ? undefined : handleAdd} style={{ background: COLORS.purple, color: 'white', textAlign: 'center', padding: '11px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
-              {saving ? 'Saving...' : 'Save Room Type'}
+              {saving ? 'Saving...' : `Save ${formLabels.singular}`}
             </div>
           </div>
         )}
 
-        <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>Room Types</p>
+        <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>{formLabels.plural}</p>
 
         {items.length === 0 ? (
           <div style={{ background: COLORS.card, padding: '32px 20px', textAlign: 'center', borderRadius: '14px', color: COLORS.textMuted }}>
-            No room types yet. Tap + to add your first one.
+            No {formLabels.plural.toLowerCase()} yet. Tap + to add your first one.
           </div>
         ) : (
           items.map((item) => {
             const avail = available(item)
-            const photo = item.services?.photo_url
+            const photo = item.image_url || item.services?.photo_url
+            const itemLabels = (item.services?.category && CATEGORY_LABELS[item.services.category]) || DEFAULT_LABELS
             return (
               <div key={item.id} style={{ background: COLORS.card, borderRadius: '16px', padding: '12px', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex', gap: '12px' }}>
                 <div style={{ width: '68px', height: '68px', borderRadius: '12px', flexShrink: 0, overflow: 'hidden', background: photo ? undefined : `linear-gradient(135deg, #F97316, #0EA5E9)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {photo ? <img src={photo} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '22px' }}>🛏️</span>}
+                  {photo ? <img src={photo} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '22px' }}>{itemLabels.icon}</span>}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
