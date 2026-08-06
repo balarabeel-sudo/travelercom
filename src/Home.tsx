@@ -403,8 +403,8 @@ if (accountType === 'company') {
   
 const services = [
     { icon: '🏨', label: 'Hotels & Stays', desc: 'Find your comfort', path: '/hotels' },
-    { icon: '🚌', label: 'Bus Stations', desc: 'Travel by road', path: '/services/bus' },
-    { icon: '🚆', label: 'Railway', desc: 'Travel by train', path: '/services/train' },
+    { icon: '🚌', label: 'Bus Stations', desc: 'Travel by road', path: '/bus' },
+    { icon: '🚆', label: 'Railway', desc: 'Travel by train', path: '/train' },
     { icon: '✈️', label: 'Domestic Flights', desc: 'Fly across Nigeria', path: '/services/flight' },
     { icon: '🗺️', label: 'Tours & Attractions', desc: 'Explore places', path: '/services/tour' },
     { icon: '🎪', label: 'Event Centers', desc: 'Book a venue', path: '/services/event_center' },
@@ -481,14 +481,27 @@ const services = [
         </p>
       </div>
 
-      {/* ---------- QUICK SERVICES GRID ---------- */}
+      {/* ---------- QUICK SERVICES (icon row, no cards) ---------- */}
       <div style={{ padding: '4px 16px' }}>
         <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
           Our Services
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', gap: '18px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '24px' }}>
           {services.map((s) => (
-            <ServiceCard key={s.label} {...s} navigate={navigate} />
+            <div
+              key={s.label}
+              onClick={() => navigate(s.path)}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', flexShrink: 0, width: '64px' }}>
+              <div style={{
+                width: '52px', height: '52px', borderRadius: '50%', background: COLORS.bg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px'
+              }}>
+                {s.icon}
+              </div>
+              <p style={{ fontSize: '10.5px', fontWeight: 600, color: COLORS.text, textAlign: 'center', lineHeight: 1.2 }}>
+                {s.label}
+              </p>
+            </div>
           ))}
         </div>
       </div>
