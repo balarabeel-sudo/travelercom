@@ -80,12 +80,13 @@ function Home() {
   }[]>([])
   const [popularBus, setPopularBus] = useState<{
     id: string; origin: string | null; destination: string; departure_time: string | null;
-    price: number; companyName: string
+    price: number; photo_url: string | null; companyName: string
   }[]>([])
   const [popularFlights, setPopularFlights] = useState<{
     id: string; origin: string | null; destination: string; departure_time: string | null;
-    price: number; companyName: string
+    price: number; photo_url: string | null; companyName: string
   }[]>([])
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const loadUser = async () => {
@@ -210,7 +211,7 @@ function Home() {
 
         const { data: busRows } = await supabase
           .from('services')
-          .select('id, origin, destination, departure_time, price, companies(business_name)')
+          .select('id, origin, destination, departure_time, price, photo_url, companies(business_name)')
           .eq('category', 'bus')
           .eq('status', 'active')
           .order('created_at', { ascending: false })
@@ -219,12 +220,18 @@ function Home() {
 
         const { data: flightRows } = await supabase
           .from('services')
-          .select('id, origin, destination, departure_time, price, companies(business_name)')
+          .select('id, origin, destination, departure_time, price, photo_url, companies(business_name)')
           .eq('category', 'flight')
           .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(6)
         setPopularFlights((flightRows || []).map((r: any) => ({ ...r, companyName: r.companies?.business_name || 'Traveler.com Partner' })))
+
+        const { data: favRows } = await supabase
+          .from('favorites')
+          .select('service_id')
+          .eq('user_id', data.user.id)
+        setFavoriteIds(new Set((favRows || []).map((f: any) => f.service_id)))
       }
 
       setLoading(false)
@@ -235,6 +242,23 @@ function Home() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     navigate('/login')
+  }
+
+  const toggleFavorite = async (e: React.MouseEvent, serviceId: string) => {
+    e.stopPropagation()
+    const { data: userData } = await supabase.auth.getUser()
+    if (!userData.user) return
+    const isFav = favoriteIds.has(serviceId)
+    const next = new Set(favoriteIds)
+    if (isFav) {
+      next.delete(serviceId)
+      setFavoriteIds(next)
+      await supabase.from('favorites').delete().eq('user_id', userData.user.id).eq('service_id', serviceId)
+    } else {
+      next.add(serviceId)
+      setFavoriteIds(next)
+      await supabase.from('favorites').insert({ user_id: userData.user.id, service_id: serviceId })
+    }
   }
 
   if (loading) {
@@ -545,41 +569,36 @@ const services = [
             View all <Icon name="chevronRight" size={13} color={COLORS.primary} />
           </span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '24px' }}>
           {services.map((s) => (
             <div
               key={s.label}
               onClick={() => navigate(s.path)}
               style={{
                 background: COLORS.card,
-                borderRadius: '18px',
-                padding: '16px',
+                borderRadius: '14px',
+                padding: '12px 8px',
                 cursor: 'pointer',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-                position: 'relative',
+                border: `1px solid ${COLORS.border}`,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
               }}>
               <div style={{
-                fontSize: '24px',
-                width: '46px',
-                height: '46px',
+                fontSize: '18px',
+                width: '36px',
+                height: '36px',
                 background: COLORS.bg,
-                borderRadius: '14px',
+                borderRadius: '11px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginBottom: '12px',
+                marginBottom: '6px',
               }}>
                 {s.icon}
               </div>
-              <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text, marginBottom: '2px' }}>{s.label}</p>
-              <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{s.desc}</p>
-              <div style={{
-                position: 'absolute', bottom: '14px', right: '14px',
-                width: '26px', height: '26px', borderRadius: '50%', background: '#EFF6FF',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Icon name="chevronRight" size={13} color={COLORS.primary} />
-              </div>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.text, lineHeight: 1.2 }}>{s.label}</p>
             </div>
           ))}
         </div>
@@ -657,66 +676,58 @@ const services = [
             <p style={{ fontSize: '12px', marginTop: '4px' }}>Check back soon!</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
             {popularHotels.map((h) => (
               <div
                 key={h.id}
                 onClick={() => navigate(`/hotels/${h.id}`)}
                 style={{
-                  display: 'flex',
-                  gap: '12px',
+                  width: '190px',
+                  flexShrink: 0,
                   background: COLORS.card,
                   borderRadius: '16px',
-                  padding: '10px',
+                  overflow: 'hidden',
                   boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
                   cursor: 'pointer'
                 }}>
-                <div style={{
-                  width: '80px',
-                  height: '80px',
-                  borderRadius: '12px',
-                  background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '28px',
-                  flexShrink: 0,
-                  overflow: 'hidden'
-                }}>
-                  {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🏨'}
-                </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div>
-                    <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>{h.title}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{h.destination}</p>
-                      {h.avgRating !== null && (
-                        <>
-                          <span style={{ fontSize: '11px', color: COLORS.textMuted }}>•</span>
-                          <Icon name="star" size={11} color="#D4A017" />
-                          <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{h.avgRating.toFixed(1)}</span>
-                        </>
-                      )}
-                    </div>
+                <div style={{ position: 'relative', height: '110px' }}>
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '30px',
+                  }}>
+                    {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🏨'}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                    <div>
-                      <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()}<span style={{ fontSize: '10px', color: COLORS.textMuted, fontWeight: 400 }}> /night</span></p>
-                      {h.seats_available !== null && (
-                        <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{h.seats_available} rooms left</p>
-                      )}
-                    </div>
-                    <span style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: 'white',
-                      background: COLORS.secondary,
-                      padding: '5px 10px',
-                      borderRadius: '8px'
+                  <div
+                    onClick={(e) => toggleFavorite(e, h.id)}
+                    style={{
+                      position: 'absolute', top: '8px', right: '8px',
+                      width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.9)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px',
+                      color: favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8',
                     }}>
-                      View
-                    </span>
+                    {favoriteIds.has(h.id) ? '♥' : '♡'}
                   </div>
+                </div>
+                <div style={{ padding: '10px' }}>
+                  <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.title}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{h.destination}</p>
+                    {h.avgRating !== null && (
+                      <>
+                        <span style={{ fontSize: '10px', color: COLORS.textMuted }}>•</span>
+                        <Icon name="star" size={10} color="#D4A017" />
+                        <span style={{ fontSize: '11px', color: COLORS.textMuted }}>{h.avgRating.toFixed(1)}</span>
+                      </>
+                    )}
+                  </div>
+                  <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.primary, marginTop: '4px' }}>
+                    ₦{Number(h.price).toLocaleString()}<span style={{ fontSize: '10px', color: COLORS.textMuted, fontWeight: 400 }}> /night</span>
+                  </p>
                 </div>
               </div>
             ))}
@@ -737,16 +748,19 @@ const services = [
         {popularBus.length === 0 ? (
           <EmptyCard text="No bus routes available yet" />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
             {popularBus.map((r) => (
-              <RouteCard
+              <TripCard
                 key={r.id}
+                icon="🚌"
                 route={r.origin ? `${r.origin} → ${r.destination}` : r.destination}
                 company={r.companyName}
-                time={r.departure_time ? new Date(r.departure_time).toLocaleDateString() : 'Schedule TBA'}
+                date={r.departure_time ? new Date(r.departure_time).toLocaleDateString() : 'Schedule TBA'}
                 price={Number(r.price)}
-                navigate={navigate}
-                path={`/bus/${r.id}`}
+                photoUrl={r.photo_url}
+                isFavorite={favoriteIds.has(r.id)}
+                onToggleFavorite={(e) => toggleFavorite(e, r.id)}
+                onClick={() => navigate(`/bus/${r.id}`)}
               />
             ))}
           </div>
@@ -766,16 +780,19 @@ const services = [
         {popularFlights.length === 0 ? (
           <EmptyCard text="No flights available yet" />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
             {popularFlights.map((f) => (
-              <RouteCard
+              <TripCard
                 key={f.id}
+                icon="✈️"
                 route={f.origin ? `${f.origin} → ${f.destination}` : f.destination}
                 company={f.companyName}
-                time={f.departure_time ? new Date(f.departure_time).toLocaleDateString() : 'Schedule TBA'}
+                date={f.departure_time ? new Date(f.departure_time).toLocaleDateString() : 'Schedule TBA'}
                 price={Number(f.price)}
-                navigate={navigate}
-                path={`/flight/${f.id}`}
+                photoUrl={f.photo_url}
+                isFavorite={favoriteIds.has(f.id)}
+                onToggleFavorite={(e) => toggleFavorite(e, f.id)}
+                onClick={() => navigate(`/flight/${f.id}`)}
               />
             ))}
           </div>
@@ -837,39 +854,61 @@ function EmptyCard({ text, subtext }: { text: string; subtext?: string }) {
   )
 }
 
-function RouteCard({ route, company, time, price, navigate, path }: {
-  route: string; company: string; time: string; price: number;
-  navigate: (p: string) => void; path: string
+function TripCard({ icon, route, company, date, price, photoUrl, isFavorite, onToggleFavorite, onClick }: {
+  icon: string; route: string; company: string; date: string; price: number;
+  photoUrl: string | null; isFavorite: boolean; onToggleFavorite: (e: React.MouseEvent) => void; onClick: () => void
 }) {
   return (
     <div
-      onClick={() => navigate(path)}
+      onClick={onClick}
       style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        width: '190px',
+        flexShrink: 0,
         background: COLORS.card,
-        borderRadius: '14px',
-        padding: '14px',
+        borderRadius: '16px',
+        overflow: 'hidden',
         boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
         cursor: 'pointer'
       }}>
-      <div>
-        <p style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.text }}>{route}</p>
-        <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{company} • {time}</p>
-      </div>
-      <div style={{ textAlign: 'right' }}>
-        <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.primary, marginBottom: '4px' }}>₦{price.toLocaleString()}</p>
-        <span style={{
-          fontSize: '10.5px',
-          fontWeight: 700,
-          color: 'white',
-          background: COLORS.secondary,
-          padding: '4px 10px',
-          borderRadius: '8px'
+      <div style={{ position: 'relative', height: '90px' }}>
+        <div style={{
+          width: '100%',
+          height: '100%',
+          background: photoUrl ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '26px',
         }}>
-          Book
-        </span>
+          {photoUrl ? <img src={photoUrl} alt={route} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : icon}
+        </div>
+        <div
+          onClick={onToggleFavorite}
+          style={{
+            position: 'absolute', top: '8px', right: '8px',
+            width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(255,255,255,0.9)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px',
+            color: isFavorite ? COLORS.secondary : '#94a3b8',
+          }}>
+          {isFavorite ? '♥' : '♡'}
+        </div>
+      </div>
+      <div style={{ padding: '10px' }}>
+        <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{route}</p>
+        <p style={{ fontSize: '10.5px', color: COLORS.textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{company} • {date}</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+          <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.primary }}>₦{price.toLocaleString()}</p>
+          <span style={{
+            fontSize: '10px',
+            fontWeight: 700,
+            color: 'white',
+            background: COLORS.secondary,
+            padding: '4px 9px',
+            borderRadius: '7px'
+          }}>
+            Book
+          </span>
+        </div>
       </div>
     </div>
   )
