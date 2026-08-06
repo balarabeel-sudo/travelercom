@@ -20,14 +20,6 @@ const CATEGORY_META: Record<string, { label: string; icon: string; unitLabel: st
   event_center: { label: 'Event Centers', icon: '🎪', unitLabel: 'capacity', isTransport: false },
 }
 
-const AMENITY_ICON: Record<string, string> = {
-  WiFi: '📶', Parking: '🅿️', Restaurant: '🍽️', Pool: '🏊', Gym: '🏋️',
-  'Airport Pickup': '✈️', 'Conference Hall': '🏢', Laundry: '🧺', AC: '❄️', Breakfast: '☕',
-  Meals: '🍱', 'Charging Port': '🔌', 'Reclining Seats': '💺', Toilet: '🚻',
-  'Guide Included': '🧭', 'Transport Included': '🚐', 'Meals Included': '🍱', Insurance: '🛡️',
-  Catering: '🍽️', 'Sound System': '🔊', Seating: '🪑',
-}
-
 type ServiceItem = {
   id: string
   title: string
@@ -37,7 +29,6 @@ type ServiceItem = {
   destination: string
   price: number
   seats_available: number | null
-  amenities: string[] | null
   companies: { business_name: string } | null
 }
 
@@ -57,7 +48,7 @@ function Services() {
     setLoading(true)
     let query = supabase
       .from('services')
-      .select('id, title, description, origin, destination, price, seats_available, amenities, photo_url, companies(business_name)')
+      .select('id, title, description, origin, destination, price, seats_available, photo_url, companies(business_name)')
       .eq('category', category)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -163,31 +154,6 @@ function Services() {
                   <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '10px' }}>{it.description}</p>
                 )}
 
-                {it.amenities && it.amenities.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '6px', marginBottom: '10px' }}>
-                    {it.amenities.slice(0, 4).map((a) => (
-                      <span
-                        key={a}
-                        style={{
-                          padding: '4px 9px',
-                          borderRadius: '20px',
-                          fontSize: '10.5px',
-                          fontWeight: 700,
-                          background: COLORS.bg,
-                          border: `1px solid ${COLORS.border}`,
-                          color: COLORS.textMuted,
-                        }}>
-                        {AMENITY_ICON[a] || '✓'} {a}
-                      </span>
-                    ))}
-                    {it.amenities.length > 4 && (
-                      <span style={{ fontSize: '10.5px', color: COLORS.textMuted, alignSelf: 'center' }}>
-                        +{it.amenities.length - 4} more
-                      </span>
-                    )}
-                  </div>
-                )}
-
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(it.price).toLocaleString()}</p>
@@ -196,7 +162,7 @@ function Services() {
                     )}
                   </div>
                   <button
-                    onClick={() => navigate(category === 'flight' ? `/flight/${it.id}` : `/services/${category}/${it.id}`)}
+                    onClick={() => navigate(category === 'flight' ? `/flight/${it.id}` : category === 'bus' ? `/bus/${it.id}` : category === 'train' ? `/train/${it.id}` : `/services/${category}/${it.id}`)}
                     style={{ padding: '9px 16px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12.5px', cursor: 'pointer' }}>
                     View Details
                   </button>
