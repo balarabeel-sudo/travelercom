@@ -74,6 +74,18 @@ function Home() {
     completed: 0,
     activeListings: 0,
   })
+  const [popularHotels, setPopularHotels] = useState<{
+    id: string; title: string; destination: string; photo_url: string | null;
+    price: number; seats_available: number | null; avgRating: number | null
+  }[]>([])
+  const [popularBus, setPopularBus] = useState<{
+    id: string; origin: string | null; destination: string; departure_time: string | null;
+    price: number; companyName: string
+  }[]>([])
+  const [popularFlights, setPopularFlights] = useState<{
+    id: string; origin: string | null; destination: string; departure_time: string | null;
+    price: number; companyName: string
+  }[]>([])
 
   useEffect(() => {
     const loadUser = async () => {
@@ -166,6 +178,53 @@ function Home() {
             activeListings: activeListings || 0,
           })
         }
+      } else {
+        const { data: hotelRows } = await supabase
+          .from('services')
+          .select('id, title, destination, photo_url, price, seats_available')
+          .eq('category', 'hotel')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(6)
+
+        if (hotelRows && hotelRows.length > 0) {
+          const ids = hotelRows.map((h) => h.id)
+          const { data: reviewRows } = await supabase
+            .from('reviews')
+            .select('service_id, rating')
+            .in('service_id', ids)
+
+          const ratingMap: Record<string, number[]> = {}
+          ;(reviewRows || []).forEach((r: any) => {
+            if (r.rating == null) return
+            if (!ratingMap[r.service_id]) ratingMap[r.service_id] = []
+            ratingMap[r.service_id].push(Number(r.rating))
+          })
+
+          setPopularHotels(hotelRows.map((h: any) => {
+            const ratings = ratingMap[h.id] || []
+            const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null
+            return { ...h, avgRating }
+          }))
+        }
+
+        const { data: busRows } = await supabase
+          .from('services')
+          .select('id, origin, destination, departure_time, price, companies(business_name)')
+          .eq('category', 'bus')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(6)
+        setPopularBus((busRows || []).map((r: any) => ({ ...r, companyName: r.companies?.business_name || 'Traveler.com Partner' })))
+
+        const { data: flightRows } = await supabase
+          .from('services')
+          .select('id, origin, destination, departure_time, price, companies(business_name)')
+          .eq('category', 'flight')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(6)
+        setPopularFlights((flightRows || []).map((r: any) => ({ ...r, companyName: r.companies?.business_name || 'Traveler.com Partner' })))
       }
 
       setLoading(false)
@@ -418,10 +477,7 @@ const services = [
     { city: 'Port Harcourt', emoji: '🌊', color: '#0EA5E9' },
   ]
 
-  // No real listings yet — will be populated once companies start adding services
-  const hotels: { name: string; city: string; rating: number; price: number; rooms: number }[] = []
-  const busRoutes: { route: string; company: string; time: string; price: number }[] = []
-  const flights: { route: string; company: string; time: string; price: number }[] = []
+  // No real listings yet for tours/events — will be populated once companies start adding services
 
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
@@ -481,26 +537,49 @@ const services = [
         </p>
       </div>
 
-      {/* ---------- QUICK SERVICES (icon row, no cards) ---------- */}
+      {/* ---------- QUICK SERVICES GRID ---------- */}
       <div style={{ padding: '4px 16px' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
-          Our Services
-        </h3>
-        <div style={{ display: 'flex', gap: '18px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>Our Services</h3>
+          <span onClick={() => navigate('/search')} style={{ fontSize: '12.5px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
+            View all <Icon name="chevronRight" size={13} color={COLORS.primary} />
+          </span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
           {services.map((s) => (
             <div
               key={s.label}
               onClick={() => navigate(s.path)}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', flexShrink: 0, width: '64px' }}>
+              style={{
+                background: COLORS.card,
+                borderRadius: '18px',
+                padding: '16px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+                position: 'relative',
+              }}>
               <div style={{
-                width: '52px', height: '52px', borderRadius: '50%', background: COLORS.bg,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px'
+                fontSize: '24px',
+                width: '46px',
+                height: '46px',
+                background: COLORS.bg,
+                borderRadius: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '12px',
               }}>
                 {s.icon}
               </div>
-              <p style={{ fontSize: '10.5px', fontWeight: 600, color: COLORS.text, textAlign: 'center', lineHeight: 1.2 }}>
-                {s.label}
-              </p>
+              <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text, marginBottom: '2px' }}>{s.label}</p>
+              <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{s.desc}</p>
+              <div style={{
+                position: 'absolute', bottom: '14px', right: '14px',
+                width: '26px', height: '26px', borderRadius: '50%', background: '#EFF6FF',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon name="chevronRight" size={13} color={COLORS.primary} />
+              </div>
             </div>
           ))}
         </div>
@@ -565,7 +644,7 @@ const services = [
           </span>
         </div>
 
-        {hotels.length === 0 ? (
+        {popularHotels.length === 0 ? (
           <div style={{
             background: COLORS.card,
             borderRadius: '16px',
@@ -579,10 +658,10 @@ const services = [
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {hotels.map((h) => (
+            {popularHotels.map((h) => (
               <div
-                key={h.name}
-                onClick={() => navigate('/hotels')}
+                key={h.id}
+                onClick={() => navigate(`/hotels/${h.id}`)}
                 style={{
                   display: 'flex',
                   gap: '12px',
@@ -596,24 +675,36 @@ const services = [
                   width: '80px',
                   height: '80px',
                   borderRadius: '12px',
-                  background: `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
+                  background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '28px',
-                  flexShrink: 0
+                  flexShrink: 0,
+                  overflow: 'hidden'
                 }}>
-                  🏨
+                  {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🏨'}
                 </div>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
-                    <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>{h.name}</p>
-                    <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{h.city} • ⭐ {h.rating}</p>
+                    <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>{h.title}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{h.destination}</p>
+                      {h.avgRating !== null && (
+                        <>
+                          <span style={{ fontSize: '11px', color: COLORS.textMuted }}>•</span>
+                          <Icon name="star" size={11} color="#D4A017" />
+                          <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{h.avgRating.toFixed(1)}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                     <div>
-                      <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.primary }}>₦{h.price.toLocaleString()}<span style={{ fontSize: '10px', color: COLORS.textMuted, fontWeight: 400 }}> /night</span></p>
-                      <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{h.rooms} rooms left</p>
+                      <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()}<span style={{ fontSize: '10px', color: COLORS.textMuted, fontWeight: 400 }}> /night</span></p>
+                      {h.seats_available !== null && (
+                        <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{h.seats_available} rooms left</p>
+                      )}
                     </div>
                     <span style={{
                       fontSize: '11px',
@@ -639,16 +730,24 @@ const services = [
           <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>
             Popular Bus Routes
           </h3>
-          <span onClick={() => navigate('/buses')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer' }}>
+          <span onClick={() => navigate('/bus')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer' }}>
             See all →
           </span>
         </div>
-        {busRoutes.length === 0 ? (
+        {popularBus.length === 0 ? (
           <EmptyCard text="No bus routes available yet" />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {busRoutes.map((r) => (
-              <RouteCard key={r.route} {...r} navigate={navigate} path="/buses" />
+            {popularBus.map((r) => (
+              <RouteCard
+                key={r.id}
+                route={r.origin ? `${r.origin} → ${r.destination}` : r.destination}
+                company={r.companyName}
+                time={r.departure_time ? new Date(r.departure_time).toLocaleDateString() : 'Schedule TBA'}
+                price={Number(r.price)}
+                navigate={navigate}
+                path={`/bus/${r.id}`}
+              />
             ))}
           </div>
         )}
@@ -660,16 +759,24 @@ const services = [
           <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>
             Domestic Flights
           </h3>
-          <span onClick={() => navigate('/flights')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer' }}>
+          <span onClick={() => navigate('/services/flight')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer' }}>
             See all →
           </span>
         </div>
-        {flights.length === 0 ? (
+        {popularFlights.length === 0 ? (
           <EmptyCard text="No flights available yet" />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {flights.map((f) => (
-              <RouteCard key={f.route} {...f} navigate={navigate} path="/flights" />
+            {popularFlights.map((f) => (
+              <RouteCard
+                key={f.id}
+                route={f.origin ? `${f.origin} → ${f.destination}` : f.destination}
+                company={f.companyName}
+                time={f.departure_time ? new Date(f.departure_time).toLocaleDateString() : 'Schedule TBA'}
+                price={Number(f.price)}
+                navigate={navigate}
+                path={`/flight/${f.id}`}
+              />
             ))}
           </div>
         )}
