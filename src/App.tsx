@@ -36,6 +36,10 @@ import Settings from './Settings'
 import AddGuest from './AddGuest'
 import FlightDetails from './FlightDetails'
 import MyBookings from './MyBookings'
+import Bus from './Bus'
+import BusDetails from './BusDetails'
+import Train from './Train'
+import TrainDetails from './TrainDetails'
 
 function App() {
   return (
@@ -77,6 +81,10 @@ function App() {
        <Route path="/settings" element={<Settings />} />
         <Route path="/add-guest" element={<AddGuest />} />
         <Route path="/flight/:id" element={<FlightDetails />} />
+        <Route path="/bus" element={<Bus />} />
+        <Route path="/bus/:id" element={<BusDetails />} />
+        <Route path="/train" element={<Train />} />
+        <Route path="/train/:id" element={<TrainDetails />} />
         <Route path="/my-bookings" element={<MyBookings />} />
         <Route path="/bookings" element={<MyBookings />} />
       </Routes>
