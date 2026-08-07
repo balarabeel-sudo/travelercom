@@ -21,6 +21,8 @@ const AMENITY_ICON: Record<string, string> = {
   Catering: '🍽️', 'Sound System': '🔊', Seating: '🪑',
 }
 const AMENITIES_LIST = Object.keys(AMENITY_ICON)
+const TOUR_TYPES = ['Nature', 'History', 'Adventure', 'Water', 'Culture']
+const EVENT_TYPES = ['Conference', 'Wedding', 'Party', 'Seminar', 'Exhibition']
 
 function AddListing() {
   const navigate = useNavigate()
@@ -39,6 +41,8 @@ function AddListing() {
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState('')
   const [amenities, setAmenities] = useState<string[]>([])
+  const [tourType, setTourType] = useState('')
+  const [eventType, setEventType] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -121,7 +125,9 @@ function AddListing() {
       seats_available: quantity ? parseInt(quantity, 10) : null,
       status: 'active',
       photo_url: photoUrl,
-      amenities: amenities.length > 0 ? amenities : null,
+      amenities: category === 'hotel' && amenities.length > 0 ? amenities : null,
+      tour_type: category === 'tour' && tourType ? tourType : null,
+      event_type: category === 'event_center' && eventType ? eventType : null,
     })
 
     setSubmitting(false)
@@ -229,30 +235,80 @@ function AddListing() {
             <input type="number" placeholder="e.g. 20" value={quantity} onChange={(e) => setQuantity(e.target.value)} style={inputStyle} />
           </Field>
 
-          <Field label="Amenities">
-            <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
-              {AMENITIES_LIST.map((a) => {
-                const active = amenities.includes(a)
-                return (
+          {category === 'hotel' && (
+            <Field label="Amenities">
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+                {AMENITIES_LIST.map((a) => {
+                  const active = amenities.includes(a)
+                  return (
+                    <span
+                      key={a}
+                      onClick={() => toggleAmenity(a)}
+                      style={{
+                        padding: '7px 12px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        border: `1px solid ${active ? COLORS.primary : COLORS.border}`,
+                        background: active ? COLORS.primary : COLORS.bg,
+                        color: active ? 'white' : COLORS.textMuted,
+                      }}>
+                      {AMENITY_ICON[a]} {a}
+                    </span>
+                  )
+                })}
+              </div>
+            </Field>
+          )}
+
+          {category === 'tour' && (
+            <Field label="Tour Type">
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+                {TOUR_TYPES.map((t) => (
                   <span
-                    key={a}
-                    onClick={() => toggleAmenity(a)}
+                    key={t}
+                    onClick={() => setTourType(t)}
                     style={{
                       padding: '7px 12px',
                       borderRadius: '20px',
                       fontSize: '12px',
                       fontWeight: 700,
                       cursor: 'pointer',
-                      border: `1px solid ${active ? COLORS.primary : COLORS.border}`,
-                      background: active ? COLORS.primary : COLORS.bg,
-                      color: active ? 'white' : COLORS.textMuted,
+                      border: `1px solid ${tourType === t ? COLORS.primary : COLORS.border}`,
+                      background: tourType === t ? COLORS.primary : COLORS.bg,
+                      color: tourType === t ? 'white' : COLORS.textMuted,
                     }}>
-                    {AMENITY_ICON[a]} {a}
+                    {t}
                   </span>
-                )
-              })}
-            </div>
-          </Field>
+                ))}
+              </div>
+            </Field>
+          )}
+
+          {category === 'event_center' && (
+            <Field label="Event Type">
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+                {EVENT_TYPES.map((t) => (
+                  <span
+                    key={t}
+                    onClick={() => setEventType(t)}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '20px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: `1px solid ${eventType === t ? COLORS.primary : COLORS.border}`,
+                      background: eventType === t ? COLORS.primary : COLORS.bg,
+                      color: eventType === t ? 'white' : COLORS.textMuted,
+                    }}>
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </Field>
+          )}
 
           <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '14px' }}>
             Commission: {category ? COMMISSION_BY_CATEGORY[category] ?? 3 : 3}% will be deducted after each verified booking.
