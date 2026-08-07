@@ -21,8 +21,13 @@ function Register() {
   // Company fields
   const [companyName, setCompanyName] = useState('')
   const [businessType, setBusinessType] = useState('')
+  const [agreedTerms, setAgreedTerms] = useState(false)
 
   const handleRegister = async () => {
+    if (!agreedTerms) {
+      setError('Please agree to the Terms & Conditions to continue.')
+      return
+    }
     if (password !== confirmPassword) {
       setError('Passwords do not match!')
       return
@@ -150,10 +155,16 @@ function Register() {
         padding: '32px',
         boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
       }}>
+        <span onClick={() => navigate(-1)} style={{ fontSize: '20px', cursor: 'pointer', display: 'inline-block', marginBottom: '10px' }}>←</span>
+
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <div style={{ fontSize: '40px', marginBottom: '8px' }}>
-            {isPersonal ? 'Personal' : 'Company'}
+          <div style={{
+            width: '52px', height: '52px', borderRadius: '50%', background: color,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px',
+            margin: '0 auto 10px', color: 'white'
+          }}>
+            {isPersonal ? '👤' : '💼'}
           </div>
           <h1 style={{ fontSize: '22px', fontWeight: 'bold', color }}>
             {isPersonal ? 'Personal Account' : 'Company Account'}
@@ -233,24 +244,34 @@ function Register() {
           style={inputStyle}
         />
 
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '16px', cursor: 'pointer' }}>
+          <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} style={{ marginTop: '3px' }} />
+          <span style={{ fontSize: '12.5px', color: '#666' }}>
+            I agree to the{' '}
+            <span onClick={(e) => { e.preventDefault(); navigate('/terms') }} style={{ color, fontWeight: 'bold', cursor: 'pointer' }}>
+              Terms &amp; Conditions
+            </span>
+          </span>
+        </label>
+
         <button
           onClick={handleRegister}
-          disabled={loading}
+          disabled={loading || !agreedTerms}
           style={{
             width: '100%',
             padding: '14px',
-            background: loading ? '#94a3b8' : color,
+            background: loading || !agreedTerms ? '#94a3b8' : color,
             color: 'white',
             border: 'none',
             borderRadius: '10px',
             fontSize: '16px',
             fontWeight: 'bold',
-            cursor: loading ? 'not-allowed' : 'pointer',
+            cursor: loading || !agreedTerms ? 'not-allowed' : 'pointer',
             marginBottom: '16px',
             marginTop: '8px'
           }}
         >
-          {loading ? 'Creating account...' : isPersonal ? '✅ Create Account' : '✅ Register Company'}
+          {loading ? 'Creating account...' : isPersonal ? 'Create Account' : 'Register Company'}
         </button>
 
         <p style={{ textAlign: 'center', color: '#666', fontSize: '13px' }}>
