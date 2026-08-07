@@ -13,6 +13,10 @@ const COLORS = {
   green: '#16A34A',
 }
 
+const TRAVEL_AMENITY_ICON: Record<string, string> = {
+  WiFi: '📶', AC: '❄️', 'Charging Port': '🔌', Meals: '🍱', 'Reclining Seats': '💺', Toilet: '🚻', Refundable: '🔄', 'Baggage Allowance': '🧳',
+}
+
 type TripItem = {
   id: string
   title: string
@@ -20,9 +24,11 @@ type TripItem = {
   origin: string | null
   destination: string
   departure_time: string | null
+  duration_minutes: number | null
   price: number
   seats_available: number | null
   photo_url: string | null
+  amenities: string[] | null
   companies: { business_name: string } | null
   avgRating: number | null
   reviewCount: number
@@ -47,7 +53,7 @@ function Train() {
     setLoading(true)
     let query = supabase
       .from('services')
-      .select('id, title, description, origin, destination, departure_time, price, seats_available, photo_url, companies(business_name)')
+      .select('id, title, description, origin, destination, departure_time, duration_minutes, price, seats_available, photo_url, amenities, companies(business_name)')
       .eq('category', 'train')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -224,7 +230,18 @@ function Train() {
 
                   <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '6px' }}>
                     {h.departure_time ? new Date(h.departure_time).toLocaleString() : 'Schedule to be announced'}
+                    {h.duration_minutes && ` · ${Math.floor(h.duration_minutes / 60)}h ${h.duration_minutes % 60}m`}
                   </p>
+
+                  {h.amenities && h.amenities.length > 0 && (
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                      {h.amenities.slice(0, 4).map((a) => (
+                        <span key={a} style={{ fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
+                          {TRAVEL_AMENITY_ICON[a] || '✓'} {a}
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '10px' }}>
                     <div>
