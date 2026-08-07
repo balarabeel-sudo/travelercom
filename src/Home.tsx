@@ -489,8 +489,8 @@ const services = [
     { icon: '🚌', label: 'Bus Stations', desc: 'Travel by road', path: '/bus' },
     { icon: '🚆', label: 'Railway', desc: 'Travel by train', path: '/train' },
     { icon: '✈️', label: 'Domestic Flights', desc: 'Fly across Nigeria', path: '/services/flight' },
-    { icon: '🗺️', label: 'Tours & Attractions', desc: 'Explore places', path: '/services/tour' },
-    { icon: '🎪', label: 'Event Centers', desc: 'Book a venue', path: '/services/event_center' },
+    { icon: '🗺️', label: 'Tours & Attractions', desc: 'Explore places', path: '/tours' },
+    { icon: '🎪', label: 'Event Centers', desc: 'Book a venue', path: '/event-centers' },
   ]
 
   const destinations = [
