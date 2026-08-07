@@ -23,6 +23,10 @@ const AMENITY_ICON: Record<string, string> = {
 const AMENITIES_LIST = Object.keys(AMENITY_ICON)
 const TOUR_TYPES = ['Nature', 'History', 'Adventure', 'Water', 'Culture']
 const EVENT_TYPES = ['Conference', 'Wedding', 'Party', 'Seminar', 'Exhibition']
+const TRAVEL_AMENITY_ICON: Record<string, string> = {
+  WiFi: '📶', AC: '❄️', 'Charging Port': '🔌', Meals: '🍱', 'Reclining Seats': '💺', Toilet: '🚻', Refundable: '🔄', 'Baggage Allowance': '🧳',
+}
+const TRAVEL_AMENITIES_LIST = Object.keys(TRAVEL_AMENITY_ICON)
 
 function AddListing() {
   const navigate = useNavigate()
@@ -36,6 +40,8 @@ function AddListing() {
   const [origin, setOrigin] = useState('')
   const [destination, setDestination] = useState('')
   const [departureTime, setDepartureTime] = useState('')
+  const [arrivalTime, setArrivalTime] = useState('')
+  const [duration, setDuration] = useState('')
   const [price, setPrice] = useState('')
   const [quantity, setQuantity] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -120,12 +126,14 @@ function AddListing() {
       origin: isTransport ? origin.trim() || null : null,
       destination: destination.trim(),
       departure_time: departureTime ? new Date(departureTime).toISOString() : null,
+      arrival_time: isTransport && arrivalTime ? new Date(arrivalTime).toISOString() : null,
+      duration_minutes: isTransport && duration ? parseInt(duration, 10) : null,
       price: parseFloat(price),
       commission_rate: COMMISSION_BY_CATEGORY[category] ?? 3,
       seats_available: quantity ? parseInt(quantity, 10) : null,
       status: 'active',
       photo_url: photoUrl,
-      amenities: category === 'hotel' && amenities.length > 0 ? amenities : null,
+      amenities: (category === 'hotel' || isTransport) && amenities.length > 0 ? amenities : null,
       tour_type: category === 'tour' && tourType ? tourType : null,
       event_type: category === 'event_center' && eventType ? eventType : null,
     })
@@ -227,6 +235,18 @@ function AddListing() {
             </Field>
           )}
 
+          {isTransport && (
+            <Field label="Arrival Time">
+              <input type="datetime-local" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} style={inputStyle} />
+            </Field>
+          )}
+
+          {isTransport && (
+            <Field label="Duration (minutes)">
+              <input type="number" placeholder="e.g. 80" value={duration} onChange={(e) => setDuration(e.target.value)} style={inputStyle} />
+            </Field>
+          )}
+
           <Field label="Price (₦)">
             <input type="number" placeholder="e.g. 15000" value={price} onChange={(e) => setPrice(e.target.value)} style={inputStyle} />
           </Field>
@@ -255,6 +275,33 @@ function AddListing() {
                         color: active ? 'white' : COLORS.textMuted,
                       }}>
                       {AMENITY_ICON[a]} {a}
+                    </span>
+                  )
+                })}
+              </div>
+            </Field>
+          )}
+
+          {isTransport && (
+            <Field label="Travel Amenities">
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+                {TRAVEL_AMENITIES_LIST.map((a) => {
+                  const active = amenities.includes(a)
+                  return (
+                    <span
+                      key={a}
+                      onClick={() => toggleAmenity(a)}
+                      style={{
+                        padding: '7px 12px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        border: `1px solid ${active ? COLORS.primary : COLORS.border}`,
+                        background: active ? COLORS.primary : COLORS.bg,
+                        color: active ? 'white' : COLORS.textMuted,
+                      }}>
+                      {TRAVEL_AMENITY_ICON[a]} {a}
                     </span>
                   )
                 })}
