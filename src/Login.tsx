@@ -1,145 +1,100 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import { Logo, PrimaryButton, InputField, PasswordField, FormError, SocialLoginButtons, COLORS } from './AuthComponents'
 
 function Login() {
   const navigate = useNavigate()
+  const [toggle, setToggle] = useState<'personal' | 'company'>('personal')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [toast, setToast] = useState('')
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(''), 2200)
+    return () => clearTimeout(t)
+  }, [toast])
 
   const handleLogin = async () => {
     setErrorMsg('')
-
     if (!email || !password) {
-      setErrorMsg('Please enter both email and password')
+      setErrorMsg('Please enter both email and password.')
       return
     }
-
     setLoading(true)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    })
-
-    setLoading(false)
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
+      setLoading(false)
       setErrorMsg('Incorrect email or password. Please try again.')
       return
     }
 
     if (data.user) {
+      setLoading(false)
       navigate('/home')
     }
   }
 
+  const color = toggle === 'personal' ? COLORS.primary : COLORS.secondary
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#f8fafc',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px'
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '400px',
-        background: 'white',
-        borderRadius: '16px',
-        padding: '32px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-      }}>
-        <h1 style={{
-          fontSize: '28px',
-          fontWeight: 'bold',
-          color: '#0ea5e9',
-          marginBottom: '8px',
-          textAlign: 'center'
-        }}>
-          TRAVELER.COM
-        </h1>
-        <p style={{
-          textAlign: 'center',
-          color: '#666',
-          marginBottom: '32px'
-        }}>
-          Login to your account
+    <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      {toast && (
+        <div style={{ position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)', background: '#0B1E3D', color: 'white', fontSize: '12.5px', fontWeight: 600, padding: '10px 18px', borderRadius: '10px', zIndex: 50 }}>
+          {toast}
+        </div>
+      )}
+
+      <div style={{ width: '100%', maxWidth: '400px', background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+        <span onClick={() => navigate(-1)} style={{ fontSize: '20px', cursor: 'pointer', display: 'inline-block', marginBottom: '14px' }}>←</span>
+
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <Logo size={48} />
+          <h1 style={{ fontSize: '21px', fontWeight: 800, color: COLORS.text, marginTop: '12px' }}>Welcome Back</h1>
+          <p style={{ color: COLORS.textMuted, fontSize: '13px', marginTop: '4px' }}>Login to your account</p>
+        </div>
+
+        <div style={{ display: 'flex', background: COLORS.bg, borderRadius: '11px', padding: '4px', marginBottom: '20px' }}>
+          {(['personal', 'company'] as const).map((t) => (
+            <div key={t} onClick={() => setToggle(t)} style={{
+              flex: 1, textAlign: 'center', padding: '10px 4px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+              background: toggle === t ? (t === 'personal' ? COLORS.primary : COLORS.secondary) : 'transparent',
+              color: toggle === t ? 'white' : COLORS.textMuted,
+            }}>
+              {t === 'personal' ? 'Personal' : 'Company'}
+            </div>
+          ))}
+        </div>
+
+        <FormError message={errorMsg} />
+
+        <InputField label="Email Address" type="email" value={email} onChange={setEmail} placeholder="Enter your email" />
+        <PasswordField label="Password" value={password} onChange={setPassword} />
+
+        <p onClick={() => setToast('Password reset is coming soon')} style={{ textAlign: 'right', fontSize: '12.5px', color, fontWeight: 700, cursor: 'pointer', marginBottom: '18px' }}>
+          Forgot Password?
         </p>
 
-        {errorMsg && (
-          <div style={{
-            background: '#fee2e2',
-            color: '#dc2626',
-            padding: '10px',
-            borderRadius: '8px',
-            fontSize: '14px',
-            marginBottom: '16px',
-            textAlign: 'center'
-          }}>
-            {errorMsg}
-          </div>
-        )}
+        <div style={{ marginBottom: '20px' }}>
+          <PrimaryButton onClick={handleLogin} color={color} loading={loading}>Login</PrimaryButton>
+        </div>
 
-        <input
-          type="email"
-          placeholder="Email address"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '12px',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            fontSize: '16px',
-            marginBottom: '16px',
-            boxSizing: 'border-box'
-          }}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+          <div style={{ flex: 1, height: '1px', background: COLORS.border }} />
+          <span style={{ fontSize: '12px', color: COLORS.textMuted }}>or continue with</span>
+          <div style={{ flex: 1, height: '1px', background: COLORS.border }} />
+        </div>
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '12px',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            fontSize: '16px',
-            marginBottom: '24px',
-            boxSizing: 'border-box'
-          }}
-        />
+        <SocialLoginButtons onProviderClick={(p) => setToast(`${p.charAt(0).toUpperCase() + p.slice(1)} login is coming soon`)} />
 
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          style={{
-            width: '100%',
-            padding: '14px',
-            background: loading ? '#94d3f0' : '#0ea5e9',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '16px',
-            fontWeight: 'bold',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            marginBottom: '16px'
-          }}>
-          {loading ? 'Logging in...' : 'Login'}
-        </button>
-
-        <p style={{ textAlign: 'center', color: '#666', fontSize: '14px' }}>
+        <p style={{ textAlign: 'center', color: COLORS.textMuted, fontSize: '13px', marginTop: '22px' }}>
           Don't have an account?{' '}
-          <span
-            onClick={() => navigate('/account-type')}
-            style={{ color: '#0ea5e9', cursor: 'pointer' }}>
+          <span onClick={() => navigate('/account-type')} style={{ color: COLORS.primary, fontWeight: 700, cursor: 'pointer' }}>
             Sign Up
           </span>
         </p>
