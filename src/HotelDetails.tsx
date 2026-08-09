@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -28,11 +29,11 @@ type ServiceDetail = {
 }
 
 const AMENITY_ICON: Record<string, string> = {
-  WiFi: '📶', Parking: '🅿️', Restaurant: '🍽️', Pool: '🏊', Gym: '🏋️',
-  'Airport Pickup': '✈️', 'Conference Hall': '🏢', Laundry: '🧺', AC: '❄️', Breakfast: '☕',
-  Meals: '🍱', 'Charging Port': '🔌', 'Reclining Seats': '💺', Toilet: '🚻',
-  'Guide Included': '🧭', 'Transport Included': '🚐', 'Meals Included': '🍱', Insurance: '🛡️',
-  Catering: '🍽️', 'Sound System': '🔊', Seating: '🪑',
+  WiFi: 'wifi', Parking: 'parking', Restaurant: 'restaurant', Pool: 'pool', Gym: 'gym',
+  'Airport Pickup': 'plane', 'Conference Hall': 'building', Laundry: 'laundry', AC: 'snowflake', Breakfast: 'coffee',
+  Meals: 'food', 'Charging Port': 'plug', 'Reclining Seats': 'seat', Toilet: 'toilet',
+  'Guide Included': 'compass', 'Transport Included': 'van', 'Meals Included': 'food', Insurance: 'shield',
+  Catering: 'restaurant', 'Sound System': 'speaker', Seating: 'seat',
 }
 
 type RoomType = {
@@ -363,7 +364,7 @@ function HotelDetails() {
     return (
       <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ background: COLORS.card, borderRadius: '20px', padding: '30px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', width: '100%' }}>
-          <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
+          <div style={{ width: '48px', height: '48px', marginBottom: '12px', color: COLORS.green, display: 'flex', justifyContent: 'center' }}><Icon name="checkCircle" size={44} color={COLORS.green} /></div>
           <p style={{ fontSize: '17px', fontWeight: 800, color: COLORS.green, marginBottom: '6px' }}>Booking Confirmed!</p>
           <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '20px' }}>{service.title}</p>
 
@@ -420,7 +421,7 @@ function HotelDetails() {
           overflow: 'hidden',
           position: 'relative'
         }}>
-          {service.photo_url ? <img src={service.photo_url} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🏨'}
+          {service.photo_url ? <img src={service.photo_url} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="hotel" size={56} color="white" />}
           {activePromo && (
             <div style={{
               position: 'absolute', top: '12px', left: '12px', background: '#6B21A8', color: 'white',
@@ -453,7 +454,7 @@ function HotelDetails() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {service.amenities.map((a) => (
                 <div key={a} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <span style={{ fontSize: '14px' }}>{AMENITY_ICON[a] || '✓'}</span>
+                  <Icon name={AMENITY_ICON[a] || 'check'} size={14} color={COLORS.textMuted} />
                   <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{a}</span>
                 </div>
               ))}
@@ -582,7 +583,7 @@ function HotelDetails() {
               display: 'flex', alignItems: 'center', gap: '6px', background: '#F5F3FF',
               border: '1px solid #DDD6FE', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px'
             }}>
-              <span style={{ fontSize: '13px' }}>🏷️</span>
+              <span style={{ display: 'flex' }}><Icon name="tag" size={13} color="#6B21A8" /></span>
               <p style={{ fontSize: '11.5px', fontWeight: 700, color: '#6B21A8' }}>
                 {activePromo.title} — {activePromo.discount_type === 'percentage' ? `${activePromo.discount_value}% OFF` : `₦${activePromo.discount_value.toLocaleString()} OFF`}
               </p>
