@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -16,7 +17,7 @@ const COLORS = {
 }
 
 const TRAVEL_AMENITY_ICON: Record<string, string> = {
-  WiFi: '📶', AC: '❄️', 'Charging Port': '🔌', Meals: '🍱', 'Reclining Seats': '💺', Toilet: '🚻', Refundable: '🔄', 'Baggage Allowance': '🧳',
+  WiFi: 'wifi', AC: 'snowflake', 'Charging Port': 'plug', Meals: 'food', 'Reclining Seats': 'seat', Toilet: 'toilet', Refundable: 'refresh', 'Baggage Allowance': 'luggage',
 }
 
 type Flight = {
@@ -160,13 +161,13 @@ function Flights() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
             <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer', marginTop: '6px' }}>←</span>
-            <div style={{ width: '38px', height: '38px', borderRadius: '11px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>✈️</div>
+            <div style={{ width: '38px', height: '38px', borderRadius: '11px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="plane" size={18} color={COLORS.primary} /></div>
             <div>
               <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Domestic Flights</h1>
               <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Book affordable flights across Nigeria</p>
             </div>
           </div>
-          <span style={{ fontSize: '18px', color: COLORS.textMuted, marginTop: '6px' }}>♡</span>
+          <span style={{ color: COLORS.textMuted, marginTop: '6px', display: 'flex' }}><Icon name="heart" size={18} color={COLORS.textMuted} /></span>
         </div>
       </div>
 
@@ -199,8 +200,8 @@ function Flights() {
             <input type="number" placeholder="Max price (₦)" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} style={{ ...inputStyle, background: 'white', flex: 1 }} />
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={fetchFlights} style={{ flex: 1, padding: '12px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
-              🔍 Search
+            <button onClick={fetchFlights} style={{ flex: 1, padding: '12px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <Icon name="search" size={15} color="white" /> Search
             </button>
             <button onClick={() => { setDestination(''); setMinPrice(''); setMaxPrice(''); fetchFlights() }} style={{ padding: '12px 16px', background: 'white', color: COLORS.navy, border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
               Clear
@@ -211,13 +212,13 @@ function Flights() {
         {/* Trust row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', background: COLORS.card, borderRadius: '14px', padding: '14px 8px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
           {[
-            ['✅', 'Best Fares'],
-            ['🧳', 'Safe Booking'],
-            ['🎧', '24/7 Support'],
-            ['🛡️', 'Secure Payment'],
+            ['checkCircle', 'Best Fares'],
+            ['luggage', 'Safe Booking'],
+            ['headphones', '24/7 Support'],
+            ['shield', 'Secure Payment'],
           ].map(([icon, label]) => (
             <div key={label} style={{ flex: 1, textAlign: 'center' as const }}>
-              <p style={{ fontSize: '18px' }}>{icon}</p>
+              <div style={{ display: 'flex', justifyContent: 'center' }}><Icon name={icon} size={18} color={COLORS.primary} /></div>
               <p style={{ fontSize: '9.5px', fontWeight: 700, color: COLORS.text, marginTop: '4px' }}>{label}</p>
             </div>
           ))}
@@ -256,10 +257,10 @@ function Flights() {
               <div key={f.id} onClick={() => navigate(`/flight/${f.id}`)} style={{ background: COLORS.card, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer' }}>
                 <div style={{ position: 'relative', height: '110px' }}>
                   <div style={{ width: '100%', height: '100%', background: f.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '30px' }}>
-                    {f.photo_url ? <img src={f.photo_url} alt={f.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✈️'}
+                    {f.photo_url ? <img src={f.photo_url} alt={f.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="plane" size={30} color="white" />}
                   </div>
-                  <div onClick={(e) => toggleFavorite(e, f.id)} style={{ position: 'absolute', top: '10px', right: '10px', width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', color: favoriteIds.has(f.id) ? COLORS.secondary : '#94a3b8' }}>
-                    {favoriteIds.has(f.id) ? '♥' : '♡'}
+                  <div onClick={(e) => toggleFavorite(e, f.id)} style={{ position: 'absolute', top: '10px', right: '10px', width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(f.id) ? COLORS.secondary : '#94a3b8' }}>
+                    <Icon name="heart" size={15} color={favoriteIds.has(f.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(f.id)} />
                   </div>
                   {f.id === bestDealId && (
                     <span style={{ position: 'absolute', top: '10px', left: '10px', background: COLORS.green, color: 'white', fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '20px' }}>Best Deal</span>
@@ -273,7 +274,7 @@ function Flights() {
                   <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{f.companies?.business_name || 'Traveler.com Partner'}</p>
                   {f.avgRating !== null && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
-                      <span style={{ background: '#FEF3C7', color: COLORS.gold, fontSize: '11.5px', fontWeight: 800, padding: '2px 7px', borderRadius: '6px' }}>⭐ {f.avgRating.toFixed(1)}</span>
+                      <span style={{ background: '#FEF3C7', color: COLORS.gold, fontSize: '11.5px', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Icon name="star" size={11} color={COLORS.gold} filled /> {f.avgRating.toFixed(1)}</span>
                       <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>({f.reviewCount} review{f.reviewCount !== 1 ? 's' : ''})</span>
                     </div>
                   )}
@@ -286,7 +287,7 @@ function Flights() {
                     <div style={{ flex: 1, textAlign: 'center' as const, padding: '0 8px' }}>
                       <p style={{ fontSize: '10px', color: COLORS.textMuted }}>{fmtDuration(f.duration_minutes)}</p>
                       <div style={{ height: '1px', background: COLORS.border, margin: '4px 0', position: 'relative' }}>
-                        <span style={{ position: 'absolute', right: 0, top: '-8px', fontSize: '11px' }}>✈️</span>
+                        <span style={{ position: 'absolute', right: 0, top: '-9px', display: 'flex' }}><Icon name="plane" size={14} color={COLORS.textMuted} /></span>
                       </div>
                       <p style={{ fontSize: '9.5px', color: COLORS.green, fontWeight: 700 }}>Direct</p>
                     </div>
@@ -299,8 +300,8 @@ function Flights() {
                   {f.amenities && f.amenities.length > 0 && (
                     <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                       {f.amenities.slice(0, 3).map((a) => (
-                        <span key={a} style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 600 }}>
-                          {TRAVEL_AMENITY_ICON[a] || '✓'} {a}
+                        <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 600 }}>
+                          <Icon name={TRAVEL_AMENITY_ICON[a] || 'check'} size={12} color={COLORS.textMuted} /> {a}
                         </span>
                       ))}
                     </div>
