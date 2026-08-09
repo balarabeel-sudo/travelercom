@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import logo from './assets/logo.png'
+import Icon from './Icons'
 
 export const COLORS = {
   primary: '#0ea5e9',
@@ -59,8 +60,8 @@ export function InputField({ label, type = 'text', value, onChange, placeholder,
             borderRadius: '10px', fontSize: '14.5px', boxSizing: 'border-box' as const, outline: 'none',
           }}
         />
-        {valid === true && <span style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', color: COLORS.green }}>✓</span>}
-        {valid === false && <span style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', color: COLORS.red }}>✕</span>}
+        {valid === true && <span style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', color: COLORS.green, display: 'flex' }}><Icon name="check" size={16} color={COLORS.green} strokeWidth={2.5} /></span>}
+        {valid === false && <span style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', color: COLORS.red, display: 'flex' }}><Icon name="x" size={16} color={COLORS.red} strokeWidth={2.5} /></span>}
       </div>
     </div>
   )
@@ -100,8 +101,8 @@ export function PasswordField({ label, value, onChange, valid }: { label: string
             borderRadius: '10px', fontSize: '14.5px', boxSizing: 'border-box' as const, outline: 'none',
           }}
         />
-        <span onClick={() => setShow(!show)} style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', fontSize: '15px', color: COLORS.textMuted }}>
-          {show ? '🙈' : '👁️'}
+        <span onClick={() => setShow(!show)} style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', display: 'flex', color: COLORS.textMuted }}>
+          <Icon name={show ? 'eyeOff' : 'eye'} size={18} />
         </span>
       </div>
     </div>
@@ -163,8 +164,8 @@ export function AccountTypeCard({ icon, color, title, description, buttonLabel, 
         position: 'relative', textAlign: 'center' as const,
       }}>
       {selected && (
-        <div style={{ position: 'absolute', top: '12px', left: '12px', width: '22px', height: '22px', borderRadius: '50%', background: color, color: 'white', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          ✓
+        <div style={{ position: 'absolute', top: '12px', left: '12px', width: '22px', height: '22px', borderRadius: '50%', background: color, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="check" size={13} color="white" strokeWidth={3} />
         </div>
       )}
       <div style={{
