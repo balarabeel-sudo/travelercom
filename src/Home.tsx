@@ -331,7 +331,7 @@ if (accountType === 'company') {
               color: companyPlan === 'business_suite' ? 'white' : COLORS.text,
               display: 'flex', alignItems: 'center', gap: '6px'
             }}>
-              Welcome back, {displayName}! 👋
+              Welcome back, {displayName}!
               {companyPlan === 'business_suite' && <Icon name="star" size={14} color="#FBBF24" />}
             </p>
             <p style={{
@@ -451,8 +451,8 @@ if (accountType === 'company') {
 
           <h3
             onClick={() => navigate('/listings-management')}
-            style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px', cursor: 'pointer' }}>
-            My Listings →
+            style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            My Listings <Icon name="chevronRight" size={15} color={COLORS.text} />
           </h3>
           <div
             onClick={() => navigate('/listings-management')}
@@ -465,8 +465,8 @@ if (accountType === 'company') {
 
           <h3
             onClick={() => navigate('/bookings-management')}
-            style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px', cursor: 'pointer' }}>
-            Bookings Received →
+            style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            Bookings Received <Icon name="chevronRight" size={15} color={COLORS.text} />
           </h3>
           <div
             onClick={() => navigate('/bookings-management')}
@@ -485,20 +485,20 @@ if (accountType === 'company') {
   }
   
 const services = [
-    { icon: '🏨', label: 'Hotels & Stays', desc: 'Find your comfort', path: '/hotels' },
-    { icon: '🚌', label: 'Bus Stations', desc: 'Travel by road', path: '/bus' },
-    { icon: '🚆', label: 'Railway', desc: 'Travel by train', path: '/train' },
-    { icon: '✈️', label: 'Domestic Flights', desc: 'Fly across Nigeria', path: '/services/flight' },
-    { icon: '🗺️', label: 'Tours & Attractions', desc: 'Explore places', path: '/tours' },
-    { icon: '🎪', label: 'Event Centers', desc: 'Book a venue', path: '/event-centers' },
+    { icon: 'hotel', label: 'Hotels & Stays', desc: 'Find your comfort', path: '/hotels' },
+    { icon: 'bus', label: 'Bus Stations', desc: 'Travel by road', path: '/bus' },
+    { icon: 'train', label: 'Railway', desc: 'Travel by train', path: '/train' },
+    { icon: 'plane', label: 'Domestic Flights', desc: 'Fly across Nigeria', path: '/flights' },
+    { icon: 'map', label: 'Tours & Attractions', desc: 'Explore places', path: '/tours' },
+    { icon: 'tent', label: 'Event Centers', desc: 'Book a venue', path: '/event-centers' },
   ]
 
   const destinations = [
-    { city: 'Lagos', emoji: '🌆', color: '#0369a1' },
-    { city: 'Abuja', emoji: '🏛️', color: '#0EA5E9' },
-    { city: 'Kaduna', emoji: '🕌', color: '#F97316' },
-    { city: 'Kano', emoji: '🏺', color: '#0369a1' },
-    { city: 'Port Harcourt', emoji: '🌊', color: '#0EA5E9' },
+    { city: 'Lagos', icon: 'mapPin', color: '#0369a1' },
+    { city: 'Abuja', icon: 'mapPin', color: '#0EA5E9' },
+    { city: 'Kaduna', icon: 'mapPin', color: '#F97316' },
+    { city: 'Kano', icon: 'mapPin', color: '#0369a1' },
+    { city: 'Port Harcourt', icon: 'mapPin', color: '#0EA5E9' },
   ]
 
   // No real listings yet for tours/events — will be populated once companies start adding services
@@ -522,7 +522,7 @@ const services = [
           TRAVELER<span style={{ color: COLORS.secondary }}>.COM</span>
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ fontSize: '19px', cursor: 'pointer' }}>🔔</div>
+          <div style={{ cursor: 'pointer', display: 'flex' }}><Icon name="bell" size={19} color={COLORS.text} /></div>
           <div
             onClick={handleLogout}
             title="Logout"
@@ -539,7 +539,7 @@ const services = [
               fontWeight: 'bold',
               cursor: 'pointer'
             }}>
-            {displayName ? displayName.charAt(0).toUpperCase() : '👤'}
+            {displayName ? displayName.charAt(0).toUpperCase() : <Icon name="user" size={16} color="white" />}
           </div>
         </div>
       </div>
@@ -586,7 +586,6 @@ const services = [
                 textAlign: 'center',
               }}>
               <div style={{
-                fontSize: '18px',
                 width: '36px',
                 height: '36px',
                 background: COLORS.bg,
@@ -596,7 +595,7 @@ const services = [
                 justifyContent: 'center',
                 marginBottom: '6px',
               }}>
-                {s.icon}
+                <Icon name={s.icon} size={18} color={COLORS.primary} />
               </div>
               <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.text, lineHeight: 1.2 }}>{s.label}</p>
             </div>
@@ -633,16 +632,15 @@ const services = [
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '32px'
               }}>
-                {d.emoji}
+                <Icon name={d.icon} size={30} color="white" />
               </div>
               <div style={{ padding: '10px' }}>
                 <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '2px' }}>
                   {d.city}
                 </p>
-                <p style={{ fontSize: '11px', color: COLORS.primary, fontWeight: 600 }}>
-                  Explore →
+                <p style={{ fontSize: '11px', color: COLORS.primary, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  Explore <Icon name="chevronRight" size={12} color={COLORS.primary} />
                 </p>
               </div>
             </div>
@@ -658,8 +656,8 @@ const services = [
           </h3>
           <span
             onClick={() => navigate('/hotels')}
-            style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer' }}>
-            See all →
+            style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
+            See all <Icon name="chevronRight" size={13} color={COLORS.primary} />
           </span>
         </div>
 
@@ -700,7 +698,7 @@ const services = [
                     justifyContent: 'center',
                     fontSize: '30px',
                   }}>
-                    {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🏨'}
+                    {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="hotel" size={30} color="white" />}
                   </div>
                   <div
                     onClick={(e) => toggleFavorite(e, h.id)}
@@ -710,7 +708,7 @@ const services = [
                       display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px',
                       color: favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8',
                     }}>
-                    {favoriteIds.has(h.id) ? '♥' : '♡'}
+                    <Icon name="heart" size={14} color={favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(h.id)} />
                   </div>
                 </div>
                 <div style={{ padding: '10px' }}>
@@ -741,8 +739,8 @@ const services = [
           <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>
             Popular Bus Routes
           </h3>
-          <span onClick={() => navigate('/bus')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer' }}>
-            See all →
+          <span onClick={() => navigate('/bus')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
+            See all <Icon name="chevronRight" size={13} color={COLORS.primary} />
           </span>
         </div>
         {popularBus.length === 0 ? (
@@ -752,7 +750,7 @@ const services = [
             {popularBus.map((r) => (
               <TripCard
                 key={r.id}
-                icon="🚌"
+                icon="bus"
                 route={r.origin ? `${r.origin} → ${r.destination}` : r.destination}
                 company={r.companyName}
                 date={r.departure_time ? new Date(r.departure_time).toLocaleDateString() : 'Schedule TBA'}
@@ -773,8 +771,8 @@ const services = [
           <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>
             Domestic Flights
           </h3>
-          <span onClick={() => navigate('/services/flight')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer' }}>
-            See all →
+          <span onClick={() => navigate('/services/flight')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
+            See all <Icon name="chevronRight" size={13} color={COLORS.primary} />
           </span>
         </div>
         {popularFlights.length === 0 ? (
@@ -784,7 +782,7 @@ const services = [
             {popularFlights.map((f) => (
               <TripCard
                 key={f.id}
-                icon="✈️"
+                icon="plane"
                 route={f.origin ? `${f.origin} → ${f.destination}` : f.destination}
                 company={f.companyName}
                 date={f.departure_time ? new Date(f.departure_time).toLocaleDateString() : 'Schedule TBA'}
@@ -819,7 +817,7 @@ const services = [
               One platform for hotels, buses, trains & flights.
             </p>
           </div>
-          <div style={{ fontSize: '36px', marginLeft: '12px' }}>🧳</div>
+          <div style={{ marginLeft: '12px' }}><Icon name="luggage" size={36} color="white" /></div>
         </div>
       </div>
 
@@ -880,17 +878,17 @@ function TripCard({ icon, route, company, date, price, photoUrl, isFavorite, onT
           justifyContent: 'center',
           fontSize: '26px',
         }}>
-          {photoUrl ? <img src={photoUrl} alt={route} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : icon}
+          {photoUrl ? <img src={photoUrl} alt={route} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name={icon} size={26} color="white" />}
         </div>
         <div
           onClick={onToggleFavorite}
           style={{
             position: 'absolute', top: '8px', right: '8px',
             width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(255,255,255,0.9)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: isFavorite ? COLORS.secondary : '#94a3b8',
           }}>
-          {isFavorite ? '♥' : '♡'}
+          <Icon name="heart" size={13} color={isFavorite ? COLORS.secondary : '#94a3b8'} filled={isFavorite} />
         </div>
       </div>
       <div style={{ padding: '10px' }}>
@@ -916,10 +914,10 @@ function TripCard({ icon, route, company, date, price, photoUrl, isFavorite, onT
 
 function BottomNav({ active, navigate }: { active: string; navigate: (p: string) => void }) {
   const items = [
-    { key: 'home', icon: '🏠', label: 'Home', path: '/home' },
-    { key: 'search', icon: '🔍', label: 'Search', path: '/search' },
-    { key: 'bookings', icon: '🎫', label: 'Bookings', path: '/bookings' },
-    { key: 'account', icon: '👤', label: 'Account', path: '/account' },
+    { key: 'home', icon: 'home', label: 'Home', path: '/home' },
+    { key: 'search', icon: 'search', label: 'Search', path: '/search' },
+    { key: 'bookings', icon: 'ticket', label: 'Bookings', path: '/bookings' },
+    { key: 'account', icon: 'user', label: 'Account', path: '/account' },
   ]
 
   return (
@@ -948,9 +946,7 @@ function BottomNav({ active, navigate }: { active: string; navigate: (p: string)
             cursor: 'pointer',
             gap: '2px'
           }}>
-          <span style={{ fontSize: '20px', opacity: active === item.key ? 1 : 0.5 }}>
-            {item.icon}
-          </span>
+          <Icon name={item.icon} size={20} color={active === item.key ? COLORS.primary : COLORS.textMuted} strokeWidth={active === item.key ? 2.3 : 2} />
           <span style={{
             fontSize: '10.5px',
             fontWeight: active === item.key ? 700 : 500,
@@ -1040,49 +1036,6 @@ function CompanyBottomNav({ active, navigate }: { active: string; navigate: (p: 
           </div>
         )
       })}
-    </div>
-  )
-}
-
-function ServiceCard({ icon, label, desc, path, navigate, wide }: {
-  icon: string; label: string; desc: string; path: string;
-  navigate: (p: string) => void; wide?: boolean
-}) {
-  return (
-    <div
-      onClick={() => navigate(path)}
-      style={{
-        background: COLORS.card,
-        borderRadius: '16px',
-        padding: '16px',
-        cursor: 'pointer',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: wide ? 'center' : 'flex-start',
-        flexDirection: wide ? 'row' : 'column',
-        gap: wide ? '12px' : '0',
-      }}>
-      <div style={{
-        fontSize: '24px',
-        marginBottom: wide ? 0 : '10px',
-        width: '44px',
-        height: '44px',
-        background: COLORS.bg,
-        borderRadius: '12px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        {icon}
-      </div>
-      <div>
-        <p style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.text, marginBottom: '2px' }}>
-          {label}
-        </p>
-        <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>
-          {desc}
-        </p>
-      </div>
     </div>
   )
 }
