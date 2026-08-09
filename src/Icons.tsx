@@ -1,5 +1,5 @@
-function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2 }: {
-  name: string; size?: number; color?: string; strokeWidth?: number
+function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2, filled = false }: {
+  name: string; size?: number; color?: string; strokeWidth?: number; filled?: boolean
 }) {
   const icons: Record<string, JSX.Element> = {
     box: <><path d="M3 7l9-4 9 4-9 4-9-4z" /><path d="M3 7v10l9 4 9-4V7" /><path d="M12 11v10" /></>,
@@ -24,18 +24,40 @@ function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2 }: {
     shield: <><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" /></>,
     info: <><circle cx="12" cy="12" r="9" /><line x1="12" y1="11" x2="12" y2="16" /><line x1="12" y1="8" x2="12.01" y2="8" /></>,
     chevronRight: <><polyline points="9 6 15 12 9 18" /></>,
+    chevronDown: <><polyline points="6 9 12 15 18 9" /></>,
     arrowLeft: <><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></>,
     users: <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" /><circle cx="17" cy="9" r="2.6" /><path d="M15.5 14c2.2.3 3.8 1.9 3.8 5" /></>,
     userPlus: <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" /><line x1="18" y1="8" x2="18" y2="14" /><line x1="15" y1="11" x2="21" y2="11" /></>,
     barChart: <><line x1="5" y1="20" x2="5" y2="12" /><line x1="12" y1="20" x2="12" y2="7" /><line x1="19" y1="20" x2="19" y2="15" /></>,
     megaphone: <><path d="M3 10v4a1 1 0 0 0 1 1h2l5 4V5l-5 4H4a1 1 0 0 0-1 1z" /><path d="M16 9a4 4 0 0 1 0 6" /></>,
-    star: <><path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1-5.4 3.1 1.3-6-4.6-4.1 6.1-.6z" /></>,
+    star: <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1-5.4 3.1 1.3-6-4.6-4.1 6.1-.6z" fill={filled ? color : 'none'} />,
     edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></>,
     crown: <><path d="M3 8l4 3 5-6 5 6 4-3-2 10H5L3 8z" /><path d="M5 21h14" /></>,
     moreHorizontal: <><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></>,
     trash: <><path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" /></>,
     minus: <><line x1="5" y1="12" x2="19" y2="12" /></>,
     calendarX: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /><path d="M8 3v4M16 3v4" /><line x1="9" y1="15" x2="15" y2="19" /><line x1="15" y1="15" x2="9" y2="19" /></>,
+    // --- Added for emoji replacement across the app ---
+    hotel: <><path d="M3 21V6a1 1 0 0 1 1-1h5v16" /><path d="M15 21V9a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v12" /><path d="M9 21v-4a2 2 0 0 1 4 0v4" /><line x1="3" y1="21" x2="21" y2="21" /><line x1="6" y1="8" x2="6" y2="8.01" /><line x1="6" y1="11" x2="6" y2="11.01" /><line x1="6" y1="14" x2="6" y2="14.01" /></>,
+    bus: <><rect x="3" y="5" width="18" height="12" rx="2" /><line x1="3" y1="11" x2="21" y2="11" /><line x1="7" y1="19" x2="7" y2="21" /><line x1="17" y1="19" x2="17" y2="21" /><circle cx="7.5" cy="17" r="0.01" /><circle cx="16.5" cy="17" r="0.01" /></>,
+    train: <><rect x="6" y="3" width="12" height="13" rx="3" /><line x1="6" y1="10" x2="18" y2="10" /><line x1="9" y1="19" x2="7" y2="22" /><line x1="15" y1="19" x2="17" y2="22" /><circle cx="9" cy="13" r="0.01" /><circle cx="15" cy="13" r="0.01" /></>,
+    plane: <path d="M3 13l7-2 4-8 2 1-2 7 6 1v2l-6 1 2 7-2 1-4-8-7-2v-2z" />,
+    map: <><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" /><line x1="9" y1="4" x2="9" y2="18" /><line x1="15" y1="6" x2="15" y2="20" /></>,
+    tent: <><path d="M12 4l9 16H3z" /><path d="M12 4l5 16" /><path d="M12 4L7 20" /><line x1="9" y1="20" x2="15" y2="20" /></>,
+    heart: <path d="M12 20s-7-4.3-9.5-8.8C.8 8 2 4.5 5.5 4c2-.3 3.7.8 4.5 2.3C10.8 4.8 12.5 3.7 14.5 4 18 4.5 19.2 8 17.5 11.2 15 15.7 12 20 12 20z" fill={filled ? color : 'none'} />,
+    wifi: <><path d="M2 8.5a16 16 0 0 1 20 0" /><path d="M5.5 12a11 11 0 0 1 13 0" /><path d="M9 15.5a6 6 0 0 1 6 0" /><line x1="12" y1="19" x2="12.01" y2="19" /></>,
+    search: <><circle cx="10.5" cy="10.5" r="6.5" /><line x1="20" y1="20" x2="15.3" y2="15.3" /></>,
+    filter: <path d="M3 4h18l-7 8v6l-4 2v-8z" />,
+    mapPin: <><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z" /><circle cx="12" cy="9" r="2.3" /></>,
+    phone: <path d="M5 3h3l1.5 4.5-2 2a13 13 0 0 0 6 6l2-2L20 15v3a1.5 1.5 0 0 1-1.6 1.5A16 16 0 0 1 3.5 4.6 1.5 1.5 0 0 1 5 3z" />,
+    mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><polyline points="3 7 12 13 21 7" /></>,
+    ticket: <><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.5a1.75 1.75 0 0 0 0 3V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3.5a1.75 1.75 0 0 0 0-3z" /><line x1="10" y1="7" x2="10" y2="17" strokeDasharray="2 2" /></>,
+    refresh: <><path d="M4 12a8 8 0 0 1 14-5.2M4 12a8 8 0 0 0 14 5.2" /><polyline points="18 3 18 7 14 7" /><polyline points="6 21 6 17 10 17" /></>,
+    headphones: <><path d="M4 14v-2a8 8 0 0 1 16 0v2" /><rect x="2" y="14" width="5" height="6" rx="1.5" /><rect x="17" y="14" width="5" height="6" rx="1.5" /></>,
+    creditCard: <><rect x="3" y="6" width="18" height="13" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="6" y1="15" x2="10" y2="15" /></>,
+    briefcase: <><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" /><line x1="3" y1="13" x2="21" y2="13" /></>,
+    sun: <><circle cx="12" cy="12" r="4.5" /><line x1="12" y1="2.5" x2="12" y2="5" /><line x1="12" y1="19" x2="12" y2="21.5" /><line x1="4.2" y1="4.2" x2="6" y2="6" /><line x1="18" y1="18" x2="19.8" y2="19.8" /><line x1="2.5" y1="12" x2="5" y2="12" /><line x1="19" y1="12" x2="21.5" y2="12" /><line x1="4.2" y1="19.8" x2="6" y2="18" /><line x1="18" y1="6" x2="19.8" y2="4.2" /></>,
+    luggage: <><rect x="5" y="8" width="14" height="13" rx="2" /><path d="M9 8V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v3" /><line x1="9" y1="12" x2="9" y2="17" /><line x1="15" y1="12" x2="15" y2="17" /></>,
   }
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
