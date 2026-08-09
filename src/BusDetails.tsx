@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -321,7 +322,7 @@ function BusDetails() {
               <div style={{ height: '150px', background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.primary})`, position: 'relative' }}>
                 {service.photo_url && <img src={service.photo_url} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.55 }} />}
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '16px' }}>
-                  <p style={{ color: 'white', fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px' }}>🚌 {service.companies?.business_name || 'Traveler.com Partner'}</p>
+                  <p style={{ color: 'white', fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '5px' }}><Icon name="bus" size={12} color="white" /> {service.companies?.business_name || 'Traveler.com Partner'}</p>
                   <p style={{ color: 'white', fontSize: '19px', fontWeight: 800, marginTop: '4px' }}>{service.title}</p>
                 </div>
               </div>
@@ -333,7 +334,7 @@ function BusDetails() {
                   <div style={{ flex: 1, textAlign: 'center' as const, padding: '0 10px' }}>
                     <p style={{ fontSize: '10px', color: COLORS.textMuted }}>Direct</p>
                     <div style={{ height: '1px', background: COLORS.border, margin: '6px 0', position: 'relative' }}>
-                      <span style={{ position: 'absolute', right: 0, top: '-8px' }}>🚌</span>
+                      <span style={{ position: 'absolute', right: 0, top: '-9px', display: 'flex' }}><Icon name="bus" size={14} color={COLORS.textMuted} /></span>
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' as const }}>
@@ -381,8 +382,9 @@ function BusDetails() {
             </select>
             <input style={{ ...inputStyle, marginBottom: '4px' }} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder={`Enter your ${idType} number`} />
             {idNumber.trim().length > 0 && (
-              <p style={{ fontSize: '11px', fontWeight: 700, marginBottom: '10px', color: isIdFormatValid(idType, idNumber) ? COLORS.green : COLORS.red }}>
-                {isIdFormatValid(idType, idNumber) ? '✅ Format valid' : '❌ Format invalid — check the number'}
+              <p style={{ fontSize: '11px', fontWeight: 700, marginBottom: '10px', color: isIdFormatValid(idType, idNumber) ? COLORS.green : COLORS.red, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <Icon name={isIdFormatValid(idType, idNumber) ? 'check' : 'x'} size={13} color={isIdFormatValid(idType, idNumber) ? COLORS.green : COLORS.red} strokeWidth={2.5} />
+                {isIdFormatValid(idType, idNumber) ? 'Format valid' : 'Format invalid — check the number'}
               </p>
             )}
             <p style={{ fontSize: '10.5px', color: COLORS.textMuted, fontStyle: 'italic' as const }}>
@@ -446,8 +448,8 @@ function BusDetails() {
                   <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{a.label}</p>
                   <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>+₦{a.price.toLocaleString()}</p>
                 </div>
-                <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${a.val ? COLORS.primary : COLORS.border}`, background: a.val ? COLORS.primary : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '13px' }}>
-                  {a.val ? '✓' : ''}
+                <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${a.val ? COLORS.primary : COLORS.border}`, background: a.val ? COLORS.primary : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                  {a.val ? <Icon name="check" size={13} color="white" strokeWidth={3} /> : ''}
                 </div>
               </div>
             ))}
@@ -530,7 +532,7 @@ function BusDetails() {
         {/* STEP 6 — CONFIRMATION */}
         {step === 6 && (
           <div style={{ textAlign: 'center' as const }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: COLORS.green, color: 'white', fontSize: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '20px auto' }}>✓</div>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: COLORS.green, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '20px auto' }}><Icon name="check" size={30} color="white" strokeWidth={3} /></div>
             <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>Booking Successful</p>
             <p style={{ fontSize: '13px', color: COLORS.green, fontWeight: 700, marginBottom: '20px' }}>Reservation Confirmed</p>
 
