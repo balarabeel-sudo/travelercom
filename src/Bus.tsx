@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -14,7 +15,7 @@ const COLORS = {
 }
 
 const TRAVEL_AMENITY_ICON: Record<string, string> = {
-  WiFi: '📶', AC: '❄️', 'Charging Port': '🔌', Meals: '🍱', 'Reclining Seats': '💺', Toilet: '🚻', Refundable: '🔄', 'Baggage Allowance': '🧳',
+  WiFi: 'wifi', AC: 'snowflake', 'Charging Port': 'plug', Meals: 'food', 'Reclining Seats': 'seat', Toilet: 'toilet', Refundable: 'refresh', 'Baggage Allowance': 'luggage',
 }
 
 type TripItem = {
@@ -139,11 +140,11 @@ function Bus() {
           <div style={{ display: 'flex', gap: '10px' }}>
             <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer', marginTop: '2px' }}>←</span>
             <div>
-              <h1 style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>🚌 Bus Stations</h1>
+              <h1 style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text, display: 'flex', alignItems: 'center', gap: '6px' }}><Icon name="bus" size={18} color={COLORS.text} /> Bus Stations</h1>
               <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Travel by road, city to city</p>
             </div>
           </div>
-          <span style={{ fontSize: '18px', color: COLORS.textMuted }}>♡</span>
+          <span style={{ color: COLORS.textMuted, display: 'flex' }}><Icon name="heart" size={18} color={COLORS.textMuted} /></span>
         </div>
       </div>
 
@@ -155,8 +156,8 @@ function Bus() {
             <input type="number" placeholder="Max price (₦)" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-            <button onClick={fetchItems} style={{ flex: 1, padding: '12px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
-              🔍 Search Buses
+            <button onClick={fetchItems} style={{ flex: 1, padding: '12px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <Icon name="search" size={15} color="white" /> Search Buses
             </button>
             <button onClick={() => { setDestination(''); setMinPrice(''); setMaxPrice(''); fetchItems() }} style={{ padding: '12px 16px', background: COLORS.bg, color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
               Clear
@@ -165,8 +166,8 @@ function Bus() {
         </div>
 
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '14px' }}>
-          <FilterChip icon="⭐" label="Top Rated" active={sortBy === 'rating'} onClick={() => setSortBy(sortBy === 'rating' ? 'recommended' : 'rating')} />
-          <FilterChip icon="💰" label={sortBy === 'price_low' ? 'Price ↑' : sortBy === 'price_high' ? 'Price ↓' : 'Price'} active={sortBy === 'price_low' || sortBy === 'price_high'} onClick={() => setSortBy(sortBy === 'price_low' ? 'price_high' : sortBy === 'price_high' ? 'recommended' : 'price_low')} />
+          <FilterChip icon="star" label="Top Rated" active={sortBy === 'rating'} onClick={() => setSortBy(sortBy === 'rating' ? 'recommended' : 'rating')} />
+          <FilterChip icon="cash" label={sortBy === 'price_low' ? 'Price ↑' : sortBy === 'price_high' ? 'Price ↓' : 'Price'} active={sortBy === 'price_low' || sortBy === 'price_high'} onClick={() => setSortBy(sortBy === 'price_low' ? 'price_high' : sortBy === 'price_high' ? 'recommended' : 'price_low')} />
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -202,10 +203,10 @@ function Bus() {
               <div key={h.id} onClick={() => navigate(`/bus/${h.id}`)} style={{ background: COLORS.card, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer' }}>
                 <div style={{ position: 'relative', height: '130px' }}>
                   <div style={{ width: '100%', height: '100%', background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>
-                    {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🚌'}
+                    {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="bus" size={32} color="white" />}
                   </div>
-                  <div onClick={(e) => toggleFavorite(e, h.id)} style={{ position: 'absolute', top: '10px', right: '10px', width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', color: favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8' }}>
-                    {favoriteIds.has(h.id) ? '♥' : '♡'}
+                  <div onClick={(e) => toggleFavorite(e, h.id)} style={{ position: 'absolute', top: '10px', right: '10px', width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8' }}>
+                    <Icon name="heart" size={15} color={favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(h.id)} />
                   </div>
                   {h.id === lowestPriceId && (
                     <span style={{ position: 'absolute', top: '10px', left: '10px', background: COLORS.secondary, color: 'white', fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '20px' }}>Best Value</span>
@@ -236,8 +237,8 @@ function Bus() {
                   {h.amenities && h.amenities.length > 0 && (
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
                       {h.amenities.slice(0, 4).map((a) => (
-                        <span key={a} style={{ fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
-                          {TRAVEL_AMENITY_ICON[a] || '✓'} {a}
+                        <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
+                          <Icon name={TRAVEL_AMENITY_ICON[a] || 'check'} size={11} color={COLORS.textMuted} /> {a}
                         </span>
                       ))}
                     </div>
@@ -273,7 +274,7 @@ function FilterChip({ icon, label, active, onClick }: { icon: string; label: str
       color: active ? 'white' : COLORS.text,
       border: `1px solid ${active ? COLORS.primary : COLORS.border}`,
     }}>
-      {icon} {label}
+      <Icon name={icon} size={13} color={active ? 'white' : COLORS.text} /> {label}
     </span>
   )
 }
