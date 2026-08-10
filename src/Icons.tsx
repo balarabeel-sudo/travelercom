@@ -82,12 +82,11 @@ function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2, filled
     mic: <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="8" y1="22" x2="16" y2="22" /></>,
     rings: <><circle cx="9" cy="14" r="5" /><circle cx="15" cy="14" r="5" /></>,
     party: <><path d="M3 21l6-2 11-11-4-4L5 15z" /><circle cx="18" cy="6" r="1" /><circle cx="15" cy="3" r="1" /><circle cx="20" cy="9" r="1" /></>,
-    clipboard: <><rect x="5" y="4" width="14" height="17" rx="2" /><rect x="9" y="2" width="6" height="4" rx="1" /><line x1="8" y1="11" x2="16" y2="11" /><line x1="8" y1="15" x2="16" y2="15" /></>,
     image: <><rect x="3" y="4" width="18" height="15" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M21 15l-5-5-9 9" /></>,
     square: <rect x="4" y="4" width="16" height="16" rx="2" />,
-    camera: <><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M8 7l2-3h4l2 3" /><circle cx="12" cy="14" r="4" /></>,
     hourglass: <><path d="M6 2h12M6 22h12M6 2c0 6 6 8 6 10s-6 4-6 10M18 2c0 6-6 8-6 10s6 4 6 10" /></>,
-    plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
+    chat: <path d="M4 4h16v12H8l-4 4z" />,
+    lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>,
   }
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
