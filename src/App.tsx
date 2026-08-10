@@ -42,6 +42,7 @@ import Train from './Train'
 import TrainDetails from './TrainDetails'
 import Tours from './Tours'
 import EventCenters from './EventCenters'
+import Flights from './Flights'
 
 function App() {
   return (
@@ -82,6 +83,7 @@ function App() {
        <Route path="/support" element={<Support />} />
        <Route path="/settings" element={<Settings />} />
         <Route path="/add-guest" element={<AddGuest />} />
+        <Route path="/flights" element={<Flights />} />
         <Route path="/flight/:id" element={<FlightDetails />} />
         <Route path="/bus" element={<Bus />} />
         <Route path="/bus/:id" element={<BusDetails />} />
