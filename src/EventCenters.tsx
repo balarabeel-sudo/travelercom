@@ -75,7 +75,7 @@ function EventCenters() {
     }
 
     setEvents(rows.map((t) => {
-      const ratings = ratingMap[e.id] || []
+      const ratings = ratingMap[t.id] || []
       const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null
       return { ...t, avgRating, reviewCount: ratings.length }
     }))
@@ -111,7 +111,7 @@ function EventCenters() {
     }
   }
 
-  let visible = typeFilter ? events.filter((t) => e.event_type === typeFilter) : tours
+  let visible = typeFilter ? events.filter((t) => t.event_type === typeFilter) : events
   visible = [...visible].sort((a, b) => {
     if (sortBy === 'price_low') return a.price - b.price
     if (sortBy === 'price_high') return b.price - a.price
