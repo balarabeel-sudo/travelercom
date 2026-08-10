@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -14,7 +15,7 @@ const COLORS = {
 }
 
 const TOUR_TYPES = ['Nature', 'History', 'Adventure', 'Water', 'Culture']
-const TOUR_TYPE_ICON: Record<string, string> = { Nature: '🌿', History: '🏛️', Adventure: '🥾', Water: '🌊', Culture: '🎭' }
+const TOUR_TYPE_ICON: Record<string, string> = { Nature: 'sun', History: 'building', Adventure: 'compass', Water: 'pool', Culture: 'party' }
 
 type Tour = {
   id: string
@@ -137,11 +138,11 @@ function Tours() {
           <div style={{ display: 'flex', gap: '10px' }}>
             <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer', marginTop: '2px' }}>←</span>
             <div>
-              <h1 style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>🗺️ Tours & Attractions</h1>
+              <h1 style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text, display: 'flex', alignItems: 'center', gap: '6px' }}><Icon name="map" size={18} color={COLORS.text} /> Tours & Attractions</h1>
               <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Discover amazing places and experiences</p>
             </div>
           </div>
-          <span style={{ fontSize: '18px', color: COLORS.textMuted }}>♡</span>
+          <span style={{ color: COLORS.textMuted, display: 'flex' }}><Icon name="heart" size={18} color={COLORS.textMuted} /></span>
         </div>
       </div>
 
@@ -153,8 +154,8 @@ function Tours() {
             <input type="number" placeholder="Max price (₦)" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-            <button onClick={fetchTours} style={{ flex: 1, padding: '12px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
-              🔍 Search
+            <button onClick={fetchTours} style={{ flex: 1, padding: '12px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <Icon name="search" size={15} color="white" /> Search
             </button>
             <button onClick={() => { setLocation(''); setMinPrice(''); setMaxPrice(''); setTypeFilter(null); fetchTours() }} style={{ padding: '12px 16px', background: COLORS.bg, color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
               Clear
@@ -163,7 +164,7 @@ function Tours() {
         </div>
 
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '14px' }}>
-          <FilterChip icon="◻️" label="All" active={typeFilter === null} onClick={() => setTypeFilter(null)} />
+          <FilterChip icon="square" label="All" active={typeFilter === null} onClick={() => setTypeFilter(null)} />
           {TOUR_TYPES.map((t) => (
             <FilterChip key={t} icon={TOUR_TYPE_ICON[t]} label={t} active={typeFilter === t} onClick={() => setTypeFilter(typeFilter === t ? null : t)} />
           ))}
@@ -199,13 +200,13 @@ function Tours() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {visible.map((t) => (
-              <div key={t.id} onClick={() => navigate(`/services/tour/${t.id}`)} style={{ background: COLORS.card, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer' }}>
+              <div key={t.id} onClick={() => navigate(`/tour/${t.id}`)} style={{ background: COLORS.card, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer' }}>
                 <div style={{ position: 'relative', height: '150px' }}>
-                  <div style={{ width: '100%', height: '100%', background: t.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '34px' }}>
-                    {t.photo_url ? <img src={t.photo_url} alt={t.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🗺️'}
+                  <div style={{ width: '100%', height: '100%', background: t.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {t.photo_url ? <img src={t.photo_url} alt={t.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="map" size={30} color="white" />}
                   </div>
-                  <div onClick={(e) => toggleFavorite(e, t.id)} style={{ position: 'absolute', top: '10px', right: '10px', width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', color: favoriteIds.has(t.id) ? COLORS.secondary : '#94a3b8' }}>
-                    {favoriteIds.has(t.id) ? '♥' : '♡'}
+                  <div onClick={(e) => toggleFavorite(e, t.id)} style={{ position: 'absolute', top: '10px', right: '10px', width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(t.id) ? COLORS.secondary : '#94a3b8' }}>
+                    <Icon name="heart" size={15} color={favoriteIds.has(t.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(t.id)} />
                   </div>
                   {t.id === lowestPriceId && (
                     <span style={{ position: 'absolute', top: '10px', left: '10px', background: COLORS.secondary, color: 'white', fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '20px' }}>Best Value</span>
@@ -217,7 +218,7 @@ function Tours() {
 
                 <div style={{ padding: '14px' }}>
                   <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{t.title}</p>
-                  <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>📍 {t.destination}</p>
+                  <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon name="mapPin" size={11} color={COLORS.textMuted} /> {t.destination}</p>
                   {t.description && (
                     <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '6px' }}>{t.description}</p>
                   )}
@@ -230,8 +231,8 @@ function Tours() {
                   )}
 
                   {t.tour_type && (
-                    <span style={{ display: 'inline-block', marginTop: '8px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
-                      {TOUR_TYPE_ICON[t.tour_type] || '🗺️'} {t.tour_type}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '8px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
+                      <Icon name={TOUR_TYPE_ICON[t.tour_type] || 'map'} size={11} color={COLORS.textMuted} /> {t.tour_type}
                     </span>
                   )}
 
@@ -265,7 +266,7 @@ function FilterChip({ icon, label, active, onClick }: { icon: string; label: str
       color: active ? 'white' : COLORS.text,
       border: `1px solid ${active ? COLORS.primary : COLORS.border}`,
     }}>
-      {icon} {label}
+      <Icon name={icon} size={13} color={active ? 'white' : COLORS.text} /> {label}
     </span>
   )
 }
