@@ -200,7 +200,7 @@ function EventCenters() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {visible.map((e) => (
-              <div key={e.id} onClick={() => navigate(`/services/tour/${e.id}`)} style={{ background: COLORS.card, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer' }}>
+              <div key={e.id} onClick={() => navigate(`/event-center/${e.id}`)} style={{ background: COLORS.card, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer' }}>
                 <div style={{ position: 'relative', height: '150px' }}>
                   <div style={{ width: '100%', height: '100%', background: e.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '34px' }}>
                     {e.photo_url ? <img src={e.photo_url} alt={e.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tent" size={32} color="white" />}
