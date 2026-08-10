@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -14,7 +15,7 @@ const COLORS = {
 }
 
 const EVENT_TYPES = ['Conference', 'Wedding', 'Party', 'Seminar', 'Exhibition']
-const EVENT_TYPE_ICON: Record<string, string> = { Conference: '🎤', Wedding: '💍', Party: '🎉', Seminar: '📋', Exhibition: '🖼️' }
+const EVENT_TYPE_ICON: Record<string, string> = { Conference: 'mic', Wedding: 'rings', Party: 'party', Seminar: 'clipboard', Exhibition: 'image' }
 
 type EventCenter = {
   id: string
@@ -137,11 +138,11 @@ function EventCenters() {
           <div style={{ display: 'flex', gap: '10px' }}>
             <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer', marginTop: '2px' }}>←</span>
             <div>
-              <h1 style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>🎪 Event Centers</h1>
+              <h1 style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text, display: 'flex', alignItems: 'center', gap: '6px' }}><Icon name="tent" size={18} color={COLORS.text} /> Event Centers</h1>
               <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Book the perfect venue for your event</p>
             </div>
           </div>
-          <span style={{ fontSize: '18px', color: COLORS.textMuted }}>♡</span>
+          <span style={{ color: COLORS.textMuted, display: 'flex' }}><Icon name="heart" size={18} color={COLORS.textMuted} /></span>
         </div>
       </div>
 
@@ -153,8 +154,8 @@ function EventCenters() {
             <input type="number" placeholder="Max price (₦)" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-            <button onClick={fetchEvents} style={{ flex: 1, padding: '12px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
-              🔍 Search
+            <button onClick={fetchEvents} style={{ flex: 1, padding: '12px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <Icon name="search" size={15} color="white" /> Search
             </button>
             <button onClick={() => { setLocation(''); setMinPrice(''); setMaxPrice(''); setTypeFilter(null); fetchEvents() }} style={{ padding: '12px 16px', background: COLORS.bg, color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
               Clear
@@ -163,7 +164,7 @@ function EventCenters() {
         </div>
 
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '14px' }}>
-          <FilterChip icon="◻️" label="All" active={typeFilter === null} onClick={() => setTypeFilter(null)} />
+          <FilterChip icon="square" label="All" active={typeFilter === null} onClick={() => setTypeFilter(null)} />
           {EVENT_TYPES.map((t) => (
             <FilterChip key={t} icon={EVENT_TYPE_ICON[t]} label={t} active={typeFilter === t} onClick={() => setTypeFilter(typeFilter === t ? null : t)} />
           ))}
@@ -202,10 +203,10 @@ function EventCenters() {
               <div key={e.id} onClick={() => navigate(`/services/tour/${e.id}`)} style={{ background: COLORS.card, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer' }}>
                 <div style={{ position: 'relative', height: '150px' }}>
                   <div style={{ width: '100%', height: '100%', background: e.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '34px' }}>
-                    {e.photo_url ? <img src={e.photo_url} alt={e.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🎪'}
+                    {e.photo_url ? <img src={e.photo_url} alt={e.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tent" size={32} color="white" />}
                   </div>
-                  <div onClick={(e) => toggleFavorite(e, e.id)} style={{ position: 'absolute', top: '10px', right: '10px', width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', color: favoriteIds.has(e.id) ? COLORS.secondary : '#94a3b8' }}>
-                    {favoriteIds.has(e.id) ? '♥' : '♡'}
+                  <div onClick={(e) => toggleFavorite(e, e.id)} style={{ position: 'absolute', top: '10px', right: '10px', width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(e.id) ? COLORS.secondary : '#94a3b8' }}>
+                    <Icon name="heart" size={15} color={favoriteIds.has(e.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(e.id)} />
                   </div>
                   {e.id === lowestPriceId && (
                     <span style={{ position: 'absolute', top: '10px', left: '10px', background: COLORS.secondary, color: 'white', fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '20px' }}>Best Value</span>
@@ -217,7 +218,7 @@ function EventCenters() {
 
                 <div style={{ padding: '14px' }}>
                   <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{e.title}</p>
-                  <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>📍 {e.destination}</p>
+                  <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon name="mapPin" size={11} color={COLORS.textMuted} /> {e.destination}</p>
                   {e.description && (
                     <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '6px' }}>{e.description}</p>
                   )}
@@ -230,8 +231,8 @@ function EventCenters() {
                   )}
 
                   {e.event_type && (
-                    <span style={{ display: 'inline-block', marginTop: '8px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
-                      {EVENT_TYPE_ICON[e.event_type] || '🎪'} {e.event_type}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '8px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
+                      <Icon name={EVENT_TYPE_ICON[e.event_type] || 'tent'} size={11} color={COLORS.textMuted} /> {e.event_type}
                     </span>
                   )}
 
@@ -265,7 +266,7 @@ function FilterChip({ icon, label, active, onClick }: { icon: string; label: str
       color: active ? 'white' : COLORS.text,
       border: `1px solid ${active ? COLORS.primary : COLORS.border}`,
     }}>
-      {icon} {label}
+      <Icon name={icon} size={13} color={active ? 'white' : COLORS.text} /> {label}
     </span>
   )
 }
