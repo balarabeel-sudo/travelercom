@@ -42,6 +42,7 @@ import Train from './Train'
 import TrainDetails from './TrainDetails'
 import Tours from './Tours'
 import EventCenters from './EventCenters'
+import EventCenterDetails from './EventCenterDetails'
 import Flights from './Flights'
 
 function App() {
@@ -91,6 +92,7 @@ function App() {
         <Route path="/train/:id" element={<TrainDetails />} />
         <Route path="/tours" element={<Tours />} />
         <Route path="/event-centers" element={<EventCenters />} />
+        <Route path="/event-center/:id" element={<EventCenterDetails />} />
         <Route path="/my-bookings" element={<MyBookings />} />
         <Route path="/bookings" element={<MyBookings />} />
       </Routes>
