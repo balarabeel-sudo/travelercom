@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -16,7 +17,7 @@ const COLORS = {
 }
 
 const CATEGORY_ICON: Record<string, string> = {
-  hotel: '🏨', bus: '🚌', train: '🚆', flight: '✈️', tour: '🗺️', event_center: '🎪',
+  hotel: 'hotel', bus: 'bus', train: 'train', flight: 'plane', tour: 'map', event_center: 'tent',
 }
 
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
@@ -104,7 +105,7 @@ function MyBookings() {
 
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center' as const, padding: '60px 20px', color: COLORS.textMuted }}>
-            <p style={{ fontSize: '32px', marginBottom: '10px' }}>🧳</p>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}><Icon name="luggage" size={30} color={COLORS.textMuted} /></div>
             <p style={{ fontSize: '13.5px' }}>No bookings here yet.</p>
           </div>
         )}
@@ -132,8 +133,8 @@ function MyBookings() {
           return (
             <div key={b.id} style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                <p style={{ fontSize: '13.5px', fontWeight: 800, color: COLORS.text }}>
-                  {CATEGORY_ICON[category] || '📍'} {b.services?.title || 'Booking'}
+                <p style={{ fontSize: '13.5px', fontWeight: 800, color: COLORS.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Icon name={CATEGORY_ICON[category] || 'mapPin'} size={13} color={COLORS.text} /> {b.services?.title || 'Booking'}
                 </p>
                 <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '4px 9px', borderRadius: '20px', background: style.bg, color: style.color, textTransform: 'capitalize' as const }}>
                   {status}
