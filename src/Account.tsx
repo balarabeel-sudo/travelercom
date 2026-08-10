@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -40,32 +41,32 @@ function Account() {
     {
       title: 'My Account',
       items: [
-        { icon: '👤', label: 'My Profile', path: '/profile' },
-        { icon: '🎫', label: 'My Bookings', path: '/bookings' },
-        { icon: '💳', label: 'Wallet', path: '/wallet' },
-        { icon: '💰', label: 'Payment Methods', path: '/payment-methods' },
+        { icon: 'user', label: 'My Profile', path: '/profile' },
+        { icon: 'ticket', label: 'My Bookings', path: '/bookings' },
+        { icon: 'creditCard', label: 'Wallet', path: '/wallet' },
+        { icon: 'cash', label: 'Payment Methods', path: '/payment-methods' },
       ]
     },
     {
       title: 'Saved',
       items: [
-        { icon: '⭐', label: 'Saved Favorites', path: '/favorites' },
-        { icon: '🔔', label: 'Notifications', path: '/notifications' },
+        { icon: 'star', label: 'Saved Favorites', path: '/favorites' },
+        { icon: 'bell', label: 'Notifications', path: '/notifications' },
       ]
     },
     {
       title: 'Support',
       items: [
-        { icon: '💬', label: 'Help & Support', path: '/support' },
-        { icon: 'ℹ️', label: 'About Traveler.com', path: '/about' },
-        { icon: '📜', label: 'Terms & Conditions', path: '/terms' },
-        { icon: '🔒', label: 'Privacy Policy', path: '/privacy' },
+        { icon: 'chat', label: 'Help & Support', path: '/support' },
+        { icon: 'info', label: 'About Traveler.com', path: '/about' },
+        { icon: 'fileText', label: 'Terms & Conditions', path: '/terms' },
+        { icon: 'lock', label: 'Privacy Policy', path: '/privacy' },
       ]
     },
     {
       title: 'Preferences',
       items: [
-        { icon: '⚙️', label: 'Settings', path: '/settings' },
+        { icon: 'settings', label: 'Settings', path: '/settings' },
       ]
     },
   ]
@@ -107,7 +108,7 @@ function Account() {
           fontSize: '22px',
           fontWeight: 'bold'
         }}>
-          {displayName ? displayName.charAt(0).toUpperCase() : '👤'}
+          {displayName ? displayName.charAt(0).toUpperCase() : <Icon name="user" size={24} color="white" />}
         </div>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: '15px', fontWeight: 700, color: COLORS.text }}>{displayName || 'Traveler'}</p>
@@ -140,7 +141,7 @@ function Account() {
                   cursor: 'pointer',
                   borderBottom: idx < section.items.length - 1 ? `1px solid ${COLORS.border}` : 'none'
                 }}>
-                <span style={{ fontSize: '18px' }}>{item.icon}</span>
+                <span style={{ display: 'flex', color: COLORS.text }}><Icon name={item.icon} size={18} color={COLORS.text} /></span>
                 <span style={{ flex: 1, fontSize: '14px', color: COLORS.text }}>{item.label}</span>
                 <span style={{ fontSize: '16px', color: COLORS.textMuted }}>›</span>
               </div>
@@ -163,7 +164,7 @@ function Account() {
             gap: '12px',
             cursor: 'pointer'
           }}>
-          <span style={{ fontSize: '18px' }}>🚪</span>
+          <span style={{ display: 'flex' }}><Icon name="logOut" size={18} color={COLORS.red} /></span>
           <span style={{ fontSize: '14px', fontWeight: 700, color: COLORS.red }}>Logout</span>
         </div>
       </div>
@@ -176,10 +177,10 @@ function Account() {
 
 function BottomNav({ active, navigate }: { active: string; navigate: (p: string) => void }) {
   const items = [
-    { key: 'home', icon: '🏠', label: 'Home', path: '/home' },
-    { key: 'search', icon: '🔍', label: 'Search', path: '/search' },
-    { key: 'bookings', icon: '🎫', label: 'Bookings', path: '/bookings' },
-    { key: 'account', icon: '👤', label: 'Account', path: '/account' },
+    { key: 'home', icon: 'home', label: 'Home', path: '/home' },
+    { key: 'search', icon: 'search', label: 'Search', path: '/search' },
+    { key: 'bookings', icon: 'ticket', label: 'Bookings', path: '/bookings' },
+    { key: 'account', icon: 'user', label: 'Account', path: '/account' },
   ]
 
   return (
@@ -208,8 +209,8 @@ function BottomNav({ active, navigate }: { active: string; navigate: (p: string)
             cursor: 'pointer',
             gap: '2px'
           }}>
-          <span style={{ fontSize: '20px', opacity: active === item.key ? 1 : 0.5 }}>
-            {item.icon}
+          <span style={{ display: 'flex', opacity: active === item.key ? 1 : 0.5 }}>
+            <Icon name={item.icon} size={20} color={active === item.key ? COLORS.primary : COLORS.textMuted} />
           </span>
           <span style={{
             fontSize: '10.5px',
