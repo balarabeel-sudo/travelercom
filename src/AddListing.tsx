@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9', secondary: '#F97316', bg: '#F8FAFC', card: '#FFFFFF',
@@ -10,21 +11,22 @@ const COLORS = {
 const COMMISSION_BY_CATEGORY: Record<string, number> = {
   hotel: 3, bus: 5, train: 5, flight: 3, tour: 3, event_center: 3,
 }
-const CATEGORY_LABELS: Record<string, string> = {
-  hotel: '🏨 Hotel', bus: '🚌 Bus', train: '🚆 Railway', flight: '✈️ Flight', tour: '🗺️ Tour', event_center: '🎪 Event Center',
+const CATEGORY_LABELS: Record<string, { icon: string; label: string }> = {
+  hotel: { icon: 'hotel', label: 'Hotel' }, bus: { icon: 'bus', label: 'Bus' }, train: { icon: 'train', label: 'Railway' },
+  flight: { icon: 'plane', label: 'Flight' }, tour: { icon: 'map', label: 'Tour' }, event_center: { icon: 'tent', label: 'Event Center' },
 }
 const AMENITY_ICON: Record<string, string> = {
-  WiFi: '📶', Parking: '🅿️', Restaurant: '🍽️', Pool: '🏊', Gym: '🏋️',
-  'Airport Pickup': '✈️', 'Conference Hall': '🏢', Laundry: '🧺', AC: '❄️', Breakfast: '☕',
-  Meals: '🍱', 'Charging Port': '🔌', 'Reclining Seats': '💺', Toilet: '🚻',
-  'Guide Included': '🧭', 'Transport Included': '🚐', 'Meals Included': '🍱', Insurance: '🛡️',
-  Catering: '🍽️', 'Sound System': '🔊', Seating: '🪑',
+  WiFi: 'wifi', Parking: 'parking', Restaurant: 'restaurant', Pool: 'pool', Gym: 'gym',
+  'Airport Pickup': 'plane', 'Conference Hall': 'building', Laundry: 'laundry', AC: 'snowflake', Breakfast: 'coffee',
+  Meals: 'food', 'Charging Port': 'plug', 'Reclining Seats': 'seat', Toilet: 'toilet',
+  'Guide Included': 'compass', 'Transport Included': 'van', 'Meals Included': 'food', Insurance: 'shield',
+  Catering: 'restaurant', 'Sound System': 'speaker', Seating: 'seat',
 }
 const AMENITIES_LIST = Object.keys(AMENITY_ICON)
 const TOUR_TYPES = ['Nature', 'History', 'Adventure', 'Water', 'Culture']
 const EVENT_TYPES = ['Conference', 'Wedding', 'Party', 'Seminar', 'Exhibition']
 const TRAVEL_AMENITY_ICON: Record<string, string> = {
-  WiFi: '📶', AC: '❄️', 'Charging Port': '🔌', Meals: '🍱', 'Reclining Seats': '💺', Toilet: '🚻', Refundable: '🔄', 'Baggage Allowance': '🧳',
+  WiFi: 'wifi', AC: 'snowflake', 'Charging Port': 'plug', Meals: 'food', 'Reclining Seats': 'seat', Toilet: 'toilet', Refundable: 'refresh', 'Baggage Allowance': 'luggage',
 }
 const TRAVEL_AMENITIES_LIST = Object.keys(TRAVEL_AMENITY_ICON)
 
@@ -158,7 +160,7 @@ function AddListing() {
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Listing</h1>
         </div>
         <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>⏳</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', color: COLORS.textMuted }}><Icon name="hourglass" size={38} color={COLORS.textMuted} /></div>
           <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text, marginBottom: '6px' }}>Account Not Yet Approved</p>
           <p style={{ fontSize: '13px', color: COLORS.textMuted }}>You need to be approved before you can add listings.</p>
         </div>
@@ -170,7 +172,7 @@ function AddListing() {
     return (
       <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}><Icon name="checkCircle" size={44} color={COLORS.green} /></div>
           <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.green, marginBottom: '8px' }}>Listing Added!</p>
           <button onClick={() => navigate('/home')} style={{ padding: '12px 24px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
             Back to Dashboard
@@ -188,8 +190,8 @@ function AddListing() {
       </div>
 
       <div style={{ padding: '20px 16px' }}>
-        <div style={{ background: COLORS.card, borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', display: 'inline-block', fontSize: '13px', fontWeight: 700, color: COLORS.primary }}>
-          {category ? CATEGORY_LABELS[category] || category : 'Unknown category'}
+        <div style={{ background: COLORS.card, borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: COLORS.primary }}>
+          {category && CATEGORY_LABELS[category] ? (<><Icon name={CATEGORY_LABELS[category].icon} size={14} color={COLORS.primary} /> {CATEGORY_LABELS[category].label}</>) : (category || 'Unknown category')}
         </div>
 
         {errorMsg && <p style={{ color: 'red', fontSize: '13px', marginBottom: '12px' }}>{errorMsg}</p>}
@@ -205,7 +207,7 @@ function AddListing() {
               {photoPreview ? (
                 <img src={photoPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <span style={{ fontSize: '13px', color: COLORS.textMuted }}>📷 Tap to upload photo</span>
+                <span style={{ fontSize: '13px', color: COLORS.textMuted, display: 'flex', alignItems: 'center', gap: '6px' }}><Icon name="camera" size={16} color={COLORS.textMuted} /> Tap to upload photo</span>
               )}
               <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
             </label>
@@ -265,6 +267,7 @@ function AddListing() {
                       key={a}
                       onClick={() => toggleAmenity(a)}
                       style={{
+                        display: 'flex', alignItems: 'center', gap: '5px',
                         padding: '7px 12px',
                         borderRadius: '20px',
                         fontSize: '12px',
@@ -274,7 +277,7 @@ function AddListing() {
                         background: active ? COLORS.primary : COLORS.bg,
                         color: active ? 'white' : COLORS.textMuted,
                       }}>
-                      {AMENITY_ICON[a]} {a}
+                      <Icon name={AMENITY_ICON[a]} size={13} color={active ? 'white' : COLORS.textMuted} /> {a}
                     </span>
                   )
                 })}
@@ -292,6 +295,7 @@ function AddListing() {
                       key={a}
                       onClick={() => toggleAmenity(a)}
                       style={{
+                        display: 'flex', alignItems: 'center', gap: '5px',
                         padding: '7px 12px',
                         borderRadius: '20px',
                         fontSize: '12px',
@@ -301,7 +305,7 @@ function AddListing() {
                         background: active ? COLORS.primary : COLORS.bg,
                         color: active ? 'white' : COLORS.textMuted,
                       }}>
-                      {TRAVEL_AMENITY_ICON[a]} {a}
+                      <Icon name={TRAVEL_AMENITY_ICON[a]} size={13} color={active ? 'white' : COLORS.textMuted} /> {a}
                     </span>
                   )
                 })}
@@ -367,9 +371,9 @@ function AddListing() {
             style={{
               width: '100%', padding: '13px', background: submitting ? '#94a3b8' : COLORS.secondary,
               color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '14px',
-              cursor: submitting ? 'not-allowed' : 'pointer'
+              cursor: submitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
             }}>
-            {submitting ? 'Adding...' : '➕ Add Listing'}
+            {submitting ? 'Adding...' : (<><Icon name="plus" size={14} color="white" strokeWidth={2.5} /> Add Listing</>)}
           </button>
         </div>
       </div>
