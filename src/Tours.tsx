@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { ListCardSkeleton } from './LoadingSkeleton'
+import NetworkError from './NetworkError'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -36,6 +38,7 @@ type SortKey = 'recommended' | 'price_low' | 'price_high' | 'rating'
 function Tours() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [netError, setNetError] = useState(false)
   const [tours, setTours] = useState<Tour[]>([])
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
 
@@ -49,6 +52,7 @@ function Tours() {
 
   const fetchTours = async () => {
     setLoading(true)
+    setNetError(false)
     let query = supabase
       .from('services')
       .select('id, title, description, destination, price, seats_available, photo_url, tour_type, companies(business_name)')
@@ -60,7 +64,12 @@ function Tours() {
     if (minPrice) query = query.gte('price', parseFloat(minPrice))
     if (maxPrice) query = query.lte('price', parseFloat(maxPrice))
 
-    const { data } = await query
+    const { data, error } = await query
+    if (error) {
+      setNetError(true)
+      setLoading(false)
+      return
+    }
     const rows = (data as any[]) || []
 
     let ratingMap: Record<string, number[]> = {}
@@ -190,8 +199,10 @@ function Tours() {
           </div>
         </div>
 
-        {loading ? (
-          <p style={{ textAlign: 'center', color: COLORS.textMuted, fontSize: '13px', padding: '30px 0' }}>Loading...</p>
+        {netError ? (
+          <NetworkError onRetry={fetchTours} />
+        ) : loading ? (
+          <ListCardSkeleton count={4} />
         ) : visible.length === 0 ? (
           <div style={{ background: COLORS.card, borderRadius: '16px', padding: '30px', textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '13px' }}>No tours found</p>
