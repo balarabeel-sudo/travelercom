@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { DetailsSkeleton } from './LoadingSkeleton'
+import NetworkError from './NetworkError'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -54,6 +56,7 @@ function EventCenterDetails() {
   const navigate = useNavigate()
   const { id } = useParams()
   const [loading, setLoading] = useState(true)
+  const [netError, setNetError] = useState(false)
   const [service, setService] = useState<ServiceDetail | null>(null)
   const [userId, setUserId] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -74,8 +77,9 @@ function EventCenterDetails() {
   const [ticketCode, setTicketCode] = useState('')
   const [assignedUnitNumber, setAssignedUnitNumber] = useState('')
 
-  useEffect(() => {
-    const load = async () => {
+  const load = async () => {
+      setLoading(true)
+      setNetError(false)
       const { data: userData, error } = await supabase.auth.getUser()
       if (error || !userData.user) {
         navigate('/login')
@@ -91,11 +95,17 @@ function EventCenterDetails() {
         .maybeSingle()
       setWalletBalance(wallet ? Number(wallet.balance) : 0)
 
-      const { data: svc } = await supabase
+      const { data: svc, error: svcErr } = await supabase
         .from('services')
         .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, companies(business_name, allow_unit_selection)')
         .eq('id', id)
         .maybeSingle()
+
+      if (svcErr) {
+        setNetError(true)
+        setLoading(false)
+        return
+      }
 
       setService(svc as any)
 
@@ -161,7 +171,9 @@ function EventCenterDetails() {
       }
 
       setLoading(false)
-    }
+  }
+
+  useEffect(() => {
     load()
   }, [id, navigate])
 
@@ -341,12 +353,12 @@ function EventCenterDetails() {
     setMessage({ type: 'success', text: 'Booking confirmed!' })
   }
 
+  if (netError) {
+    return <NetworkError onRetry={load} />
+  }
+
   if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textMuted }}>
-        Loading...
-      </div>
-    )
+    return <DetailsSkeleton />
   }
 
   if (!service) {
