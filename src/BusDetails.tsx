@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { DetailsSkeleton } from './LoadingSkeleton'
+import NetworkError from './NetworkError'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -67,6 +69,7 @@ function BusDetails() {
   const { id } = useParams()
 
   const [loading, setLoading] = useState(true)
+  const [netError, setNetError] = useState(false)
   const [step, setStep] = useState(1)
   const [service, setService] = useState<BusService | null>(null)
   const [userId, setUserId] = useState('')
@@ -98,8 +101,9 @@ function BusDetails() {
   const [reservationId, setReservationId] = useState('')
   const [pnr, setPnr] = useState('')
 
-  useEffect(() => {
-    const load = async () => {
+  const load = async () => {
+      setLoading(true)
+      setNetError(false)
       const { data: userData, error } = await supabase.auth.getUser()
       if (error || !userData.user) { navigate('/login'); return }
       setUserId(userData.user.id)
@@ -113,11 +117,16 @@ function BusDetails() {
         .maybeSingle()
       setWalletBalance(wallet ? Number(wallet.balance) : 0)
 
-      const { data: svc } = await supabase
+      const { data: svc, error: svcErr } = await supabase
         .from('services')
         .select('id, title, origin, destination, departure_time, price, seats_available, company_id, photo_url, companies(business_name, allow_unit_selection)')
         .eq('id', id)
         .maybeSingle()
+      if (svcErr) {
+        setNetError(true)
+        setLoading(false)
+        return
+      }
       setService(svc as any)
 
       const today = new Date().toISOString().split('T')[0]
@@ -159,7 +168,9 @@ function BusDetails() {
         setSeatTypes(items.map((i: any) => ({ id: i.id, name: i.name, price: Number(i.price) || 0, available: availCounts[i.id] || 0 })))
       }
       setLoading(false)
-    }
+  }
+
+  useEffect(() => {
     load()
   }, [id, navigate])
 
@@ -277,8 +288,12 @@ function BusDetails() {
     setStep(6)
   }
 
+  if (netError) {
+    return <NetworkError onRetry={load} />
+  }
+
   if (loading) {
-    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textMuted }}>Loading trip...</div>
+    return <DetailsSkeleton />
   }
   if (!service) {
     return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textMuted }}>Trip not found.</div>
