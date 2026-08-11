@@ -223,10 +223,10 @@ export default function InventoryDetail() {
 
       <div style={{ padding: '16px' }}>
         <div style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
-          <TabButton label={`🛏 Items`} active={tab === 'stock'} onClick={() => setTab('stock')} />
-          <TabButton label="💵 Pricing" active={tab === 'pricing'} onClick={() => setTab('pricing')} />
-          <TabButton label="🔧 Maintenance" active={tab === 'maintenance'} onClick={() => setTab('maintenance')} />
-          <TabButton label="📅 Availability" active={tab === 'availability'} onClick={() => setTab('availability')} />
+          <TabButton icon="bed" label="Items" active={tab === 'stock'} onClick={() => setTab('stock')} />
+          <TabButton icon="cash" label="Pricing" active={tab === 'pricing'} onClick={() => setTab('pricing')} />
+          <TabButton icon="wrench" label="Maintenance" active={tab === 'maintenance'} onClick={() => setTab('maintenance')} />
+          <TabButton icon="calendar" label="Availability" active={tab === 'availability'} onClick={() => setTab('availability')} />
         </div>
 
         {tab === 'stock' && (
@@ -255,7 +255,7 @@ export default function InventoryDetail() {
                 </div>
               </div>
               <div style={{ background: '#F5F3FF', borderRadius: '10px', padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px' }}>ℹ️</span>
+                <span style={{ display: 'flex' }}><Icon name="info" size={12} color={COLORS.purple} /></span>
                 <p style={{ fontSize: '11px', color: COLORS.purple }}>Changing the total will affect availability.</p>
               </div>
             </div>
@@ -318,7 +318,7 @@ export default function InventoryDetail() {
                 return (
                   <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                     <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: st.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span style={{ fontSize: '15px' }}>🛏️</span>
+                      <Icon name="bed" size={15} color={st.color} />
                     </div>
                     <div style={{ flex: 1 }}>
                       <p style={{ fontSize: '13.5px', fontWeight: 800, color: st.color }}>{u.unit_number}</p>
@@ -332,12 +332,12 @@ export default function InventoryDetail() {
 
             {showTip && (
               <div style={{ background: '#f0fdf4', borderRadius: '14px', padding: '14px', marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '18px' }}>🛡️</span>
+                <span style={{ display: 'flex' }}><Icon name="shield" size={18} color={COLORS.green} /></span>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Keep your inventory updated</p>
                   <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>Accurate inventory helps you avoid double bookings and improve guest experience.</p>
                 </div>
-                <div onClick={() => setShowTip(false)} style={{ cursor: 'pointer', color: COLORS.textMuted, fontSize: '14px' }}>✕</div>
+                <div onClick={() => setShowTip(false)} style={{ cursor: 'pointer', color: COLORS.textMuted, display: 'flex' }}><Icon name="x" size={14} color={COLORS.textMuted} /></div>
               </div>
             )}
           </>
@@ -400,7 +400,7 @@ export default function InventoryDetail() {
                       )}
                     </div>
                     <div onClick={() => reopenUnit(u.id)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f0fdf4', color: COLORS.green, fontSize: '11.5px', fontWeight: 700, padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                      ✅ Reopen
+                      <Icon name="check" size={12} color={COLORS.green} strokeWidth={2.5} /> Reopen
                     </div>
                   </div>
                 </div>
@@ -442,22 +442,24 @@ export default function InventoryDetail() {
             background: COLORS.purple, display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', boxShadow: '0 4px 12px rgba(107,33,168,0.4)'
           }}>
-          <span style={{ color: 'white', fontSize: '18px' }}>⟳</span>
+          <Icon name="refresh" size={20} color="white" />
         </div>
       )}
     </div>
   )
 }
 
-function TabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function TabButton({ icon, label, active, onClick }: { icon: string; label: string; active: boolean; onClick: () => void }) {
   return (
     <div
       onClick={onClick}
       style={{
         flex: 1, textAlign: 'center', padding: '10px 3px', borderRadius: '10px', cursor: 'pointer',
         background: active ? COLORS.purple : COLORS.card, color: active ? 'white' : COLORS.textMuted,
-        fontWeight: 700, fontSize: '11.5px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+        fontWeight: 700, fontSize: '11.5px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
       }}>
+      <Icon name={icon} size={15} color={active ? 'white' : COLORS.textMuted} />
       {label}
     </div>
   )
