@@ -46,6 +46,7 @@ function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2, filled
     tent: <><path d="M12 4l9 16H3z" /><path d="M12 4l5 16" /><path d="M12 4L7 20" /><line x1="9" y1="20" x2="15" y2="20" /></>,
     heart: <path d="M12 20s-7-4.3-9.5-8.8C.8 8 2 4.5 5.5 4c2-.3 3.7.8 4.5 2.3C10.8 4.8 12.5 3.7 14.5 4 18 4.5 19.2 8 17.5 11.2 15 15.7 12 20 12 20z" fill={filled ? color : 'none'} />,
     wifi: <><path d="M2 8.5a16 16 0 0 1 20 0" /><path d="M5.5 12a11 11 0 0 1 13 0" /><path d="M9 15.5a6 6 0 0 1 6 0" /><line x1="12" y1="19" x2="12.01" y2="19" /></>,
+    wifiOff: <><line x1="2" y1="2" x2="22" y2="22" /><path d="M8.5 16.5a6 6 0 0 1 7 0" /><path d="M5 12.5a11 11 0 0 1 3.5-2.5" /><path d="M19 12.5a11 11 0 0 0-2.5-2" /><path d="M2 8.5a16 16 0 0 1 5-3" /><path d="M22 8.5a16 16 0 0 0-8-4" /><line x1="12" y1="19" x2="12.01" y2="19" /></>,
     search: <><circle cx="10.5" cy="10.5" r="6.5" /><line x1="20" y1="20" x2="15.3" y2="15.3" /></>,
     filter: <path d="M3 4h18l-7 8v6l-4 2v-8z" />,
     mapPin: <><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z" /><circle cx="12" cy="9" r="2.3" /></>,
