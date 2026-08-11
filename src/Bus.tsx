@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { ListCardSkeleton } from './LoadingSkeleton'
+import NetworkError from './NetworkError'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -40,6 +42,7 @@ type SortKey = 'recommended' | 'price_low' | 'price_high' | 'rating'
 function Bus() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [netError, setNetError] = useState(false)
   const [items, setItems] = useState<TripItem[]>([])
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
 
@@ -52,6 +55,7 @@ function Bus() {
 
   const fetchItems = async () => {
     setLoading(true)
+    setNetError(false)
     let query = supabase
       .from('services')
       .select('id, title, description, origin, destination, departure_time, duration_minutes, price, seats_available, photo_url, amenities, companies(business_name)')
@@ -63,7 +67,12 @@ function Bus() {
     if (minPrice) query = query.gte('price', parseFloat(minPrice))
     if (maxPrice) query = query.lte('price', parseFloat(maxPrice))
 
-    const { data } = await query
+    const { data, error } = await query
+    if (error) {
+      setNetError(true)
+      setLoading(false)
+      return
+    }
     const rows = (data as any[]) || []
 
     let ratingMap: Record<string, number[]> = {}
@@ -190,8 +199,10 @@ function Bus() {
           </div>
         </div>
 
-        {loading ? (
-          <p style={{ textAlign: 'center', color: COLORS.textMuted, fontSize: '13px', padding: '30px 0' }}>Loading...</p>
+        {netError ? (
+          <NetworkError onRetry={fetchItems} />
+        ) : loading ? (
+          <ListCardSkeleton count={4} />
         ) : visible.length === 0 ? (
           <div style={{ background: COLORS.card, borderRadius: '16px', padding: '30px', textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '13px' }}>No bus routes found</p>
