@@ -31,14 +31,14 @@ type InventoryItem = {
 type ServiceOption = { id: string; title: string; category: string | null }
 
 const CATEGORY_LABELS: Record<string, { plural: string; singular: string; unitPlural: string; icon: string; placeholder: string }> = {
-  hotel: { plural: 'Room Types', singular: 'Room Type', unitPlural: 'Rooms', icon: '🛏️', placeholder: 'e.g. Executive Room, Suite' },
-  bus: { plural: 'Seat Types', singular: 'Seat Type', unitPlural: 'Seats', icon: '💺', placeholder: 'e.g. Economy, VIP' },
-  train: { plural: 'Seat Types', singular: 'Seat Type', unitPlural: 'Seats', icon: '💺', placeholder: 'e.g. Economy, First Class' },
-  flight: { plural: 'Seat Classes', singular: 'Seat Class', unitPlural: 'Seats', icon: '✈️', placeholder: 'e.g. Economy, Business, First Class' },
-  tour: { plural: 'Slot Types', singular: 'Slot Type', unitPlural: 'Slots', icon: '🗺️', placeholder: 'e.g. Standard Group, Private Tour' },
-  event_center: { plural: 'Package Types', singular: 'Package Type', unitPlural: 'Slots', icon: '🎪', placeholder: 'e.g. Standard Hall, VIP Hall' },
+  hotel: { plural: 'Room Types', singular: 'Room Type', unitPlural: 'Rooms', icon: 'bed', placeholder: 'e.g. Executive Room, Suite' },
+  bus: { plural: 'Seat Types', singular: 'Seat Type', unitPlural: 'Seats', icon: 'seat', placeholder: 'e.g. Economy, VIP' },
+  train: { plural: 'Seat Types', singular: 'Seat Type', unitPlural: 'Seats', icon: 'seat', placeholder: 'e.g. Economy, First Class' },
+  flight: { plural: 'Seat Classes', singular: 'Seat Class', unitPlural: 'Seats', icon: 'plane', placeholder: 'e.g. Economy, Business, First Class' },
+  tour: { plural: 'Slot Types', singular: 'Slot Type', unitPlural: 'Slots', icon: 'map', placeholder: 'e.g. Standard Group, Private Tour' },
+  event_center: { plural: 'Package Types', singular: 'Package Type', unitPlural: 'Slots', icon: 'tent', placeholder: 'e.g. Standard Hall, VIP Hall' },
 }
-const DEFAULT_LABELS = { plural: 'Inventory Types', singular: 'Type', unitPlural: 'Units', icon: '📦', placeholder: 'e.g. Standard, Premium' }
+const DEFAULT_LABELS = { plural: 'Inventory Types', singular: 'Type', unitPlural: 'Units', icon: 'box', placeholder: 'e.g. Standard, Premium' }
 
 export default function InventoryManagement() {
   const navigate = useNavigate()
@@ -283,7 +283,7 @@ export default function InventoryManagement() {
 
           {holidays.length === 0 ? (
             <div style={{ background: '#F5F3FF', borderRadius: '10px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px' }}>ℹ️</span>
+              <span style={{ display: 'flex' }}><Icon name="info" size={13} color={COLORS.purple} /></span>
               <p style={{ fontSize: '11.5px', color: COLORS.purple }}>No public holiday dates set. Weekday/Weekend pricing will still apply.</p>
             </div>
           ) : (
@@ -316,7 +316,7 @@ export default function InventoryManagement() {
               {photoPreview ? (
                 <img src={photoPreview} alt="preview" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
               ) : (
-                <span style={{ fontSize: '20px' }}>{formLabels.icon}</span>
+                <span style={{ display: 'flex' }}><Icon name={formLabels.icon} size={20} color={COLORS.purple} /></span>
               )}
               <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>{photoPreview ? 'Change photo' : `Tap to add a ${formLabels.singular.toLowerCase()} photo (optional)`}</span>
               <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
@@ -345,7 +345,7 @@ export default function InventoryManagement() {
             return (
               <div key={item.id} style={{ background: COLORS.card, borderRadius: '16px', padding: '12px', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex', gap: '12px' }}>
                 <div style={{ width: '68px', height: '68px', borderRadius: '12px', flexShrink: 0, overflow: 'hidden', background: photo ? undefined : `linear-gradient(135deg, #F97316, #0EA5E9)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {photo ? <img src={photo} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '22px' }}>{itemLabels.icon}</span>}
+                  {photo ? <img src={photo} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name={itemLabels.icon} size={22} color="white" />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
