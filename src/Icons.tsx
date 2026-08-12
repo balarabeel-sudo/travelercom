@@ -88,6 +88,9 @@ function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2, filled
     hourglass: <><path d="M6 2h12M6 22h12M6 2c0 6 6 8 6 10s-6 4-6 10M18 2c0 6-6 8-6 10s6 4 6 10" /></>,
     chat: <path d="M4 4h16v12H8l-4 4z" />,
     lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>,
+    bed: <><path d="M2 18v-6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h6a2 2 0 0 1 2 2v4" /><path d="M2 20v-2h20v2" /><circle cx="6" cy="12" r="1.5" /></>,
+    wrench: <path d="M21 3l-4 4-1-1 4-4a5 5 0 0 0-6.5 6.5L5 16l3 3 8.5-8.5A5 5 0 0 0 21 3z" />,
+    globe: <><circle cx="12" cy="12" r="9" /><line x1="3" y1="12" x2="21" y2="12" /><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z" /></>,
   }
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
