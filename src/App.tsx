@@ -29,10 +29,13 @@ import CompanyProfile from './CompanyProfile'
 import CompanyStorefront from './CompanyStorefront'
 import PrivacyPolicy from './PrivacyPolicy'
 import Terms from './Terms'
+import CustomerPrivacyPolicy from './CustomerPrivacyPolicy'
+import CustomerTerms from './CustomerTerms'
 import About from './About'
 import Notifications from './Notifications'
 import Support from './Support'
 import Settings from './Settings'
+import CustomerSettings from './CustomerSettings'
 import AddGuest from './AddGuest'
 import FlightDetails from './FlightDetails'
 import MyBookings from './MyBookings'
@@ -41,8 +44,10 @@ import BusDetails from './BusDetails'
 import Train from './Train'
 import TrainDetails from './TrainDetails'
 import Tours from './Tours'
+import TourDetails from './TourDetails'
 import EventCenters from './EventCenters'
 import EventCenterDetails from './EventCenterDetails'
+import AdminDashboard from './AdminDashboard'
 import Flights from './Flights'
 
 function App() {
@@ -79,10 +84,13 @@ function App() {
         <Route path="/company/:id" element={<CompanyStorefront />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/customer-privacy" element={<CustomerPrivacyPolicy />} />
+        <Route path="/customer-terms" element={<CustomerTerms />} />
         <Route path="/about" element={<About />} />
        <Route path="/notifications" element={<Notifications />} />
        <Route path="/support" element={<Support />} />
        <Route path="/settings" element={<Settings />} />
+        <Route path="/customer-settings" element={<CustomerSettings />} />
         <Route path="/add-guest" element={<AddGuest />} />
         <Route path="/flights" element={<Flights />} />
         <Route path="/flight/:id" element={<FlightDetails />} />
@@ -91,8 +99,10 @@ function App() {
         <Route path="/train" element={<Train />} />
         <Route path="/train/:id" element={<TrainDetails />} />
         <Route path="/tours" element={<Tours />} />
+        <Route path="/tour/:id" element={<TourDetails />} />
         <Route path="/event-centers" element={<EventCenters />} />
         <Route path="/event-center/:id" element={<EventCenterDetails />} />
+        <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/my-bookings" element={<MyBookings />} />
         <Route path="/bookings" element={<MyBookings />} />
       </Routes>
