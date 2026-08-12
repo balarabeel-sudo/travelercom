@@ -14,6 +14,65 @@ const COLORS = {
   red: '#dc2626',
 }
 
+const SECTION_ITEM_DESC: Record<string, string> = {
+  'My Profile': 'View and edit your personal information',
+  'My Bookings': 'Your booking history and status',
+  'Wallet': 'Manage your balance and top-ups',
+  'Payment Methods': 'Cards and payment options',
+  'Saved Favorites': 'Places and trips you\u2019ve saved',
+  'Notifications': 'Manage alerts and preferences',
+  'Help & Support': 'Get help or contact us',
+  'About Traveler.com': 'Learn more about our platform',
+  'Terms & Conditions': 'Review our terms of service',
+  'Privacy Policy': 'How we handle your data',
+  'Settings': 'App preferences and security',
+}
+
+function AccountSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ margin: '0 16px 22px 16px' }}>
+      {title && (
+        <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '8px', paddingLeft: '4px', letterSpacing: '0.4px' }}>
+          {title.toUpperCase()}
+        </p>
+      )}
+      <div style={{ background: COLORS.card, borderRadius: '14px', border: `1px solid ${COLORS.border}` }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function AccountRow({ icon, label, desc, onClick, isLast, danger }: {
+  icon: string; label: string; desc?: string; onClick: () => void; isLast?: boolean; danger?: boolean
+}) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '13px',
+        padding: '13px 15px',
+        cursor: 'pointer',
+        borderBottom: isLast ? 'none' : `1px solid ${COLORS.border}`,
+      }}>
+      <div style={{
+        width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0,
+        background: danger ? '#FEF2F2' : '#F1F5F9',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon name={icon} size={16} color={danger ? COLORS.red : COLORS.text} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: '13.5px', fontWeight: 600, color: danger ? COLORS.red : COLORS.text }}>{label}</p>
+        {desc && <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '1px' }}>{desc}</p>}
+      </div>
+      {!danger && <Icon name="chevronRight" size={16} color={COLORS.textMuted} />}
+    </div>
+  )
+}
+
 function Account() {
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState('')
@@ -43,8 +102,8 @@ function Account() {
       items: [
         { icon: 'user', label: 'My Profile', path: '/profile' },
         { icon: 'ticket', label: 'My Bookings', path: '/bookings' },
-        { icon: 'creditCard', label: 'Wallet', path: '/wallet' },
-        { icon: 'cash', label: 'Payment Methods', path: '/payment-methods' },
+        { icon: 'wallet', label: 'Wallet', path: '/wallet' },
+        { icon: 'creditCard', label: 'Payment Methods', path: '/payment-methods' },
       ]
     },
     {
@@ -59,14 +118,14 @@ function Account() {
       items: [
         { icon: 'chat', label: 'Help & Support', path: '/support' },
         { icon: 'info', label: 'About Traveler.com', path: '/about' },
-        { icon: 'fileText', label: 'Terms & Conditions', path: '/terms' },
-        { icon: 'lock', label: 'Privacy Policy', path: '/privacy' },
+        { icon: 'fileText', label: 'Terms & Conditions', path: '/customer-terms' },
+        { icon: 'lock', label: 'Privacy Policy', path: '/customer-privacy' },
       ]
     },
     {
       title: 'Preferences',
       items: [
-        { icon: 'settings', label: 'Settings', path: '/settings' },
+        { icon: 'settings', label: 'Settings', path: '/customer-settings' },
       ]
     },
   ]
@@ -76,11 +135,11 @@ function Account() {
 
       {/* Header */}
       <div style={{
-        padding: '18px 20px',
+        padding: '16px 20px',
         background: COLORS.card,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+        borderBottom: `1px solid ${COLORS.border}`
       }}>
-        <h1 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text }}>Account</h1>
+        <h1 style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>Account</h1>
       </div>
 
       {/* Profile summary card */}
@@ -88,86 +147,63 @@ function Account() {
         margin: '16px',
         background: COLORS.card,
         borderRadius: '16px',
-        padding: '18px',
+        padding: '16px',
         display: 'flex',
         alignItems: 'center',
-        gap: '14px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-        cursor: 'pointer'
-      }}
-        onClick={() => navigate('/profile')}>
+        gap: '13px',
+        border: `1px solid ${COLORS.border}`,
+      }}>
         <div style={{
-          width: '54px',
-          height: '54px',
+          width: '50px',
+          height: '50px',
           borderRadius: '50%',
           background: COLORS.primary,
           color: 'white',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '22px',
-          fontWeight: 'bold'
+          fontSize: '19px',
+          fontWeight: 700,
+          flexShrink: 0,
         }}>
-          {displayName ? displayName.charAt(0).toUpperCase() : <Icon name="user" size={24} color="white" />}
+          {displayName ? displayName.charAt(0).toUpperCase() : <Icon name="user" size={22} color="white" />}
         </div>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: '15px', fontWeight: 700, color: COLORS.text }}>{displayName || 'Traveler'}</p>
-          <p style={{ fontSize: '12px', color: COLORS.textMuted }}>{email}</p>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: '14.5px', fontWeight: 700, color: COLORS.text }}>{displayName || 'Traveler'}</p>
+          <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '1px' }}>{email}</p>
         </div>
-        <span style={{ fontSize: '18px', color: COLORS.textMuted }}>›</span>
+        <div
+          onClick={() => navigate('/profile')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0,
+            border: `1px solid ${COLORS.border}`, borderRadius: '9px', padding: '7px 11px',
+            cursor: 'pointer',
+          }}>
+          <Icon name="edit" size={13} color={COLORS.text} />
+          <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text }}>Edit</span>
+        </div>
       </div>
 
       {/* Menu sections */}
       {sections.map((section) => (
-        <div key={section.title} style={{ margin: '0 16px 20px 16px' }}>
-          <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '8px', paddingLeft: '4px' }}>
-            {section.title.toUpperCase()}
-          </p>
-          <div style={{
-            background: COLORS.card,
-            borderRadius: '14px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-            overflow: 'hidden'
-          }}>
-            {section.items.map((item, idx) => (
-              <div
-                key={item.label}
-                onClick={() => navigate(item.path)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '14px 16px',
-                  cursor: 'pointer',
-                  borderBottom: idx < section.items.length - 1 ? `1px solid ${COLORS.border}` : 'none'
-                }}>
-                <span style={{ display: 'flex', color: COLORS.text }}><Icon name={item.icon} size={18} color={COLORS.text} /></span>
-                <span style={{ flex: 1, fontSize: '14px', color: COLORS.text }}>{item.label}</span>
-                <span style={{ fontSize: '16px', color: COLORS.textMuted }}>›</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <AccountSection key={section.title} title={section.title}>
+          {section.items.map((item, idx) => (
+            <AccountRow
+              key={item.label}
+              icon={item.icon}
+              label={item.label}
+              desc={SECTION_ITEM_DESC[item.label]}
+              onClick={() => navigate(item.path)}
+              isLast={idx === section.items.length - 1}
+            />
+          ))}
+        </AccountSection>
       ))}
 
       {/* Logout */}
-      <div style={{ margin: '0 16px 20px 16px' }}>
-        <div
-          onClick={handleLogout}
-          style={{
-            background: COLORS.card,
-            borderRadius: '14px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-            padding: '14px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            cursor: 'pointer'
-          }}>
-          <span style={{ display: 'flex' }}><Icon name="logOut" size={18} color={COLORS.red} /></span>
-          <span style={{ fontSize: '14px', fontWeight: 700, color: COLORS.red }}>Logout</span>
-        </div>
-      </div>
+      <AccountSection title="">
+        <AccountRow icon="logOut" label="Logout" onClick={handleLogout} isLast danger />
+      </AccountSection>
 
       {/* Bottom Navigation */}
       <BottomNav active="account" navigate={navigate} />
