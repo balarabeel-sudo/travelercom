@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import AdminUsers from './AdminUsers'
+import AdminCompanies from './AdminCompanies'
+import AdminBookings from './AdminBookings'
+import AdminFinance from './AdminFinance'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -238,7 +241,10 @@ function AdminDashboard() {
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {section === 'overview' && <OverviewPanel />}
         {section === 'users' && <AdminUsers />}
-        {section !== 'overview' && section !== 'users' && <ComingSoonPanel label={currentLabel} />}
+        {section === 'companies' && <AdminCompanies />}
+        {section === 'bookings' && <AdminBookings />}
+        {section === 'finance' && <AdminFinance />}
+        {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'finance' && <ComingSoonPanel label={currentLabel} />}
       </div>
     </div>
   )
