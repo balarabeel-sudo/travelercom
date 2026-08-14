@@ -137,6 +137,8 @@ function AdminDashboard() {
   const [section, setSection] = useState<SectionKey>('overview')
   const [drawerOpen, setDrawerOpen] = useState(false)
 
+  const [accessError, setAccessError] = useState('')
+
   useEffect(() => {
     const checkAccess = async () => {
       const { data: userData, error } = await supabase.auth.getUser()
@@ -145,14 +147,21 @@ function AdminDashboard() {
         return
       }
 
-      const { data: adminRow } = await supabase
+      const { data: adminRow, error: adminErr } = await supabase
         .from('admins')
         .select('is_super_admin')
         .eq('user_id', userData.user.id)
         .maybeSingle()
 
+      if (adminErr) {
+        setAccessError(`Database error checking admin access: ${adminErr.message}`)
+        setChecking(false)
+        return
+      }
+
       if (!adminRow || !adminRow.is_super_admin) {
-        navigate('/home')
+        setAccessError(`No admin record found for this account (${userData.user.email}). Check the admins table in Supabase.`)
+        setChecking(false)
         return
       }
 
@@ -166,6 +175,17 @@ function AdminDashboard() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textMuted, fontSize: '13px' }}>
         Checking access...
+      </div>
+    )
+  }
+
+  if (accessError) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '30px', textAlign: 'center' as const }}>
+        <Icon name="alertCircle" size={28} color={COLORS.red} />
+        <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.red, marginTop: '12px', marginBottom: '6px' }}>Access check failed</p>
+        <p style={{ fontSize: '12px', color: COLORS.textMuted, lineHeight: 1.6, marginBottom: '18px' }}>{accessError}</p>
+        <span onClick={() => navigate('/home')} style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.primary, cursor: 'pointer' }}>Back to Home</span>
       </div>
     )
   }
