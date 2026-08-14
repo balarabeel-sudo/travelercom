@@ -7,6 +7,7 @@ import AdminCompanies from './AdminCompanies'
 import AdminBookings from './AdminBookings'
 import AdminFinance from './AdminFinance'
 import AdminWallet from './AdminWallet'
+import AdminRefunds from './AdminRefunds'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -266,7 +267,8 @@ function AdminDashboard() {
         {section === 'bookings' && <AdminBookings />}
         {section === 'finance' && <AdminFinance />}
         {section === 'wallet' && <AdminWallet />}
-        {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'finance' && section !== 'wallet' && <ComingSoonPanel label={currentLabel} />}
+        {section === 'refunds' && <AdminRefunds />}
+        {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'finance' && section !== 'wallet' && section !== 'refunds' && <ComingSoonPanel label={currentLabel} />}
       </div>
     </div>
   )
