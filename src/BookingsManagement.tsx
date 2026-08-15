@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import RequestRefundButton from './RequestRefundButton'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -295,6 +296,20 @@ function BookingsManagement() {
                   border: `1px solid ${COLORS.red}`
                 }}>
                 {cancelling ? 'Cancelling...' : 'Cancel Booking & Refund Customer'}
+              </div>
+            )}
+
+            {getTab(selectedBooking) === 'pending' && (
+              <div style={{ marginTop: '10px' }}>
+                <RequestRefundButton
+                  bookingId={selectedBooking.id}
+                  amountPaid={Number(selectedBooking.amount_paid)}
+                  departureTime={selectedBooking.check_in_date}
+                  bookingStatus={selectedBooking.booking_status}
+                  requesterType="company"
+                  forceEligible={true}
+                  onRequested={() => setSelectedBooking(null)}
+                />
               </div>
             )}
 
