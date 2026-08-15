@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 import { Logo, PrimaryButton, InputField, PhoneField, PasswordField, FormError, COLORS } from './AuthComponents'
 
 const BUSINESS_TYPES = [
@@ -81,7 +82,7 @@ function Register() {
     return (
       <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ width: '100%', maxWidth: '400px', background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-          <div style={{ fontSize: '52px', marginBottom: '16px' }}>📧</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}><Icon name="mail" size={44} color={color} /></div>
           <h1 style={{ fontSize: '21px', fontWeight: 800, color, marginBottom: '10px' }}>Check Your Email</h1>
           <p style={{ color: COLORS.textMuted, fontSize: '14px', marginBottom: '6px' }}>We sent a verification link to:</p>
           <p style={{ color: COLORS.text, fontWeight: 700, fontSize: '15px', marginBottom: '22px' }}>{email}</p>
@@ -97,15 +98,15 @@ function Register() {
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div style={{ width: '100%', maxWidth: '400px', background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-        <span onClick={() => navigate(-1)} style={{ fontSize: '20px', cursor: 'pointer', display: 'inline-block', marginBottom: '14px' }}>←</span>
+        <span onClick={() => navigate(-1)} style={{ cursor: 'pointer', display: 'inline-flex', marginBottom: '14px' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
 
         <div style={{ textAlign: 'center', marginBottom: '22px' }}>
           <div style={{
             width: '54px', height: '54px', borderRadius: '50%', background: color,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 12px', color: 'white',
           }}>
-            {isPersonal ? '👤' : '💼'}
+            <Icon name={isPersonal ? 'user' : 'briefcase'} size={24} color="white" />
           </div>
           <h1 style={{ fontSize: '21px', fontWeight: 800, color: COLORS.text }}>
             {isPersonal ? 'Create Personal Account' : 'Create Company Account'}
