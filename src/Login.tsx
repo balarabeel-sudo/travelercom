@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 import { Logo, PrimaryButton, InputField, PasswordField, FormError, SocialLoginButtons, COLORS } from './AuthComponents'
 
 function Login() {
@@ -35,6 +36,11 @@ function Login() {
     }
 
     if (data.user) {
+      try {
+        await supabase.rpc('accept_staff_invite')
+      } catch {
+        // no pending invite for this user, or claim failed silently -- not fatal to login
+      }
       setLoading(false)
       navigate('/home')
     }
@@ -51,7 +57,7 @@ function Login() {
       )}
 
       <div style={{ width: '100%', maxWidth: '400px', background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-        <span onClick={() => navigate(-1)} style={{ fontSize: '20px', cursor: 'pointer', display: 'inline-block', marginBottom: '14px' }}>←</span>
+        <span onClick={() => navigate(-1)} style={{ cursor: 'pointer', display: 'inline-flex', marginBottom: '14px' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
 
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <Logo size={48} />
