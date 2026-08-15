@@ -14,7 +14,7 @@ const COLORS = {
 }
 
 type Role = { id: string; name: string; description: string | null }
-type StaffMember = { user_id: string; role_id: string | null; invited_at: string | null }
+type StaffMember = { user_id: string; role_id: string | null; invited_at: string | null; suspended: boolean }
 type Invite = { id: string; email: string; role_id: string; status: 'pending' | 'accepted' | 'revoked'; created_at: string }
 
 export default function AdminStaff() {
@@ -28,6 +28,9 @@ export default function AdminStaff() {
   const [email, setEmail] = useState('')
   const [roleId, setRoleId] = useState('')
   const [sending, setSending] = useState(false)
+  const [changingRoleFor, setChangingRoleFor] = useState<string | null>(null)
+  const [newRoleId, setNewRoleId] = useState('')
+  const [changing, setChanging] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -41,7 +44,7 @@ export default function AdminStaff() {
 
     const [{ data: rolesData, error: rolesErr }, { data: staffData, error: staffErr }, { data: invitesData, error: invitesErr }] = await Promise.all([
       supabase.from('roles').select('id, name, description').neq('id', 'founder').order('name'),
-      supabase.from('admins').select('user_id, role_id, invited_at').eq('is_super_admin', false),
+      supabase.from('admins').select('user_id, role_id, invited_at, suspended').eq('is_super_admin', false),
       supabase.from('staff_invites').select('id, email, role_id, status, created_at').order('created_at', { ascending: false }),
     ])
 
@@ -79,6 +82,24 @@ export default function AdminStaff() {
     if (error) setError(error.message); else load()
   }
 
+  async function changeRole() {
+    if (!changingRoleFor || !newRoleId) return
+    setChanging(true)
+    setError('')
+    const { error } = await supabase.rpc('change_staff_role', { p_user_id: changingRoleFor, p_new_role_id: newRoleId })
+    setChanging(false)
+    if (error) { setError(error.message); return }
+    setChangingRoleFor(null)
+    load()
+  }
+
+  async function toggleSuspend(s: StaffMember) {
+    const action = s.suspended ? 'reactivate' : 'suspend'
+    if (!confirm(`${action === 'suspend' ? 'Suspend' : 'Reactivate'} this staff member?`)) return
+    const { error } = await supabase.rpc('set_staff_suspended', { p_user_id: s.user_id, p_suspended: !s.suspended })
+    if (error) setError(error.message); else load()
+  }
+
   function roleName(id: string | null) {
     return roles.find((r) => r.id === id)?.name || id || 'Unknown role'
   }
@@ -113,15 +134,39 @@ export default function AdminStaff() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '22px' }}>
           {staff.map((s) => (
-            <div key={s.user_id} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{roleName(s.role_id)}</p>
-                <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>
-                  {s.invited_at ? `Since ${new Date(s.invited_at).toLocaleDateString()}` : ''}
-                </p>
+            <div key={s.user_id} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{roleName(s.role_id)}</p>
+                  <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>
+                    {s.invited_at ? `Since ${new Date(s.invited_at).toLocaleDateString()}` : ''}
+                  </p>
+                </div>
+                {s.suspended && (
+                  <span style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.orange, background: '#FFF7ED', padding: '3px 8px', borderRadius: '6px' }}>
+                    SUSPENDED
+                  </span>
+                )}
               </div>
-              <div onClick={() => revokeAccess(s.user_id)} style={{ padding: '7px 12px', borderRadius: '8px', border: `1px solid ${COLORS.red}`, fontSize: '12px', fontWeight: 600, color: COLORS.red, cursor: 'pointer' }}>
-                Revoke
+              <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' as const }}>
+                <div
+                  onClick={() => { setChangingRoleFor(s.user_id); setNewRoleId(s.role_id || roles[0]?.id || '') }}
+                  style={{ flex: 1, minWidth: '90px', textAlign: 'center' as const, padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '12px', fontWeight: 600, color: COLORS.text, cursor: 'pointer' }}
+                >
+                  Change Role
+                </div>
+                <div
+                  onClick={() => toggleSuspend(s)}
+                  style={{ flex: 1, minWidth: '90px', textAlign: 'center' as const, padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.orange}`, fontSize: '12px', fontWeight: 600, color: COLORS.orange, cursor: 'pointer' }}
+                >
+                  {s.suspended ? 'Reactivate' : 'Suspend'}
+                </div>
+                <div
+                  onClick={() => revokeAccess(s.user_id)}
+                  style={{ flex: 1, minWidth: '90px', textAlign: 'center' as const, padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.red}`, fontSize: '12px', fontWeight: 600, color: COLORS.red, cursor: 'pointer' }}
+                >
+                  Revoke
+                </div>
               </div>
             </div>
           ))}
@@ -187,6 +232,39 @@ export default function AdminStaff() {
                 {sending ? '...' : 'Send Invite'}
               </div>
               <div onClick={() => !sending && setShowForm(false)} style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, fontSize: '13.5px', cursor: 'pointer' }}>
+                Cancel
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {changingRoleFor && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 40 }} onClick={() => !changing && setChangingRoleFor(null)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: COLORS.card, borderTopLeftRadius: '18px', borderTopRightRadius: '18px', padding: '20px', width: '100%', maxWidth: '480px' }}>
+            <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>Change Role</p>
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', marginBottom: '10px' }}>
+              {roles.map((r) => (
+                <div
+                  key={r.id}
+                  onClick={() => setNewRoleId(r.id)}
+                  style={{
+                    padding: '10px', borderRadius: '10px', cursor: 'pointer',
+                    border: `1px solid ${newRoleId === r.id ? COLORS.primary : COLORS.border}`,
+                    background: newRoleId === r.id ? '#EFF6FF' : 'transparent',
+                  }}
+                >
+                  <p style={{ fontSize: '13px', fontWeight: 700, color: newRoleId === r.id ? COLORS.primary : COLORS.text }}>{r.name}</p>
+                  {r.description && <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>{r.description}</p>}
+                </div>
+              ))}
+            </div>
+            {error && <p style={{ color: COLORS.red, fontSize: '12px', marginBottom: '8px' }}>{error}</p>}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div onClick={() => !changing && changeRole()} style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', background: COLORS.primary, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}>
+                {changing ? '...' : 'Save'}
+              </div>
+              <div onClick={() => !changing && setChangingRoleFor(null)} style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, fontSize: '13.5px', cursor: 'pointer' }}>
                 Cancel
               </div>
             </div>
