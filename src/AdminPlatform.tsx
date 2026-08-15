@@ -32,6 +32,11 @@ type Settings = {
   commission_bus: number
   commission_train: number
   commission_agency: number
+  booking_cancellation_hours: number
+  refund_processing_days: number
+  booking_expiration_minutes: number
+  min_booking_amount: number
+  max_booking_amount: number | null
   maintenance_mode: boolean
   maintenance_message: string | null
   new_registrations_enabled: boolean
@@ -54,6 +59,8 @@ export default function AdminPlatform() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [showMaintenanceConfirm, setShowMaintenanceConfirm] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -98,6 +105,11 @@ export default function AdminPlatform() {
         commission_bus: settings.commission_bus,
         commission_train: settings.commission_train,
         commission_agency: settings.commission_agency,
+        booking_cancellation_hours: settings.booking_cancellation_hours,
+        refund_processing_days: settings.refund_processing_days,
+        booking_expiration_minutes: settings.booking_expiration_minutes,
+        min_booking_amount: settings.min_booking_amount,
+        max_booking_amount: settings.max_booking_amount,
         maintenance_mode: settings.maintenance_mode,
         maintenance_message: settings.maintenance_message,
         new_registrations_enabled: settings.new_registrations_enabled,
@@ -183,6 +195,41 @@ export default function AdminPlatform() {
         ))}
       </div>
 
+      <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '10px', letterSpacing: '0.4px' }}>BOOKING SETTINGS</p>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '14px', marginBottom: '22px', display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <p style={{ fontSize: '13px', color: COLORS.text }}>Free Cancellation Window</p>
+            <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Hours before departure/check-in</p>
+          </div>
+          <input type="number" value={settings.booking_cancellation_hours} onChange={(e) => update('booking_cancellation_hours', Number(e.target.value))} style={{ width: '70px', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '13px', textAlign: 'right' as const, color: COLORS.text }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <p style={{ fontSize: '13px', color: COLORS.text }}>Refund Processing Time</p>
+            <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Days to complete a refund</p>
+          </div>
+          <input type="number" value={settings.refund_processing_days} onChange={(e) => update('refund_processing_days', Number(e.target.value))} style={{ width: '70px', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '13px', textAlign: 'right' as const, color: COLORS.text }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <p style={{ fontSize: '13px', color: COLORS.text }}>Booking Expiration</p>
+            <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Minutes an unpaid booking is held</p>
+          </div>
+          <input type="number" value={settings.booking_expiration_minutes} onChange={(e) => update('booking_expiration_minutes', Number(e.target.value))} style={{ width: '70px', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '13px', textAlign: 'right' as const, color: COLORS.text }} />
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '4px', display: 'block' }}>Min Booking Amount (₦)</label>
+            <input type="number" value={settings.min_booking_amount} onChange={(e) => update('min_booking_amount', Number(e.target.value))} style={{ width: '100%', padding: '9px 10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '13px', color: COLORS.text }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '4px', display: 'block' }}>Max Booking Amount (₦)</label>
+            <input type="number" value={settings.max_booking_amount ?? ''} onChange={(e) => update('max_booking_amount', e.target.value === '' ? null : Number(e.target.value))} placeholder="No limit" style={{ width: '100%', padding: '9px 10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '13px', color: COLORS.text }} />
+          </div>
+        </div>
+      </div>
+
       <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '10px', letterSpacing: '0.4px' }}>FEATURE TOGGLES</p>
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '14px', marginBottom: '22px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -191,7 +238,7 @@ export default function AdminPlatform() {
             <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Not yet enforced anywhere</p>
           </div>
           <div
-            onClick={() => update('maintenance_mode', !settings.maintenance_mode)}
+            onClick={() => settings.maintenance_mode ? update('maintenance_mode', false) : setShowMaintenanceConfirm(true)}
             style={{ width: '42px', height: '24px', borderRadius: '12px', background: settings.maintenance_mode ? COLORS.primary : COLORS.border, cursor: 'pointer', position: 'relative' as const, transition: 'background 0.2s' }}
           >
             <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#fff', position: 'absolute' as const, top: '3px', left: settings.maintenance_mode ? '21px' : '3px', transition: 'left 0.2s' }} />
@@ -228,6 +275,54 @@ export default function AdminPlatform() {
       >
         {saving ? 'Saving...' : saved ? (<>Saved <Icon name="check" size={15} color="#fff" /></>) : 'Save Changes'}
       </div>
+
+      {showMaintenanceConfirm && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 60 }}
+          onClick={() => { setShowMaintenanceConfirm(false); setConfirmText('') }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: COLORS.card, borderTopLeftRadius: '18px', borderTopRightRadius: '18px', padding: '20px', width: '100%', maxWidth: '480px' }}
+          >
+            <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.red, marginBottom: '8px' }}>Enable Maintenance Mode?</p>
+            <p style={{ fontSize: '12.5px', color: COLORS.textMuted, lineHeight: 1.6, marginBottom: '14px' }}>
+              This is a dangerous, platform-wide action. Type CONFIRM below to proceed.
+            </p>
+            <input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="Type CONFIRM"
+              style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', color: COLORS.text, marginBottom: '14px' }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div
+                onClick={() => {
+                  if (confirmText === 'CONFIRM') {
+                    update('maintenance_mode', true)
+                    setShowMaintenanceConfirm(false)
+                    setConfirmText('')
+                  }
+                }}
+                style={{
+                  flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px',
+                  background: confirmText === 'CONFIRM' ? COLORS.red : COLORS.border,
+                  color: confirmText === 'CONFIRM' ? '#fff' : COLORS.textMuted,
+                  fontWeight: 700, fontSize: '13.5px', cursor: confirmText === 'CONFIRM' ? 'pointer' : 'not-allowed',
+                }}
+              >
+                Enable Maintenance Mode
+              </div>
+              <div
+                onClick={() => { setShowMaintenanceConfirm(false); setConfirmText('') }}
+                style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, fontSize: '13.5px', cursor: 'pointer' }}
+              >
+                Cancel
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
