@@ -14,6 +14,8 @@ import AdminAnalytics from './AdminAnalytics'
 import AdminMarketing from './AdminMarketing'
 import AdminPlatform from './AdminPlatform'
 import AdminStaff from './AdminStaff'
+import AdminAuditLogs from './AdminAuditLogs'
+import AdminSettings from './AdminSettings'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -280,7 +282,9 @@ function AdminDashboard() {
         {section === 'marketing' && <AdminMarketing />}
         {section === 'platform' && <AdminPlatform />}
         {section === 'staff' && <AdminStaff />}
-        {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'finance' && section !== 'wallet' && section !== 'refunds' && section !== 'withdrawals' && section !== 'support' && section !== 'analytics' && section !== 'marketing' && section !== 'platform' && section !== 'staff' && <ComingSoonPanel label={currentLabel} />}
+        {section === 'audit' && <AdminAuditLogs />}
+        {section === 'settings' && <AdminSettings />}
+        {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'finance' && section !== 'wallet' && section !== 'refunds' && section !== 'withdrawals' && section !== 'support' && section !== 'analytics' && section !== 'marketing' && section !== 'platform' && section !== 'staff' && section !== 'audit' && section !== 'settings' && <ComingSoonPanel label={currentLabel} />}
       </div>
     </div>
   )
