@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import AdminSystemHealth from './AdminSystemHealth'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -40,7 +41,24 @@ type Settings = {
   maintenance_mode: boolean
   maintenance_message: string | null
   new_registrations_enabled: boolean
+  feature_hotel_booking: boolean
+  feature_transport_booking: boolean
+  feature_flight_booking: boolean
+  feature_wallet: boolean
+  feature_referral: boolean
+  feature_company_registration: boolean
+  feature_reviews: boolean
 }
+
+const FEATURE_FLAGS: { key: keyof Settings; label: string }[] = [
+  { key: 'feature_hotel_booking', label: 'Hotel Booking' },
+  { key: 'feature_transport_booking', label: 'Transport Booking (Bus/Train)' },
+  { key: 'feature_flight_booking', label: 'Flight Booking' },
+  { key: 'feature_wallet', label: 'Wallet' },
+  { key: 'feature_referral', label: 'Referral System' },
+  { key: 'feature_company_registration', label: 'Company Registration' },
+  { key: 'feature_reviews', label: 'Reviews & Ratings' },
+]
 
 const COMMISSION_FIELDS: { key: keyof Settings; label: string }[] = [
   { key: 'commission_default', label: 'Default (fallback)' },
@@ -53,7 +71,7 @@ const COMMISSION_FIELDS: { key: keyof Settings; label: string }[] = [
   { key: 'commission_agency', label: 'Agency (custom partners)' },
 ]
 
-export default function AdminPlatform() {
+function PlatformSettingsTab() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -113,6 +131,13 @@ export default function AdminPlatform() {
         maintenance_mode: settings.maintenance_mode,
         maintenance_message: settings.maintenance_message,
         new_registrations_enabled: settings.new_registrations_enabled,
+        feature_hotel_booking: settings.feature_hotel_booking,
+        feature_transport_booking: settings.feature_transport_booking,
+        feature_flight_booking: settings.feature_flight_booking,
+        feature_wallet: settings.feature_wallet,
+        feature_referral: settings.feature_referral,
+        feature_company_registration: settings.feature_company_registration,
+        feature_reviews: settings.feature_reviews,
         updated_at: new Date().toISOString(),
         updated_by: userData?.user?.id,
       })
@@ -267,6 +292,22 @@ export default function AdminPlatform() {
         </div>
       </div>
 
+      <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '10px', letterSpacing: '0.4px' }}>FEATURE FLAGS</p>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '14px', marginBottom: '22px' }}>
+        <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '12px' }}>Not yet enforced anywhere</p>
+        {FEATURE_FLAGS.map((f, i) => (
+          <div key={f.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: i === 0 ? 0 : '14px' }}>
+            <span style={{ fontSize: '13px', color: COLORS.text }}>{f.label}</span>
+            <div
+              onClick={() => update(f.key, !(settings[f.key] as boolean) as any)}
+              style={{ width: '42px', height: '24px', borderRadius: '12px', background: settings[f.key] ? COLORS.green : COLORS.border, cursor: 'pointer', position: 'relative' as const, transition: 'background 0.2s' }}
+            >
+              <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#fff', position: 'absolute' as const, top: '3px', left: settings[f.key] ? '21px' : '3px', transition: 'left 0.2s' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
       {error && <p style={{ fontSize: '12px', color: COLORS.red, marginBottom: '10px' }}>{error}</p>}
 
       <div
@@ -323,6 +364,33 @@ export default function AdminPlatform() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+export default function AdminPlatform() {
+  const [tab, setTab] = useState<'settings' | 'health'>('settings')
+
+  return (
+    <div style={{ padding: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '18px' }}>
+        {(['settings', 'health'] as const).map((t) => (
+          <div
+            key={t}
+            onClick={() => setTab(t)}
+            style={{
+              padding: '7px 14px', borderRadius: '8px', cursor: 'pointer',
+              border: `1px solid ${tab === t ? '#0EA5E9' : '#E2E8F0'}`,
+              background: tab === t ? '#EFF6FF' : '#FFFFFF',
+              fontSize: '12.5px', fontWeight: 700,
+              color: tab === t ? '#0EA5E9' : '#64748B',
+            }}
+          >
+            {t === 'settings' ? 'Settings' : 'System Health'}
+          </div>
+        ))}
+      </div>
+      {tab === 'settings' ? <PlatformSettingsTab /> : <AdminSystemHealth />}
     </div>
   )
 }
