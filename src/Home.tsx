@@ -97,6 +97,7 @@ function Home() {
         .from('admin_notifications')
         .select('id, title, message, created_at')
         .eq('active', true)
+        .in('target_audience', ['all', 'personal'])
         .order('created_at', { ascending: false })
       setNotices(data || [])
     }
