@@ -18,9 +18,10 @@ type Props = {
   bookingStatus: string
   requesterType: 'customer' | 'company'
   onRequested?: () => void
+  forceEligible?: boolean
 }
 
-export default function RequestRefundButton({ bookingId, amountPaid, departureTime, bookingStatus, requesterType, onRequested }: Props) {
+export default function RequestRefundButton({ bookingId, amountPaid, departureTime, bookingStatus, requesterType, onRequested, forceEligible }: Props) {
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -28,7 +29,7 @@ export default function RequestRefundButton({ bookingId, amountPaid, departureTi
   const [done, setDone] = useState(false)
 
   const beforeDeparture = departureTime ? new Date(departureTime).getTime() > Date.now() : true
-  const eligible = beforeDeparture && bookingStatus === 'confirmed'
+  const eligible = forceEligible !== undefined ? forceEligible : (beforeDeparture && bookingStatus === 'confirmed')
 
   if (!eligible) return null
 
