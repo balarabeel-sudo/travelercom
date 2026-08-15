@@ -44,11 +44,11 @@ type ServiceRow = {
 }
 
 const AMENITY_ICON: Record<string, string> = {
-  WiFi: '📶', Parking: '🅿️', Restaurant: '🍽️', Pool: '🏊', Gym: '🏋️',
-  'Airport Pickup': '✈️', 'Conference Hall': '🏢', Laundry: '🧺', AC: '❄️', Breakfast: '☕',
-  Meals: '🍱', 'Charging Port': '🔌', 'Reclining Seats': '💺', Toilet: '🚻',
-  'Guide Included': '🧭', 'Transport Included': '🚐', 'Meals Included': '🍱', Insurance: '🛡️',
-  Catering: '🍽️', 'Sound System': '🔊', Seating: '🪑',
+  WiFi: 'wifi', Parking: 'parking', Restaurant: 'restaurant', Pool: 'pool', Gym: 'gym',
+  'Airport Pickup': 'plane', 'Conference Hall': 'building', Laundry: 'laundry', AC: 'snowflake', Breakfast: 'coffee',
+  Meals: 'food', 'Charging Port': 'plug', 'Reclining Seats': 'seat', Toilet: 'toilet',
+  'Guide Included': 'compass', 'Transport Included': 'van', 'Meals Included': 'food', Insurance: 'shield',
+  Catering: 'restaurant', 'Sound System': 'speaker', Seating: 'square',
 }
 
 export default function CompanyStorefront() {
@@ -264,7 +264,7 @@ export default function CompanyStorefront() {
               return (
                 <div key={s.id} style={{ background: COLORS.card, borderRadius: '14px', overflow: 'hidden', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex' }}>
                   <div style={{ width: '96px', height: '96px', flexShrink: 0, position: 'relative', background: s.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {s.photo_url ? <img src={s.photo_url} alt={s.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '26px' }}>🏨</span>}
+                    {s.photo_url ? <img src={s.photo_url} alt={s.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="hotel" size={26} color="white" />}
                     {promo && (
                       <div style={{
                         position: 'absolute', top: '5px', left: '5px', background: COLORS.purple, color: 'white',
@@ -357,7 +357,9 @@ export default function CompanyStorefront() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '14px' }}>
                 {uniqueAmenities.map((a) => (
                   <div key={a} style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: '20px', marginBottom: '4px' }}>{AMENITY_ICON[a] || '✓'}</p>
+                    <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'center' }}>
+                      <Icon name={AMENITY_ICON[a] || 'check'} size={20} color={COLORS.purple} />
+                    </div>
                     <p style={{ fontSize: '10px', color: COLORS.textMuted }}>{a}</p>
                   </div>
                 ))}
