@@ -26,12 +26,13 @@ type Notice = {
   id: string
   title: string
   message: string
+  target_audience: 'all' | 'personal' | 'company'
   active: boolean
   created_at: string
 }
 
 const EMPTY_BANNER_FORM = { title: '', message: '', image_url: '', link_url: '' }
-const EMPTY_NOTICE_FORM = { title: '', message: '' }
+const EMPTY_NOTICE_FORM = { title: '', message: '', target_audience: 'all' as 'all' | 'personal' | 'company' }
 
 function BannersTab() {
   const [banners, setBanners] = useState<Banner[]>([])
@@ -170,7 +171,7 @@ function NotificationsTab() {
     setSaving(true); setError('')
     const { data: userData } = await supabase.auth.getUser()
     const { error } = await supabase.from('admin_notifications').insert({
-      title: form.title.trim(), message: form.message.trim(), active: true, created_by: userData?.user?.id,
+      title: form.title.trim(), message: form.message.trim(), target_audience: form.target_audience, active: true, created_by: userData?.user?.id,
     })
     setSaving(false)
     if (error) { setError(error.message); return }
@@ -220,7 +221,9 @@ function NotificationsTab() {
                 </span>
               </div>
               <p style={{ fontSize: '12.5px', color: COLORS.textMuted, marginTop: '6px', lineHeight: 1.4 }}>{n.message}</p>
-              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '6px' }}>{new Date(n.created_at).toLocaleString()}</p>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '6px' }}>
+                {n.target_audience === 'all' ? 'All users' : n.target_audience === 'personal' ? 'Personal users only' : 'Companies only'} · {new Date(n.created_at).toLocaleString()}
+              </p>
               <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
                 <div onClick={() => toggleActive(n)} style={{ flex: 1, textAlign: 'center' as const, padding: '8px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '12px', fontWeight: 600, color: COLORS.text, cursor: 'pointer' }}>{n.active ? 'Hide' : 'Unhide'}</div>
                 <div onClick={() => remove(n)} style={{ flex: 1, textAlign: 'center' as const, padding: '8px', borderRadius: '8px', border: `1px solid ${COLORS.red}`, fontSize: '12px', fontWeight: 600, color: COLORS.red, cursor: 'pointer' }}>Delete</div>
@@ -235,7 +238,25 @@ function NotificationsTab() {
           <div onClick={(e) => e.stopPropagation()} style={{ background: COLORS.card, borderTopLeftRadius: '18px', borderTopRightRadius: '18px', padding: '20px', width: '100%', maxWidth: '480px' }}>
             <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>Send Notification</p>
             <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Title" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', color: COLORS.text }} />
-            <textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Message" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '64px', color: COLORS.text }} />
+            <textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Message" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '64px', marginBottom: '10px', color: COLORS.text }} />
+            <label style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '6px', display: 'block' }}>Audience</label>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
+              {(['all', 'personal', 'company'] as const).map((aud) => (
+                <div
+                  key={aud}
+                  onClick={() => setForm({ ...form, target_audience: aud })}
+                  style={{
+                    flex: 1, textAlign: 'center' as const, padding: '8px', borderRadius: '8px', cursor: 'pointer',
+                    border: `1px solid ${form.target_audience === aud ? COLORS.primary : COLORS.border}`,
+                    background: form.target_audience === aud ? '#EFF6FF' : 'transparent',
+                    fontSize: '12px', fontWeight: 700,
+                    color: form.target_audience === aud ? COLORS.primary : COLORS.textMuted,
+                  }}
+                >
+                  {aud === 'all' ? 'All' : aud === 'personal' ? 'Personal' : 'Company'}
+                </div>
+              ))}
+            </div>
             {error && <p style={{ color: COLORS.red, fontSize: '12px', marginTop: '8px' }}>{error}</p>}
             <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
               <div onClick={() => !saving && send()} style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', background: COLORS.primary, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}>{saving ? '...' : 'Send'}</div>
