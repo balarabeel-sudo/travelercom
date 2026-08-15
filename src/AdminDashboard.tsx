@@ -10,6 +10,8 @@ import AdminWallet from './AdminWallet'
 import AdminRefunds from './AdminRefunds'
 import AdminWithdrawals from './AdminWithdrawals'
 import AdminSupport from './AdminSupport'
+import AdminAnalytics from './AdminAnalytics'
+import AdminMarketing from './AdminMarketing'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -272,7 +274,9 @@ function AdminDashboard() {
         {section === 'refunds' && <AdminRefunds />}
         {section === 'withdrawals' && <AdminWithdrawals />}
         {section === 'support' && <AdminSupport />}
-        {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'finance' && section !== 'wallet' && section !== 'refunds' && section !== 'withdrawals' && section !== 'support' && <ComingSoonPanel label={currentLabel} />}
+        {section === 'analytics' && <AdminAnalytics />}
+        {section === 'marketing' && <AdminMarketing />}
+        {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'finance' && section !== 'wallet' && section !== 'refunds' && section !== 'withdrawals' && section !== 'support' && section !== 'analytics' && section !== 'marketing' && <ComingSoonPanel label={currentLabel} />}
       </div>
     </div>
   )
