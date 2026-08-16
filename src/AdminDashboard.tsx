@@ -16,6 +16,7 @@ import AdminPlatform from './AdminPlatform'
 import AdminStaff from './AdminStaff'
 import AdminAuditLogs from './AdminAuditLogs'
 import AdminSettings from './AdminSettings'
+import AdminApprovals from './AdminApprovals'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -290,7 +291,8 @@ function AdminDashboard() {
         {section === 'staff' && <AdminStaff />}
         {section === 'audit' && <AdminAuditLogs />}
         {section === 'settings' && <AdminSettings />}
-        {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'finance' && section !== 'wallet' && section !== 'refunds' && section !== 'withdrawals' && section !== 'support' && section !== 'analytics' && section !== 'marketing' && section !== 'platform' && section !== 'staff' && section !== 'audit' && section !== 'settings' && <ComingSoonPanel label={currentLabel} />}
+        {section === 'approvals' && <AdminApprovals />}
+        {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'finance' && section !== 'wallet' && section !== 'refunds' && section !== 'withdrawals' && section !== 'support' && section !== 'analytics' && section !== 'marketing' && section !== 'platform' && section !== 'staff' && section !== 'audit' && section !== 'settings' && section !== 'approvals' && <ComingSoonPanel label={currentLabel} />}
       </div>
     </div>
   )
