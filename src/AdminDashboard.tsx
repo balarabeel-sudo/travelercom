@@ -32,7 +32,7 @@ const COLORS = {
 
 type SectionKey =
   | 'overview' | 'users' | 'companies' | 'hotels' | 'transport' | 'flights' | 'bookings'
-  | 'finance' | 'wallet' | 'refunds' | 'withdrawals'
+  | 'finance' | 'wallet' | 'refunds' | 'withdrawals' | 'approvals'
   | 'support' | 'analytics' | 'marketing'
   | 'platform' | 'staff' | 'audit' | 'notifications' | 'settings'
 
@@ -57,6 +57,7 @@ const NAV: NavGroup[] = [
       { key: 'wallet', label: 'Wallet & Transactions', icon: 'wallet' },
       { key: 'refunds', label: 'Refunds', icon: 'refresh' },
       { key: 'withdrawals', label: 'Withdrawals', icon: 'arrowUpRight' },
+      { key: 'approvals', label: 'Approvals', icon: 'check' },
     ]
   },
   {
