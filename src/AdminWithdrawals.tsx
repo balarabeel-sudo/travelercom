@@ -53,6 +53,22 @@ export default function AdminWithdrawals() {
   const [adminNote, setAdminNote] = useState('')
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
+  const [canApprove, setCanApprove] = useState(false)
+  const [canProcess, setCanProcess] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    const checkPermissions = async () => {
+      const { data: userData } = await supabase.auth.getUser()
+      const uid = userData?.user?.id
+      if (!uid) return
+      const { data: approveData } = await supabase.rpc('has_permission', { p_user_id: uid, p_permission: 'withdrawals.approve' })
+      const { data: processData } = await supabase.rpc('has_permission', { p_user_id: uid, p_permission: 'withdrawals.process' })
+      setCanApprove(!!approveData)
+      setCanProcess(!!processData)
+    }
+    checkPermissions()
+  }, [])
 
   useEffect(() => {
     fetchRequests()
@@ -72,6 +88,12 @@ export default function AdminWithdrawals() {
 
   async function handleDecision(approve: boolean) {
     if (!selected) return
+
+    if (!approve && !adminNote.trim()) {
+      setError('Da fatan za a rubuta dalilin ki (reject).')
+      return
+    }
+
     setProcessing(true)
     setError('')
 
@@ -89,6 +111,19 @@ export default function AdminWithdrawals() {
     }
     setSelected(null)
     setAdminNote('')
+    fetchRequests()
+  }
+
+  async function submitForApproval() {
+    if (!selected) return
+    setSubmitting(true)
+    setError('')
+
+    const { error } = await supabase.rpc('submit_for_approval', { p_type: 'withdrawal', p_request_id: selected.id })
+
+    setSubmitting(false)
+    if (error) { setError(error.message); return }
+    setSelected(null)
     fetchRequests()
   }
 
@@ -182,28 +217,46 @@ export default function AdminWithdrawals() {
             <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '8px' }}>Company ID: {selected.company_id}</p>
 
             {selected.status === 'pending' ? (
-              <>
-                <textarea
-                  value={adminNote}
-                  onChange={(e) => setAdminNote(e.target.value)}
-                  placeholder="Admin note (optional)"
-                  style={{ width: '100%', marginTop: '12px', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '64px', color: COLORS.text }}
-                />
-                <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
-                  <div
-                    onClick={() => !processing && handleDecision(true)}
-                    style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', background: COLORS.green, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}
-                  >
-                    {processing ? '...' : 'Approve & Mark Paid'}
+              canApprove ? (
+                <>
+                  <textarea
+                    value={adminNote}
+                    onChange={(e) => setAdminNote(e.target.value)}
+                    placeholder="Reason (required for Reject, optional for Approve)"
+                    style={{ width: '100%', marginTop: '12px', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '64px', color: COLORS.text }}
+                  />
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+                    <div
+                      onClick={() => !processing && handleDecision(true)}
+                      style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', background: COLORS.green, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}
+                    >
+                      {processing ? '...' : 'Approve & Mark Paid'}
+                    </div>
+                    <div
+                      onClick={() => !processing && handleDecision(false)}
+                      style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', background: COLORS.red, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}
+                    >
+                      {processing ? '...' : 'Reject'}
+                    </div>
                   </div>
+                </>
+              ) : canProcess ? (
+                <>
+                  <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '10px' }}>
+                    Za ka aika wannan zuwa Founder domin amincewa ta karshe.
+                  </p>
                   <div
-                    onClick={() => !processing && handleDecision(false)}
-                    style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', background: COLORS.red, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}
+                    onClick={() => !submitting && submitForApproval()}
+                    style={{ marginTop: '10px', textAlign: 'center' as const, padding: '11px', borderRadius: '10px', background: COLORS.primary, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}
                   >
-                    {processing ? '...' : 'Reject'}
+                    {submitting ? '...' : 'Submit for Approval'}
                   </div>
-                </div>
-              </>
+                </>
+              ) : (
+                <p style={{ marginTop: '12px', fontSize: '12.5px', color: COLORS.textMuted }}>
+                  Ba ka da izinin daukar wani mataki akan wannan.
+                </p>
+              )
             ) : (
               <p style={{ marginTop: '12px', fontSize: '12.5px', color: COLORS.textMuted, lineHeight: 1.5 }}>
                 Resolved {selected.resolved_at ? new Date(selected.resolved_at).toLocaleString() : '—'}
