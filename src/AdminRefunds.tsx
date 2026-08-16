@@ -73,6 +73,11 @@ export default function AdminRefunds() {
 
   async function handleDecision(approve: boolean) {
     if (!selected) return
+
+    if (!approve && !adminNote.trim()) {
+      setError('Da fatan za a rubuta dalilin ki (reject).')
+      return
+    }
     setProcessing(true)
     setError('')
 
@@ -191,7 +196,7 @@ export default function AdminRefunds() {
                 <textarea
                   value={adminNote}
                   onChange={(e) => setAdminNote(e.target.value)}
-                  placeholder="Admin note (optional)"
+                  placeholder="Reason (required for Reject, optional for Approve)"
                   style={{ width: '100%', marginTop: '12px', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '64px', color: COLORS.text }}
                 />
                 <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
