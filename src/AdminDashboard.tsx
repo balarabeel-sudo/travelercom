@@ -80,6 +80,36 @@ const NAV: NavGroup[] = [
 
 const ALL_ITEMS: NavItem[] = NAV.flatMap((g) => g.items)
 
+// Which permission (any ONE of, if array) a section needs to appear
+// in the menu at all. Missing from this map = always visible to any
+// valid admin (overview, analytics, notifications, settings).
+const SECTION_PERMISSION: Partial<Record<SectionKey, string | string[]>> = {
+  users: 'users.view',
+  companies: ['companies.view', 'verification.view'],
+  hotels: ['companies.view', 'verification.view'],
+  transport: ['companies.view', 'verification.view'],
+  flights: ['companies.view', 'verification.view'],
+  bookings: 'bookings.view',
+  finance: 'finance.view',
+  wallet: 'wallet.view',
+  refunds: 'refunds.view',
+  withdrawals: 'withdrawals.view',
+  support: 'support.view',
+  marketing: 'marketing.view',
+  platform: 'platform.view',
+  staff: 'staff.view',
+  audit: 'audit.view',
+}
+
+function canSeeSection(key: SectionKey, isSuperAdmin: boolean, perms: Set<string>): boolean {
+  if (isSuperAdmin) return true
+  if (key === 'approvals') return false // Founder-only page, never shown to staff in the menu
+  const required = SECTION_PERMISSION[key]
+  if (!required) return true // not in the map = always visible
+  const list = Array.isArray(required) ? required : [required]
+  return list.some((p) => perms.has(p))
+}
+
 function ComingSoonPanel({ label }: { label: string }) {
   return (
     <div style={{ padding: '50px 20px', textAlign: 'center' as const }}>
@@ -145,6 +175,8 @@ function AdminDashboard() {
   const navigate = useNavigate()
   const [checking, setChecking] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [permissions, setPermissions] = useState<Set<string>>(new Set())
   const [section, setSection] = useState<SectionKey>('overview')
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -181,6 +213,11 @@ function AdminDashboard() {
         setChecking(false)
         return
       }
+
+      setIsSuperAdmin(!!adminRow.is_super_admin)
+
+      const { data: permsData } = await supabase.rpc('get_my_permissions')
+      setPermissions(new Set(permsData || []))
 
       setIsAdmin(true)
       setChecking(false)
@@ -249,29 +286,33 @@ function AdminDashboard() {
             <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, padding: '0 18px 14px 18px', borderBottom: `1px solid ${COLORS.border}`, marginBottom: '10px' }}>
               Founder Dashboard
             </p>
-            {NAV.map((group, gi) => (
-              <div key={gi} style={{ marginBottom: '10px' }}>
-                {group.title && (
-                  <p style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.textMuted, padding: '8px 18px 4px 18px', letterSpacing: '0.4px' }}>
-                    {group.title.toUpperCase()}
-                  </p>
-                )}
-                {group.items.map((item) => (
-                  <div
-                    key={item.key}
-                    onClick={() => { setSection(item.key); setDrawerOpen(false) }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '12px',
-                      padding: '11px 18px', cursor: 'pointer',
-                      background: section === item.key ? '#EFF6FF' : 'transparent',
-                      borderRight: section === item.key ? `3px solid ${COLORS.primary}` : '3px solid transparent',
-                    }}>
-                    <Icon name={item.icon} size={16} color={section === item.key ? COLORS.primary : COLORS.text} />
-                    <span style={{ fontSize: '13px', fontWeight: section === item.key ? 700 : 500, color: section === item.key ? COLORS.primary : COLORS.text }}>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
+            {NAV.map((group, gi) => {
+              const visibleItems = group.items.filter((item) => canSeeSection(item.key, isSuperAdmin, permissions))
+              if (visibleItems.length === 0) return null
+              return (
+                <div key={gi} style={{ marginBottom: '10px' }}>
+                  {group.title && (
+                    <p style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.textMuted, padding: '8px 18px 4px 18px', letterSpacing: '0.4px' }}>
+                      {group.title.toUpperCase()}
+                    </p>
+                  )}
+                  {visibleItems.map((item) => (
+                    <div
+                      key={item.key}
+                      onClick={() => { setSection(item.key); setDrawerOpen(false) }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        padding: '11px 18px', cursor: 'pointer',
+                        background: section === item.key ? '#EFF6FF' : 'transparent',
+                        borderRight: section === item.key ? `3px solid ${COLORS.primary}` : '3px solid transparent',
+                      }}>
+                      <Icon name={item.icon} size={16} color={section === item.key ? COLORS.primary : COLORS.text} />
+                      <span style={{ fontSize: '13px', fontWeight: section === item.key ? 700 : 500, color: section === item.key ? COLORS.primary : COLORS.text }}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
