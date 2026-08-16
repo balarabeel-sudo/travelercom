@@ -16,6 +16,8 @@ const COLORS = {
 type Role = { id: string; name: string; description: string | null }
 type StaffMember = { user_id: string; role_id: string | null; invited_at: string | null; suspended: boolean }
 type Invite = { id: string; email: string; role_id: string; status: 'pending' | 'accepted' | 'revoked'; created_at: string }
+type Permission = { id: string; module: string; action: string; description: string | null }
+type Override = { permission_id: string; granted: boolean; note: string | null }
 
 export default function AdminStaff() {
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null)
@@ -31,6 +33,11 @@ export default function AdminStaff() {
   const [changingRoleFor, setChangingRoleFor] = useState<string | null>(null)
   const [newRoleId, setNewRoleId] = useState('')
   const [changing, setChanging] = useState(false)
+  const [overridesFor, setOverridesFor] = useState<string | null>(null)
+  const [allPermissions, setAllPermissions] = useState<Permission[]>([])
+  const [rolePermissionIds, setRolePermissionIds] = useState<Set<string>>(new Set())
+  const [overrides, setOverrides] = useState<Record<string, Override>>({})
+  const [loadingOverrides, setLoadingOverrides] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -104,6 +111,47 @@ export default function AdminStaff() {
     return roles.find((r) => r.id === id)?.name || id || 'Unknown role'
   }
 
+  async function openOverrides(s: StaffMember) {
+    setOverridesFor(s.user_id)
+    setLoadingOverrides(true)
+    setError('')
+
+    const [{ data: permsData, error: permsErr }, { data: rpData, error: rpErr }, { data: ovData, error: ovErr }] = await Promise.all([
+      supabase.from('permissions').select('id, module, action, description').order('module').order('action'),
+      supabase.from('role_permissions').select('permission_id').eq('role_id', s.role_id || ''),
+      supabase.from('admin_permission_overrides').select('permission_id, granted, note').eq('user_id', s.user_id),
+    ])
+
+    if (permsErr || rpErr || ovErr) {
+      setError((permsErr || rpErr || ovErr)?.message || 'Error loading permissions')
+      setLoadingOverrides(false)
+      return
+    }
+
+    setAllPermissions(permsData || [])
+    setRolePermissionIds(new Set((rpData || []).map((r) => r.permission_id)))
+    const ovMap: Record<string, Override> = {}
+    ;(ovData || []).forEach((o) => { ovMap[o.permission_id] = o })
+    setOverrides(ovMap)
+    setLoadingOverrides(false)
+  }
+
+  async function setOverride(permissionId: string, granted: boolean) {
+    if (!overridesFor) return
+    const { error } = await supabase.rpc('set_permission_override', { p_user_id: overridesFor, p_permission_id: permissionId, p_granted: granted, p_note: null })
+    if (error) { setError(error.message); return }
+    setOverrides({ ...overrides, [permissionId]: { permission_id: permissionId, granted, note: null } })
+  }
+
+  async function clearOverride(permissionId: string) {
+    if (!overridesFor) return
+    const { error } = await supabase.rpc('clear_permission_override', { p_user_id: overridesFor, p_permission_id: permissionId })
+    if (error) { setError(error.message); return }
+    const next = { ...overrides }
+    delete next[permissionId]
+    setOverrides(next)
+  }
+
   if (loading) return <div style={{ padding: '16px' }}><p style={{ fontSize: '13px', color: COLORS.textMuted }}>Loading...</p></div>
 
   if (isSuperAdmin === false) {
@@ -154,6 +202,12 @@ export default function AdminStaff() {
                   style={{ flex: 1, minWidth: '90px', textAlign: 'center' as const, padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '12px', fontWeight: 600, color: COLORS.text, cursor: 'pointer' }}
                 >
                   Change Role
+                </div>
+                <div
+                  onClick={() => openOverrides(s)}
+                  style={{ flex: 1, minWidth: '90px', textAlign: 'center' as const, padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.primary}`, fontSize: '12px', fontWeight: 600, color: COLORS.primary, cursor: 'pointer' }}
+                >
+                  Overrides
                 </div>
                 <div
                   onClick={() => toggleSuspend(s)}
@@ -267,6 +321,78 @@ export default function AdminStaff() {
               <div onClick={() => !changing && setChangingRoleFor(null)} style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, fontSize: '13.5px', cursor: 'pointer' }}>
                 Cancel
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {overridesFor && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 40 }}
+          onClick={() => setOverridesFor(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: COLORS.card, borderTopLeftRadius: '18px', borderTopRightRadius: '18px', padding: '20px', width: '100%', maxWidth: '520px', maxHeight: '80vh', overflowY: 'auto' as const }}
+          >
+            <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>Permission Overrides</p>
+            <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '14px', lineHeight: 1.5 }}>
+              Grant or revoke a SPECIFIC permission for this one staff member, beyond what their role normally allows. Doesn't affect anyone else with the same role.
+            </p>
+
+            {error && <p style={{ color: COLORS.red, fontSize: '12px', marginBottom: '10px' }}>{error}</p>}
+
+            {loadingOverrides ? (
+              <p style={{ fontSize: '13px', color: COLORS.textMuted }}>Loading...</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                {allPermissions.map((p) => {
+                  const fromRole = rolePermissionIds.has(p.id)
+                  const override = overrides[p.id]
+                  const effective = override ? override.granted : fromRole
+
+                  return (
+                    <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: '8px', background: effective ? '#F0FDF4' : '#F9FAFB', border: `1px solid ${COLORS.border}` }}>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: '12.5px', fontWeight: 600, color: COLORS.text }}>{p.id}</p>
+                        <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>
+                          {fromRole ? 'From role' : 'Not in role'}
+                          {override ? ` · Override: ${override.granted ? 'GRANTED' : 'REVOKED'}` : ''}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <div
+                          onClick={() => setOverride(p.id, true)}
+                          style={{ padding: '5px 9px', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.green}`, color: override?.granted === true ? '#fff' : COLORS.green, background: override?.granted === true ? COLORS.green : 'transparent' }}
+                        >
+                          Grant
+                        </div>
+                        <div
+                          onClick={() => setOverride(p.id, false)}
+                          style={{ padding: '5px 9px', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.red}`, color: override?.granted === false ? '#fff' : COLORS.red, background: override?.granted === false ? COLORS.red : 'transparent' }}
+                        >
+                          Revoke
+                        </div>
+                        {override && (
+                          <div
+                            onClick={() => clearOverride(p.id)}
+                            style={{ padding: '5px 9px', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.border}`, color: COLORS.textMuted }}
+                          >
+                            Reset
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <div
+              onClick={() => setOverridesFor(null)}
+              style={{ marginTop: '16px', textAlign: 'center' as const, padding: '10px', border: `1px solid ${COLORS.border}`, borderRadius: '10px', color: COLORS.textMuted, fontSize: '13px', cursor: 'pointer' }}
+            >
+              Done
             </div>
           </div>
         </div>
