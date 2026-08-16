@@ -158,7 +158,7 @@ function AdminDashboard() {
 
       const { data: adminRow, error: adminErr } = await supabase
         .from('admins')
-        .select('is_super_admin')
+        .select('is_super_admin, suspended')
         .eq('user_id', userData.user.id)
         .maybeSingle()
 
@@ -168,8 +168,14 @@ function AdminDashboard() {
         return
       }
 
-      if (!adminRow || !adminRow.is_super_admin) {
+      if (!adminRow) {
         setAccessError(`No admin record found for this account (${userData.user.email}). Check the admins table in Supabase.`)
+        setChecking(false)
+        return
+      }
+
+      if (adminRow.suspended) {
+        setAccessError('Your admin access has been suspended.')
         setChecking(false)
         return
       }
