@@ -35,7 +35,7 @@ type Booking = {
   booking_status: string | null
   category: string | null
   created_at: string
-  companies: { business_name: string } | null
+  business_name: string | null
 }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
@@ -116,7 +116,10 @@ export default function AdminFinance() {
   const [totalCount, setTotalCount] = useState(0)
   const [loadingTxns, setLoadingTxns] = useState(true)
   const [txnError, setTxnError] = useState('')
+  const [txnForbidden, setTxnForbidden] = useState(false)
   const [category, setCategory] = useState('all')
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -135,30 +138,32 @@ export default function AdminFinance() {
   const fetchBookings = async () => {
     setLoadingTxns(true)
     setTxnError('')
-    const from = (page - 1) * pageSize
-    const to = from + pageSize - 1
-    let query = supabase
-      .from('bookings')
-      .select('id, ticket_code, customer_name, amount_paid, commission_amount, booking_status, category, created_at, companies(business_name)', { count: 'exact' })
-      .gte('created_at', `${startDate}T00:00:00`)
-      .lte('created_at', `${endDate}T23:59:59`)
-      .order('created_at', { ascending: false })
-    if (category !== 'all') query = query.eq('category', category)
-    query = query.range(from, to)
-
-    const { data, error, count } = await query
+    setTxnForbidden(false)
+    const { data, error } = await supabase.rpc('admin_finance_transactions', {
+      p_start: startDate,
+      p_end: endDate,
+      p_category: category,
+      p_search: search || null,
+      p_page: page,
+      p_page_size: pageSize,
+    })
     setLoadingTxns(false)
     if (error) {
-      setTxnError("Couldn't load transactions.")
+      if (error.message?.toLowerCase().includes('not authorized')) {
+        setTxnForbidden(true)
+      } else {
+        setTxnError("Couldn't load transactions — run admin_finance_transactions_setup.sql in Supabase first.")
+      }
       return
     }
-    setBookings((data as any[]) || [])
-    setTotalCount(count || 0)
+    const result = data as { rows: Booking[]; total_count: number }
+    setBookings(result?.rows || [])
+    setTotalCount(result?.total_count || 0)
   }
 
   useEffect(() => { fetchOverview() }, [startDate, endDate]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchBookings() }, [startDate, endDate, category, page, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { setPage(1) }, [startDate, endDate, category, pageSize])
+  useEffect(() => { fetchBookings() }, [startDate, endDate, category, search, page, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPage(1) }, [startDate, endDate, category, search, pageSize])
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
   const daily = overview?.daily || []
@@ -249,70 +254,86 @@ export default function AdminFinance() {
         </div>
       )}
 
-      {/* Recent Transactions */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.4px' }}>RECENT TRANSACTIONS</p>
-        <select value={category} onChange={(e) => setCategory(e.target.value)}
-          style={{ padding: '6px 9px', borderRadius: '7px', border: `1px solid ${COLORS.border}`, fontSize: '11.5px', color: COLORS.text, background: COLORS.card }}>
-          <option value="all">All Transactions</option>
-          {Object.keys(CATEGORY_LABEL).map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
-        </select>
-      </div>
-
-      {txnError ? (
-        <p style={{ fontSize: '12px', color: COLORS.red, textAlign: 'center' as const, padding: '20px 0' }}>{txnError}</p>
-      ) : loadingTxns ? (
-        <p style={{ fontSize: '12.5px', color: COLORS.textMuted, textAlign: 'center' as const, padding: '30px 0' }}>Loading...</p>
-      ) : bookings.length === 0 ? (
-        <p style={{ fontSize: '12.5px', color: COLORS.textMuted, textAlign: 'center' as const, padding: '30px 0' }}>No transactions in this period.</p>
-      ) : (
-        <div style={{ background: COLORS.card, borderRadius: '14px', border: `1px solid ${COLORS.border}` }}>
-          {bookings.map((t, idx) => {
-            const icon = (t.category && CATEGORY_ICON[t.category]) || 'ticket'
-            const label = (t.category && CATEGORY_LABEL[t.category]) || 'Booking Payment'
-            return (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderBottom: idx === bookings.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: COLORS.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon name={icon} size={14} color={COLORS.text} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>{label}</p>
-                  <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '1px' }}>
-                    {t.companies?.business_name || 'Unknown company'} · {t.customer_name || 'Unknown customer'} · {t.ticket_code || '—'}
-                  </p>
-                </div>
-                <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
-                  <p style={{ fontSize: '12.5px', fontWeight: 800, color: COLORS.text }}>₦{Number(t.amount_paid || 0).toLocaleString()}</p>
-                  <p style={{ fontSize: '10px', color: t.booking_status === 'cancelled' ? COLORS.red : COLORS.green }}>
-                    {t.booking_status || '—'} · {new Date(t.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Pagination */}
-      {!txnError && !loadingTxns && bookings.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap' as const, alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginTop: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-            <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}
-              style={{ padding: '7px 9px', borderRadius: '7px', border: `1px solid ${COLORS.border}`, fontSize: '12px', color: COLORS.text, background: COLORS.card }}>
-              {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n} per page</option>)}
+      {/* Recent Transactions — only shown if the staff member has finance.transactions.view */}
+      {!txnForbidden && (
+        <>
+          <div style={{ display: 'flex', flexWrap: 'wrap' as const, alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px' }}>
+            <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.4px' }}>RECENT TRANSACTIONS</p>
+            <select value={category} onChange={(e) => setCategory(e.target.value)}
+              style={{ padding: '6px 9px', borderRadius: '7px', border: `1px solid ${COLORS.border}`, fontSize: '11.5px', color: COLORS.text, background: COLORS.card }}>
+              <option value="all">All Transactions</option>
+              {Object.keys(CATEGORY_LABEL).map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
             </select>
-            <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>
-              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} of {totalCount.toLocaleString()} transactions
-            </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-              style={{ padding: '6px 11px', borderRadius: '7px', border: `1px solid ${COLORS.border}`, background: COLORS.card, fontSize: '12px', fontWeight: 700, color: page === 1 ? COLORS.textMuted : COLORS.text, cursor: page === 1 ? 'default' : 'pointer' }}>‹</button>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, padding: '0 6px' }}>{page} / {totalPages}</span>
-            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              style={{ padding: '6px 11px', borderRadius: '7px', border: `1px solid ${COLORS.border}`, background: COLORS.card, fontSize: '12px', fontWeight: 700, color: page === totalPages ? COLORS.textMuted : COLORS.text, cursor: page === totalPages ? 'default' : 'pointer' }}>›</button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '10px', padding: '9px 12px', marginBottom: '10px' }}>
+            <Icon name="search" size={14} color={COLORS.textMuted} />
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && setSearch(searchInput)}
+              placeholder="Search by ticket code, customer, company, or amount..."
+              style={{ flex: 1, border: 'none', outline: 'none', fontSize: '12.5px', background: 'transparent', color: COLORS.text }}
+            />
+            {searchInput && <span onClick={() => setSearch(searchInput)} style={{ fontSize: '11px', fontWeight: 700, color: COLORS.primary, cursor: 'pointer' }}>Search</span>}
           </div>
-        </div>
+
+          {txnError ? (
+            <p style={{ fontSize: '12px', color: COLORS.red, textAlign: 'center' as const, padding: '20px 0' }}>{txnError}</p>
+          ) : loadingTxns ? (
+            <p style={{ fontSize: '12.5px', color: COLORS.textMuted, textAlign: 'center' as const, padding: '30px 0' }}>Loading...</p>
+          ) : bookings.length === 0 ? (
+            <p style={{ fontSize: '12.5px', color: COLORS.textMuted, textAlign: 'center' as const, padding: '30px 0' }}>No transactions found.</p>
+          ) : (
+            <div style={{ background: COLORS.card, borderRadius: '14px', border: `1px solid ${COLORS.border}` }}>
+              {bookings.map((t, idx) => {
+                const icon = (t.category && CATEGORY_ICON[t.category]) || 'ticket'
+                const label = (t.category && CATEGORY_LABEL[t.category]) || 'Booking Payment'
+                return (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderBottom: idx === bookings.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: COLORS.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon name={icon} size={14} color={COLORS.text} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>{label}</p>
+                      <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '1px' }}>
+                        {t.business_name || 'Unknown company'} · {t.customer_name || 'Unknown customer'} · {t.ticket_code || '—'}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
+                      <p style={{ fontSize: '12.5px', fontWeight: 800, color: COLORS.text }}>₦{Number(t.amount_paid || 0).toLocaleString()}</p>
+                      <p style={{ fontSize: '10px', color: t.booking_status === 'cancelled' ? COLORS.red : COLORS.green }}>
+                        {t.booking_status || '—'} · {new Date(t.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {!txnError && !loadingTxns && bookings.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap' as const, alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginTop: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}
+                  style={{ padding: '7px 9px', borderRadius: '7px', border: `1px solid ${COLORS.border}`, fontSize: '12px', color: COLORS.text, background: COLORS.card }}>
+                  {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n} per page</option>)}
+                </select>
+                <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>
+                  Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} of {totalCount.toLocaleString()} transactions
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                  style={{ padding: '6px 11px', borderRadius: '7px', border: `1px solid ${COLORS.border}`, background: COLORS.card, fontSize: '12px', fontWeight: 700, color: page === 1 ? COLORS.textMuted : COLORS.text, cursor: page === 1 ? 'default' : 'pointer' }}>‹</button>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, padding: '0 6px' }}>{page} / {totalPages}</span>
+                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  style={{ padding: '6px 11px', borderRadius: '7px', border: `1px solid ${COLORS.border}`, background: COLORS.card, fontSize: '12px', fontWeight: 700, color: page === totalPages ? COLORS.textMuted : COLORS.text, cursor: page === totalPages ? 'default' : 'pointer' }}>›</button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
