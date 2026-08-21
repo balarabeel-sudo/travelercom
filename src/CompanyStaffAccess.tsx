@@ -23,6 +23,22 @@ const COLORS = {
   pinkBg: '#FDF2F8',
 }
 
+// supabase-js hides the real Edge Function error body behind a generic
+// "non-2xx status code" message. This digs into error.context (the raw
+// Response) to surface what the function actually said.
+async function resolveEdgeError(data: any, error: any): Promise<string> {
+  if (data && data.error) return data.error
+  if (error?.context && typeof error.context.json === 'function') {
+    try {
+      const body = await error.context.clone().json()
+      if (body?.error) return body.error
+    } catch {
+      // response wasn't JSON, fall through
+    }
+  }
+  return error?.message || 'Action failed'
+}
+
 const AVATAR_COLORS = [
   { bg: '#F5F3FF', fg: '#7c3aed' },
   { bg: '#EFF6FF', fg: '#0EA5E9' },
@@ -214,7 +230,8 @@ export default function CompanyStaffAccess({
       body: { action, company_id: companyId, ...extra },
     })
     if (error || (data && data.error)) {
-      alert((data && data.error) || error?.message || 'Action failed')
+      const msg = await resolveEdgeError(data, error)
+      alert(msg)
       return false
     }
     await loadAll()
@@ -803,7 +820,7 @@ function InviteStaffSheet({ companyId, onClose, onInvited }: { companyId: string
     })
     setLoading(false)
     if (err || (data && data.error)) {
-      setError((data && data.error) || err?.message || 'Failed to invite')
+      setError(await resolveEdgeError(data, err))
       return
     }
     setSuccess(true)
