@@ -47,6 +47,10 @@ import Tours from './Tours'
 import TourDetails from './TourDetails'
 import EventCenters from './EventCenters'
 import EventCenterDetails from './EventCenterDetails'
+import CreateRole from './CreateRole'
+import ManageRoles from './ManageRoles'
+import PermissionMatrix from './PermissionMatrix'
+import ActivityLog from './ActivityLog'
 import AdminDashboard from './AdminDashboard'
 import CompanyStaffAccess from './CompanyStaffAccess'
 import Flights from './Flights'
@@ -106,6 +110,10 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/my-bookings" element={<MyBookings />} />
         <Route path="/bookings" element={<MyBookings />} />
+        <Route path="/staff/create-role" element={<CreateRole onBack={() => window.history.back()} />} />
+        <Route path="/staff/manage-roles" element={<ManageRoles onBack={() => window.history.back()} onCreateRole={() => window.location.hash = '#/staff/create-role'} />} />
+        <Route path="/staff/permission-matrix" element={<PermissionMatrix onBack={() => window.history.back()} />} />
+        <Route path="/staff/activity-log" element={<ActivityLog onBack={() => window.history.back()} />} />
        <Route path="/staff" element={<CompanyStaffAccess onBack={() => window.history.back()} />} /> 
       </Routes>
     </Router>
