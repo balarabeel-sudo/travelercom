@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
 const COLORS = {
@@ -98,6 +99,7 @@ export default function CompanyStaffAccess({
   onBack?: () => void
 }) {
   const [companyId, setCompanyId] = useState<string | null>(companyIdProp || null)
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -552,10 +554,10 @@ export default function CompanyStaffAccess({
         <div style={{ fontSize: 15, fontWeight: 800, color: COLORS.text, marginBottom: 10 }}>Quick Actions</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))', gap: 10 }}>
           <QuickAction icon="👤➕" label="Invite Staff" onClick={() => setShowInvite(true)} />
-          <QuickAction icon="🛡" label="Create Role" onClick={() => {}} />
-          <QuickAction icon="▦" label="Permission Matrix" onClick={() => {}} />
-          <QuickAction icon="👤" label="Manage Roles" onClick={() => {}} />
-          <QuickAction icon="📋" label="Activity Log" onClick={() => {}} />
+          <QuickAction icon="🛡" label="Create Role" onClick={() => navigate('/staff/create-role')} />
+          <QuickAction icon="▦" label="Permission Matrix" onClick={() => navigate('/staff/permission-matrix')} />
+          <QuickAction icon="👤" label="Manage Roles" onClick={() => navigate('/staff/manage-roles')} />
+          <QuickAction icon="📋" label="Activity Log" onClick={() => navigate('/staff/activity-log')} />
         </div>
       </div>
 
