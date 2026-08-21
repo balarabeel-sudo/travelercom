@@ -48,6 +48,7 @@ import TourDetails from './TourDetails'
 import EventCenters from './EventCenters'
 import EventCenterDetails from './EventCenterDetails'
 import AdminDashboard from './AdminDashboard'
+import CompanyStaffAccess from './CompanyStaffAccess'
 import Flights from './Flights'
 
 function App() {
@@ -105,6 +106,7 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/my-bookings" element={<MyBookings />} />
         <Route path="/bookings" element={<MyBookings />} />
+       <Route path="/staff" element={<CompanyStaffAccess onBack={() => window.history.back()} />} /> 
       </Routes>
     </Router>
   )
