@@ -75,14 +75,31 @@ type ActivityRow = {
 }
 
 export default function CompanyStaffAccess({
-  companyId,
+  companyId: companyIdProp,
   onBack,
 }: {
-  companyId: string
+  companyId?: string
   onBack?: () => void
 }) {
+  const [companyId, setCompanyId] = useState<string | null>(companyIdProp || null)
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
+
+  // If no companyId was passed in, resolve it from the logged-in user's own company
+  useEffect(() => {
+    if (companyIdProp) { setCompanyId(companyIdProp); return }
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setErrorMsg('Not signed in'); setLoading(false); return }
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('owner_id', user.id)
+        .maybeSingle()
+      if (error || !data) { setErrorMsg('No company found for this account'); setLoading(false); return }
+      setCompanyId(data.id)
+    })()
+  }, [companyIdProp])
 
   const [totalStaff, setTotalStaff] = useState(0)
   const [activeCount, setActiveCount] = useState(0)
@@ -101,6 +118,7 @@ export default function CompanyStaffAccess({
   const [showInvite, setShowInvite] = useState(false)
 
   const loadAll = useCallback(async () => {
+    if (!companyId) return
     setLoading(true)
     setErrorMsg('')
     try {
