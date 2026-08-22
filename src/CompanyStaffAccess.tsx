@@ -109,13 +109,26 @@ export default function CompanyStaffAccess({
     ;(async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setErrorMsg('Not signed in'); setLoading(false); return }
-      const { data, error } = await supabase
+
+      // Try as company owner first
+      const { data: owned } = await supabase
         .from('companies')
         .select('id')
         .eq('owner_id', user.id)
         .maybeSingle()
-      if (error || !data) { setErrorMsg('No company found for this account'); setLoading(false); return }
-      setCompanyId(data.id)
+      if (owned) { setCompanyId(owned.id); return }
+
+      // Not an owner — check if they're an active staff member instead
+      const { data: staffRow } = await supabase
+        .from('company_staff')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle()
+      if (staffRow) { setCompanyId(staffRow.company_id); return }
+
+      setErrorMsg('No company found for this account')
+      setLoading(false)
     })()
   }, [companyIdProp])
 
