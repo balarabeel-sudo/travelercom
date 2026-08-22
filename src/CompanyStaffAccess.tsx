@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#7c3aed',
@@ -259,14 +260,14 @@ export default function CompanyStaffAccess({
       <div style={{ background: COLORS.card, padding: '16px 16px 20px', borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button onClick={onBack} style={iconBtnStyle}>‹</button>
+            <button onClick={onBack} style={iconBtnStyle}><Icon name="arrowLeft" size={18} color={COLORS.text} /></button>
             <div>
               <div style={{ fontSize: 20, fontWeight: 800, color: COLORS.text }}>Staff & Access</div>
               <div style={{ fontSize: 12.5, color: COLORS.textMuted }}>Manage your team and control access</div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button style={iconBtnStyle}>🔍</button>
+            <button style={iconBtnStyle}><Icon name="search" size={17} color={COLORS.text} /></button>
             <button
               onClick={() => setShowInvite(true)}
               style={{ ...iconBtnStyle, background: COLORS.purple, color: '#fff' }}
@@ -285,15 +286,15 @@ export default function CompanyStaffAccess({
 
       {/* Summary stats — horizontal scroll on narrow screens */}
       <div style={{ display: 'flex', overflowX: 'auto', gap: 0, padding: '16px', background: COLORS.card, marginBottom: 12 }}>
-        <StatCard icon="👥" value={totalStaff} label="Total Staff" color={COLORS.purple} bg={COLORS.purpleBg} />
+        <StatCard icon="users" value={totalStaff} label="Total Staff" color={COLORS.purple} bg={COLORS.purpleBg} />
         <Divider />
-        <StatCard icon="✓" value={activeCount} label="Active" color={COLORS.green} bg={COLORS.greenBg} />
+        <StatCard icon="checkCircle" value={activeCount} label="Active" color={COLORS.green} bg={COLORS.greenBg} />
         <Divider />
-        <StatCard icon="✉" value={pendingCount} label="Pending" color={COLORS.orange} bg={COLORS.orangeBg} />
+        <StatCard icon="mail" value={pendingCount} label="Pending" color={COLORS.orange} bg={COLORS.orangeBg} />
         <Divider />
-        <StatCard icon="⏸" value={suspendedCount} label="Suspended" color={COLORS.red} bg={COLORS.redBg} />
+        <StatCard icon="alertCircle" value={suspendedCount} label="Suspended" color={COLORS.red} bg={COLORS.redBg} />
         <Divider />
-        <StatCard icon="🛡" value={overridesCount} label="Overrides" color={COLORS.blue} bg={COLORS.blueBg} />
+        <StatCard icon="shield" value={overridesCount} label="Overrides" color={COLORS.blue} bg={COLORS.blueBg} />
       </div>
 
       {/* Tabs */}
@@ -320,7 +321,7 @@ export default function CompanyStaffAccess({
           ))}
         </div>
         <button style={{ ...iconBtnStyle, width: 'auto', padding: '0 14px', fontSize: 12.5, fontWeight: 700, color: COLORS.text }}>
-          ⏷ Filter
+          <Icon name="chevronDown" size={13} color={COLORS.text} /> Filter
         </button>
       </div>
 
@@ -418,7 +419,7 @@ export default function CompanyStaffAccess({
                   onClick={() => setMenuOpenFor(menuOpenFor === s.id ? null : s.id)}
                   style={{ background: 'none', border: 'none', fontSize: 18, color: COLORS.textMuted, cursor: 'pointer', padding: 4 }}
                 >
-                  ⋮
+                  <Icon name="moreHorizontal" size={17} color={COLORS.textMuted} />
                 </button>
                 {menuOpenFor === s.id && (
                   <div
@@ -491,8 +492,8 @@ export default function CompanyStaffAccess({
                   gap: 12,
                 }}
               >
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: COLORS.purpleBg, color: COLORS.purple, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
-                  ✉
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: COLORS.purpleBg, color: COLORS.purple, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="mail" size={18} color={COLORS.purple} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, color: COLORS.text }}>{inv.full_name || inv.email}</div>
@@ -509,7 +510,7 @@ export default function CompanyStaffAccess({
           ))}
 
         {tab === 'all' && staff.length > 0 && (
-          <button style={viewAllBtn}>View all active staff  ›</button>
+          <button style={viewAllBtn}>View all active staff <Icon name="chevronRight" size={13} color={COLORS.purple} /></button>
         )}
       </div>
 
@@ -546,8 +547,8 @@ export default function CompanyStaffAccess({
             ) : (
               activity.map((a) => (
                 <div key={a.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0' }}>
-                  <div style={{ width: 26, height: 26, borderRadius: '50%', background: COLORS.greenBg, color: COLORS.green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0 }}>
-                    ✓
+                  <div style={{ width: 26, height: 26, borderRadius: '50%', background: COLORS.greenBg, color: COLORS.green, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon name="check" size={13} color={COLORS.green} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 12.5, color: COLORS.text }}>
@@ -566,11 +567,11 @@ export default function CompanyStaffAccess({
       <div style={{ padding: '20px 16px 0' }}>
         <div style={{ fontSize: 15, fontWeight: 800, color: COLORS.text, marginBottom: 10 }}>Quick Actions</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))', gap: 10 }}>
-          <QuickAction icon="👤➕" label="Invite Staff" onClick={() => setShowInvite(true)} />
-          <QuickAction icon="🛡" label="Create Role" onClick={() => navigate('/staff/create-role')} />
-          <QuickAction icon="▦" label="Permission Matrix" onClick={() => navigate('/staff/permission-matrix')} />
-          <QuickAction icon="👤" label="Manage Roles" onClick={() => navigate('/staff/manage-roles')} />
-          <QuickAction icon="📋" label="Activity Log" onClick={() => navigate('/staff/activity-log')} />
+          <QuickAction icon="userPlus" label="Invite Staff" onClick={() => setShowInvite(true)} />
+          <QuickAction icon="shield" label="Create Role" onClick={() => navigate('/staff/create-role')} />
+          <QuickAction icon="clipboard" label="Permission Matrix" onClick={() => navigate('/staff/permission-matrix')} />
+          <QuickAction icon="crown" label="Manage Roles" onClick={() => navigate('/staff/manage-roles')} />
+          <QuickAction icon="fileText" label="Activity Log" onClick={() => navigate('/staff/activity-log')} />
         </div>
       </div>
 
@@ -592,8 +593,8 @@ export default function CompanyStaffAccess({
 function StatCard({ icon, value, label, color, bg }: { icon: string; value: number; label: string; color: string; bg: string }) {
   return (
     <div style={{ flex: 1, textAlign: 'center', padding: '0 8px', minWidth: 62 }}>
-      <div style={{ width: 34, height: 34, borderRadius: '50%', background: bg, color, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px', fontSize: 14 }}>
-        {icon}
+      <div style={{ width: 34, height: 34, borderRadius: '50%', background: bg, color, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px' }}>
+        <Icon name={icon} size={16} color={color} />
       </div>
       <div style={{ fontSize: 17, fontWeight: 800, color: COLORS.text }}>{value}</div>
       <div style={{ fontSize: 10, color: COLORS.textMuted }}>{label}</div>
@@ -661,8 +662,8 @@ function QuickAction({ icon, label, onClick }: { icon: string; label: string; on
         cursor: 'pointer',
       }}
     >
-      <div style={{ width: 38, height: 38, borderRadius: 12, background: COLORS.purpleBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
-        {icon}
+      <div style={{ width: 38, height: 38, borderRadius: 12, background: COLORS.purpleBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={18} color={COLORS.purple} />
       </div>
       <div style={{ fontSize: 10.5, fontWeight: 700, color: COLORS.text, textAlign: 'center' }}>{label}</div>
     </button>
@@ -754,7 +755,7 @@ function ManageAccessSheet({
       <div style={{ background: COLORS.card, width: '100%', maxHeight: '85vh', overflowY: 'auto', borderRadius: '20px 20px 0 0', padding: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontWeight: 800, fontSize: 16, color: COLORS.text }}>Manage Access</div>
-          <span onClick={onClose} style={{ cursor: 'pointer', fontSize: 18, color: COLORS.textMuted }}>✕</span>
+          <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={18} color={COLORS.textMuted} /></span>
         </div>
 
         <div style={{ background: COLORS.bg, borderRadius: 12, padding: 12, marginBottom: 16 }}>
@@ -780,7 +781,7 @@ function ManageAccessSheet({
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, color: COLORS.text, display: 'flex', alignItems: 'center', gap: 6 }}>
                         {p.description}
-                        {risky && <span style={{ fontSize: 10, color: COLORS.red, fontWeight: 800 }}>🔴 HIGH RISK</span>}
+                        {risky && <span style={{ fontSize: 10, color: COLORS.red, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 3 }}><Icon name="alertCircle" size={11} color={COLORS.red} /> HIGH RISK</span>}
                       </div>
                       {src && <div style={{ fontSize: 10.5, color: COLORS.textMuted }}>{src}</div>}
                     </div>
@@ -847,7 +848,7 @@ function InviteStaffSheet({ companyId, onClose, onInvited }: { companyId: string
       <div style={{ background: COLORS.card, width: '100%', borderRadius: '20px 20px 0 0', padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={{ fontWeight: 800, fontSize: 16 }}>Invite Staff</div>
-          <span onClick={onClose} style={{ cursor: 'pointer', fontSize: 18, color: COLORS.textMuted }}>✕</span>
+          <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={18} color={COLORS.textMuted} /></span>
         </div>
 
         {success ? (
