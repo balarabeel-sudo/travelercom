@@ -19,13 +19,17 @@ async function resolveEdgeError(data: any, error: any): Promise<string> {
   return error?.message || 'Something went wrong'
 }
 
-type Status = 'checking' | 'accepting' | 'success' | 'already_done' | 'error' | 'no_invite'
+type Status = 'checking' | 'accepting' | 'set_password' | 'success' | 'already_done' | 'error' | 'no_invite'
 
 export default function AcceptInvite() {
   const navigate = useNavigate()
   const [status, setStatus] = useState<Status>('checking')
   const [error, setError] = useState('')
   const [companyName, setCompanyName] = useState('')
+  const [userEmail, setUserEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [savingPassword, setSavingPassword] = useState(false)
 
   useEffect(() => {
     (async () => {
@@ -34,6 +38,7 @@ export default function AcceptInvite() {
         setStatus('no_invite')
         return
       }
+      setUserEmail(user.email || '')
 
       const inviteId = user.user_metadata?.company_invite_id
       const companyId = user.user_metadata?.company_id
@@ -72,9 +77,44 @@ export default function AcceptInvite() {
 
       const { data: co } = await supabase.from('companies').select('business_name').eq('id', companyId).maybeSingle()
       setCompanyName(co?.business_name || '')
-      setStatus('success')
+      // Staff access is granted, but this account was created via a one-time
+      // invite link with no password. Require them to set one before they
+      // can use the account normally — this also gives them a fresh,
+      // fully-established login session instead of the fragile invite session.
+      setStatus('set_password')
     })()
   }, [])
+
+  const submitPassword = async () => {
+    setError('')
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+    setSavingPassword(true)
+
+    const { error: updateErr } = await supabase.auth.updateUser({ password })
+    if (updateErr) {
+      setSavingPassword(false)
+      setError(updateErr.message)
+      return
+    }
+
+    // Establish a fresh, standard session using the new credentials —
+    // more reliable than the original invite-link session going forward.
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email: userEmail, password })
+    setSavingPassword(false)
+    if (signInErr) {
+      // Password was saved even if this re-login hiccups — not fatal.
+      setStatus('success')
+      return
+    }
+    setStatus('success')
+  }
 
   return (
     <div style={{ background: COLORS.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -84,6 +124,38 @@ export default function AcceptInvite() {
             <div style={{ fontSize: 36, marginBottom: 12 }}>⏳</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>Setting up your access…</div>
             <div style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 6 }}>This will only take a moment.</div>
+          </>
+        )}
+
+        {status === 'set_password' && (
+          <>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🔐</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: COLORS.text, marginBottom: 6 }}>Secure your account</div>
+            <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 18, textAlign: 'left' }}>
+              You're joining {companyName ? <b>{companyName}</b> : 'this company'} as staff. Set a password so you can log in normally next time.
+            </div>
+            {error && <div style={{ background: COLORS.redBg, color: COLORS.red, padding: 10, borderRadius: 10, fontSize: 12.5, marginBottom: 12, textAlign: 'left' }}>{error}</div>}
+            <div style={{ textAlign: 'left' }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.textMuted, display: 'block', marginBottom: 6 }}>New Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={inputStyle}
+                placeholder="At least 6 characters"
+              />
+              <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.textMuted, display: 'block', margin: '12px 0 6px' }}>Confirm Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                style={inputStyle}
+                placeholder="Re-enter your password"
+              />
+            </div>
+            <button onClick={submitPassword} disabled={savingPassword} style={{ ...btn, width: '100%', marginTop: 18 }}>
+              {savingPassword ? 'Saving…' : 'Set Password & Continue'}
+            </button>
           </>
         )}
 
@@ -136,4 +208,8 @@ export default function AcceptInvite() {
 const btn: React.CSSProperties = {
   padding: '12px 24px', borderRadius: 12, border: 'none', background: COLORS.purple,
   color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: 12, borderRadius: 10, border: `1px solid ${COLORS.border}`, fontSize: 14, background: '#fff',
 }
