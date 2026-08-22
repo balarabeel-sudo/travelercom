@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   bg: '#F8FAFC', card: '#FFFFFF', text: '#1A1A1A', textMuted: '#64748B',
@@ -121,7 +122,7 @@ export default function AcceptInvite() {
       <div style={{ background: COLORS.card, borderRadius: 18, padding: 28, maxWidth: 380, width: '100%', textAlign: 'center', border: `1px solid ${COLORS.border}` }}>
         {(status === 'checking' || status === 'accepting') && (
           <>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⏳</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><Icon name="clock" size={34} color={COLORS.purple} /></div>
             <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>Setting up your access…</div>
             <div style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 6 }}>This will only take a moment.</div>
           </>
@@ -129,7 +130,7 @@ export default function AcceptInvite() {
 
         {status === 'set_password' && (
           <>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>🔐</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><Icon name="lock" size={34} color={COLORS.purple} /></div>
             <div style={{ fontSize: 17, fontWeight: 800, color: COLORS.text, marginBottom: 6 }}>Secure your account</div>
             <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 18, textAlign: 'left' }}>
               You're joining {companyName ? <b>{companyName}</b> : 'this company'} as staff. Set a password so you can log in normally next time.
@@ -161,7 +162,7 @@ export default function AcceptInvite() {
 
         {status === 'success' && (
           <>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><Icon name="party" size={38} color={COLORS.green} /></div>
             <div style={{ fontSize: 17, fontWeight: 800, color: COLORS.text, marginBottom: 6 }}>Welcome aboard!</div>
             <div style={{ fontSize: 13.5, color: COLORS.textMuted, marginBottom: 20 }}>
               You now have staff access {companyName ? <>to <b>{companyName}</b></> : 'to this company'} on TravelerCom.
@@ -172,7 +173,7 @@ export default function AcceptInvite() {
 
         {status === 'already_done' && (
           <>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><Icon name="checkCircle" size={38} color={COLORS.green} /></div>
             <div style={{ fontSize: 17, fontWeight: 800, color: COLORS.text, marginBottom: 6 }}>You're already set up</div>
             <div style={{ fontSize: 13.5, color: COLORS.textMuted, marginBottom: 20 }}>
               You already have staff access {companyName ? <>to <b>{companyName}</b></> : 'to this company'}.
@@ -183,7 +184,7 @@ export default function AcceptInvite() {
 
         {status === 'no_invite' && (
           <>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>👋</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><Icon name="info" size={34} color={COLORS.textMuted} /></div>
             <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>Nothing to accept here</div>
             <div style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 6, marginBottom: 20 }}>
               This page is for staff invitations. If you followed an invite link, try opening it again.
@@ -194,7 +195,7 @@ export default function AcceptInvite() {
 
         {status === 'error' && (
           <>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><Icon name="alertCircle" size={34} color={COLORS.red} /></div>
             <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text, marginBottom: 6 }}>Couldn't complete this</div>
             <div style={{ background: COLORS.redBg, color: COLORS.red, padding: 10, borderRadius: 10, fontSize: 12.5, marginBottom: 16 }}>{error}</div>
             <button onClick={() => navigate('/')} style={btn}>Go Home</button>
