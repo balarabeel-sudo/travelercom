@@ -113,7 +113,7 @@ function Home() {
 
       // Staff members (invited via Staff Access) don't own a company, so
       // they'd otherwise land on the generic personal Home. Send them to
-      // their company's Staff & Access page instead.
+      // their own Staff Dashboard instead.
       if (!isCompany) {
         const { data: staffRow } = await supabase
           .from('company_staff')
@@ -122,7 +122,7 @@ function Home() {
           .eq('status', 'active')
           .maybeSingle()
         if (staffRow) {
-          navigate('/staff', { replace: true })
+          navigate('/staff-dashboard', { replace: true })
           return
         }
       }
