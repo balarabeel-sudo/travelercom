@@ -55,6 +55,7 @@ import PermissionMatrix from './PermissionMatrix'
 import ActivityLog from './ActivityLog'
 import AdminDashboard from './AdminDashboard'
 import CompanyStaffAccess from './CompanyStaffAccess'
+import StaffDashboard from './StaffDashboard'
 import AcceptInvite from './AcceptInvite'
 import Flights from './Flights'
 
@@ -135,6 +136,7 @@ function App() {
         <Route path="/staff/manage-roles" element={<ManageRoles onBack={() => window.history.back()} onCreateRole={() => window.location.hash = '#/staff/create-role'} />} />
         <Route path="/staff/permission-matrix" element={<PermissionMatrix onBack={() => window.history.back()} />} />
         <Route path="/staff/activity-log" element={<ActivityLog onBack={() => window.history.back()} />} />
+        <Route path="/staff-dashboard" element={<StaffDashboard />} />
         <Route path="/staff" element={<CompanyStaffAccess onBack={() => window.history.back()} />} /> 
         <Route path="/accept-invite" element={<AcceptInvite />} />
       </Routes>
