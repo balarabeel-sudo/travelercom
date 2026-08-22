@@ -108,7 +108,7 @@ export default function Notifications() {
           const pct = lastWeekRevenue > 0 ? Math.round(((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100) : 100
           list.push({
             id: 'weekly-performance', icon: 'trendingUp', iconBg: up ? '#DCFCE7' : '#FEF2F2', iconColor: up ? COLORS.green : COLORS.red,
-            title: up ? `Revenue up ${Math.abs(pct)}% this week 🎉` : `Revenue down ${Math.abs(pct)}% this week`,
+            title: up ? `Revenue up ${Math.abs(pct)}% this week` : `Revenue down ${Math.abs(pct)}% this week`,
             text: up ? 'Great momentum — keep it going!' : 'Check Analytics for insights on what changed.',
             time: 'This week',
           })
@@ -154,7 +154,7 @@ export default function Notifications() {
       <div style={{ padding: '16px' }}>
         {alerts.length === 0 ? (
           <div style={{ background: COLORS.card, padding: '40px 20px', textAlign: 'center', borderRadius: '14px', color: COLORS.textMuted }}>
-            <p style={{ fontSize: '30px', marginBottom: '10px' }}>🔔</p>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}><Icon name="bell" size={26} color={COLORS.textMuted} /></div>
             <p style={{ fontSize: '13px' }}>You're all caught up — no notifications right now.</p>
           </div>
         ) : (
