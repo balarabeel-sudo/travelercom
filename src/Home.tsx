@@ -118,11 +118,12 @@ function Home() {
 
   useEffect(() => {
     const loadUser = async () => {
-      const { data, error } = await supabase.auth.getUser()
-      if (error || !data.user) {
+    const { data: sessionData } = await supabase.auth.getSession()
+      if (!sessionData.session?.user) {
         navigate('/login')
         return
       }
+      const data = { user: sessionData.session.user }  
       const meta = data.user.user_metadata || {}
       const isCompany = meta.account_type === 'company'
       setAccountType(isCompany ? 'company' : 'personal')
