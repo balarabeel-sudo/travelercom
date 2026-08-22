@@ -20,20 +20,34 @@ const COLORS = {
   purpleBg: '#F5F3FF',
 }
 
-// Maps a permission "module" (from company_permissions.module) to an icon + label.
-// This only controls how modules are *displayed* — it does not grant access.
-const MODULE_META: Record<string, { label: string; icon: string }> = {
+// Maps a permission "module" (from company_permissions.module) to a real
+// destination in the app. Modules with no built destination yet (finance,
+// refunds, platform) are intentionally left out — they'll appear here
+// automatically once those pages exist, since this list drives what's shown.
+type ActionConfig = { label: string; icon: string; type: 'route' | 'contact'; route?: string }
+const MODULE_ACTIONS: Record<string, ActionConfig> = {
+  bookings: { label: 'Bookings', icon: 'ticket', type: 'route', route: '/bookings-management' },
+  tickets: { label: 'Tickets', icon: 'clipboard', type: 'route', route: '/verify-booking' },
+  customers: { label: 'Guests', icon: 'users', type: 'route', route: '/guests' },
+  support: { label: 'Support', icon: 'headphones', type: 'contact' },
+  finance: { label: 'Finance', icon: 'cash', type: 'route', route: '/analytics' },
+  // refunds: no built page yet — stays hidden until one exists
+}
+
+// Display-only labels/icons for grouping the full permission catalog in
+// "My Permissions" — every module shows here regardless of whether a
+// Quick Action page exists for it yet.
+const MODULE_LABELS: Record<string, { label: string; icon: string }> = {
   bookings: { label: 'Bookings', icon: 'ticket' },
   tickets: { label: 'Tickets', icon: 'clipboard' },
-  customers: { label: 'Customers', icon: 'users' },
+  customers: { label: 'Guests', icon: 'users' },
   finance: { label: 'Finance', icon: 'cash' },
   refunds: { label: 'Refunds', icon: 'refresh' },
   support: { label: 'Support', icon: 'headphones' },
   platform: { label: 'Platform', icon: 'globe' },
 }
-
 function moduleMeta(mod: string) {
-  return MODULE_META[mod] || { label: mod.charAt(0).toUpperCase() + mod.slice(1), icon: 'box' }
+  return MODULE_LABELS[mod] || { label: mod.charAt(0).toUpperCase() + mod.slice(1), icon: 'box' }
 }
 
 type PermRow = { key: string; module: string; description: string; risk_level: string }
@@ -98,6 +112,8 @@ export default function StaffDashboard() {
   const [userName, setUserName] = useState('')
   const [staff, setStaff] = useState<StaffInfo | null>(null)
   const [companyName, setCompanyName] = useState('')
+  const [companyPhone, setCompanyPhone] = useState('')
+  const [companyEmail, setCompanyEmail] = useState('')
   const [roleName, setRoleName] = useState('')
 
   const [catalog, setCatalog] = useState<PermRow[]>([])
@@ -139,7 +155,7 @@ export default function StaffDashboard() {
       setRoleName(staffRow.role_label || 'Staff')
 
       const [companyRes, templateRes, catalogRes, overridesRes] = await Promise.all([
-        supabase.from('companies').select('business_name').eq('id', staffRow.company_id).maybeSingle(),
+        supabase.from('companies').select('*').eq('id', staffRow.company_id).maybeSingle(),
         staffRow.template_id
           ? supabase.from('company_role_templates').select('name').eq('id', staffRow.template_id).maybeSingle()
           : Promise.resolve({ data: null } as any),
@@ -148,6 +164,9 @@ export default function StaffDashboard() {
       ])
 
       if (companyRes.data?.business_name) setCompanyName(companyRes.data.business_name)
+      const cd: any = companyRes.data || {}
+      setCompanyPhone(cd.business_phone || cd.phone || cd.contact_phone || '')
+      setCompanyEmail(cd.business_email || cd.email || cd.contact_email || '')
       if (templateRes?.data?.name) setRoleName(templateRes.data.name)
 
       const permCatalog: PermRow[] = catalogRes.data || []
@@ -212,9 +231,13 @@ export default function StaffDashboard() {
     return acc
   }, {})
 
-  const visibleModules = Object.keys(groupedCatalog).filter((m) =>
-    groupedCatalog[m].some((p) => effective.has(p.key))
-  )
+  const visibleModules = Object.keys(groupedCatalog).filter((m) => {
+    if (!groupedCatalog[m].some((p) => effective.has(p.key))) return false
+    const action = MODULE_ACTIONS[m]
+    if (!action) return false // no built page for this module yet — stays hidden until one exists
+    if (action.type === 'contact' && !companyPhone && !companyEmail) return false
+    return true
+  })
 
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: 480, margin: '0 auto', paddingBottom: 90 }}>
@@ -286,14 +309,22 @@ export default function StaffDashboard() {
               <SectionCard title="Quick Actions">
                 <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 10 }}>
                   {visibleModules.map((m) => {
-                    const meta = moduleMeta(m)
+                    const action = MODULE_ACTIONS[m]
+                    const handleClick = () => {
+                      if (action.type === 'route' && action.route) navigate(action.route)
+                      else if (action.type === 'contact') {
+                        if (companyPhone) window.location.href = `tel:${companyPhone}`
+                        else if (companyEmail) window.location.href = `mailto:${companyEmail}`
+                      }
+                    }
                     return (
-                      <div key={m} style={{
+                      <div key={m} onClick={handleClick} style={{
                         flex: '1 1 45%', background: '#F8FAFC', borderRadius: 12, padding: 12,
                         display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 6,
+                        cursor: 'pointer',
                       }}>
-                        <Icon name={meta.icon} size={18} color={COLORS.primary} />
-                        <span style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.text }}>{meta.label}</span>
+                        <Icon name={action.icon} size={18} color={COLORS.primary} />
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.text }}>{action.label}</span>
                       </div>
                     )
                   })}
