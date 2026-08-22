@@ -1,4 +1,6 @@
-import { HashRouter as Router, Routes, Route } from 'react-router-dom'
+import { useEffect } from 'react'
+import { HashRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
+import { supabase } from './supabaseClient'
 import SplashScreen from './splashScreen'
 import AccountType from './AccountType'
 import Login from './Login'
@@ -56,9 +58,27 @@ import CompanyStaffAccess from './CompanyStaffAccess'
 import AcceptInvite from './AcceptInvite'
 import Flights from './Flights'
 
+// Listens for the auth session created when an invited staff member clicks
+// their invite email link, and routes them to the Accept Invite page.
+function InviteRedirectListener() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user?.user_metadata?.company_invite_id) {
+        navigate('/accept-invite', { replace: true })
+      }
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [navigate])
+
+  return null
+}
+
 function App() {
   return (
     <Router>
+      <InviteRedirectListener />
       <Routes>
         <Route path="/" element={<SplashScreen />} />
         <Route path="/account-type" element={<AccountType />} />
