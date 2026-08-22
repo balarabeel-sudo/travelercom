@@ -88,21 +88,6 @@ function Home() {
   }[]>([])
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
   const [banners, setBanners] = useState<{ id: string; title: string; message: string; image_url: string | null; link_url: string | null }[]>([])
-  const [notices, setNotices] = useState<{ id: string; title: string; message: string; created_at: string }[]>([])
-  const [showNotices, setShowNotices] = useState(false)
-
-  useEffect(() => {
-    const loadNotices = async () => {
-      const { data } = await supabase
-        .from('admin_notifications')
-        .select('id, title, message, created_at')
-        .eq('active', true)
-        .in('target_audience', ['all', 'personal'])
-        .order('created_at', { ascending: false })
-      setNotices(data || [])
-    }
-    loadNotices()
-  }, [])
 
   useEffect(() => {
     const loadBanners = async () => {
@@ -118,14 +103,30 @@ function Home() {
 
   useEffect(() => {
     const loadUser = async () => {
-    const { data: sessionData } = await supabase.auth.getSession()
-      if (!sessionData.session?.user) {
+      const { data, error } = await supabase.auth.getUser()
+      if (error || !data.user) {
         navigate('/login')
         return
       }
-      const data = { user: sessionData.session.user }  
       const meta = data.user.user_metadata || {}
       const isCompany = meta.account_type === 'company'
+
+      // Staff members (invited via Staff Access) don't own a company, so
+      // they'd otherwise land on the generic personal Home. Send them to
+      // their company's Staff & Access page instead.
+      if (!isCompany) {
+        const { data: staffRow } = await supabase
+          .from('company_staff')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .eq('status', 'active')
+          .maybeSingle()
+        if (staffRow) {
+          navigate('/staff', { replace: true })
+          return
+        }
+      }
+
       setAccountType(isCompany ? 'company' : 'personal')
       setDisplayName(meta.full_name || '')
 
@@ -550,35 +551,8 @@ const services = [
         <h1 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.primary, letterSpacing: '0.5px' }}>
           TRAVELER<span style={{ color: COLORS.secondary }}>.COM</span>
         </h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', position: 'relative' as const }}>
-          <div onClick={() => setShowNotices((v) => !v)} style={{ cursor: 'pointer', display: 'flex', position: 'relative' as const }}>
-            <Icon name="bell" size={19} color={COLORS.text} />
-            {notices.length > 0 && (
-              <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', borderRadius: '50%', background: COLORS.secondary }} />
-            )}
-          </div>
-          {showNotices && (
-            <div
-              style={{
-                position: 'absolute', top: '38px', right: 0, width: '280px', maxHeight: '360px', overflowY: 'auto' as const,
-                background: COLORS.card, borderRadius: '14px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', border: `1px solid ${COLORS.border}`,
-                zIndex: 50, padding: '10px',
-              }}
-            >
-              <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, padding: '4px 6px 8px 6px' }}>Notifications</p>
-              {notices.length === 0 ? (
-                <p style={{ fontSize: '12px', color: COLORS.textMuted, padding: '10px 6px' }}>No notifications yet.</p>
-              ) : (
-                notices.map((n) => (
-                  <div key={n.id} style={{ padding: '8px 6px', borderTop: `1px solid ${COLORS.border}` }}>
-                    <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>{n.title}</p>
-                    <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '2px', lineHeight: 1.4 }}>{n.message}</p>
-                    <p style={{ fontSize: '10px', color: COLORS.textMuted, marginTop: '2px' }}>{new Date(n.created_at).toLocaleDateString()}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ cursor: 'pointer', display: 'flex' }}><Icon name="bell" size={19} color={COLORS.text} /></div>
           <div
             onClick={handleLogout}
             title="Logout"
