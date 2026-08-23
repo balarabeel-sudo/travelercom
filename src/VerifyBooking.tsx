@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -57,7 +58,18 @@ function VerifyBooking() {
       .eq('owner_id', userData.user.id)
       .maybeSingle()
 
-    if (!company) {
+    let companyId: string | null = company?.id || null
+    if (!companyId) {
+      const { data: staffRow } = await supabase
+        .from('company_staff')
+        .select('company_id')
+        .eq('user_id', userData.user.id)
+        .eq('status', 'active')
+        .maybeSingle()
+      if (staffRow) companyId = staffRow.company_id
+    }
+
+    if (!companyId) {
       setErrorMsg('Company profile not found.')
       setLoading(false)
       setSearched(true)
@@ -68,7 +80,7 @@ function VerifyBooking() {
       .from('bookings')
       .select('id, ticket_code, customer_name, booking_status, checked_in, created_at, amount_paid, company_id, services(category, commission_rate)')
       .eq('ticket_code', code.trim().toUpperCase())
-      .eq('company_id', company.id)
+      .eq('company_id', companyId)
       .maybeSingle()
 
     setLoading(false)
@@ -257,7 +269,7 @@ function VerifyBooking() {
               fontSize: '14px',
               cursor: loading ? 'not-allowed' : 'pointer'
             }}>
-            {loading ? 'Searching...' : '🔍 Verify Ticket'}
+            {loading ? 'Searching...' : (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="search" size={14} color="#fff" /> Verify Ticket</span>)}
           </button>
         </div>
 
@@ -269,7 +281,7 @@ function VerifyBooking() {
             padding: '20px',
             textAlign: 'center'
           }}>
-            <div style={{ fontSize: '32px', marginBottom: '8px' }}>❌</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}><Icon name="alertCircle" size={30} color={COLORS.red} /></div>
             <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.red }}>Ticket Not Found</p>
             <p style={{ fontSize: '12px', color: '#991b1b', marginTop: '4px' }}>
               This code doesn't match any booking with your company.
@@ -285,8 +297,12 @@ function VerifyBooking() {
             padding: '20px'
           }}>
             <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-              <div style={{ fontSize: '32px', marginBottom: '6px' }}>
-                {isValid ? '✅' : result.checked_in ? '⚠️' : '❌'}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+                {isValid
+                  ? <Icon name="checkCircle" size={30} color={COLORS.green} />
+                  : result.checked_in
+                    ? <Icon name="clock" size={30} color="#F59E0B" />
+                    : <Icon name="alertCircle" size={30} color={COLORS.red} />}
               </div>
               <p style={{ fontSize: '15px', fontWeight: 800, color: isValid ? COLORS.green : COLORS.red }}>
                 {result.checked_in ? 'Already Checked In' : result.booking_status !== 'confirmed' ? `Booking ${result.booking_status}` : 'Valid Ticket'}
@@ -325,7 +341,7 @@ function VerifyBooking() {
                   fontSize: '14px',
                   cursor: confirming ? 'not-allowed' : 'pointer'
                 }}>
-                {confirming ? 'Confirming...' : '✅ Confirm Check-In'}
+                {confirming ? 'Confirming...' : (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="checkCircle" size={14} color="#fff" /> Confirm Check-In</span>)}
               </button>
             )}
           </div>
