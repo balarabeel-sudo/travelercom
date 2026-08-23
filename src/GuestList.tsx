@@ -22,12 +22,23 @@ function GuestList() {
 
       const { data: company } = await supabase
         .from('companies').select('id').eq('owner_id', userData.user.id).maybeSingle()
-      if (!company) { setLoading(false); return }
+
+      let companyId: string | null = company?.id || null
+      if (!companyId) {
+        const { data: staffRow } = await supabase
+          .from('company_staff')
+          .select('company_id')
+          .eq('user_id', userData.user.id)
+          .eq('status', 'active')
+          .maybeSingle()
+        if (staffRow) companyId = staffRow.company_id
+      }
+      if (!companyId) { setLoading(false); return }
 
       const { data: bookings } = await supabase
         .from('bookings')
         .select('customer_name, amount_paid, created_at')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
         .order('created_at', { ascending: false })
 
       const map: Record<string, Guest> = {}
@@ -49,8 +60,12 @@ function GuestList() {
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
       <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-        <span onClick={() => navigate('/business-suite')} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
-        <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Guests</h1>
+        <span onClick={() => navigate(-1)} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
+        <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text, flex: 1 }}>Guests</h1>
+        <span onClick={() => navigate('/add-guest')} style={{
+          fontSize: '12.5px', fontWeight: 700, color: '#fff', background: COLORS.primary,
+          padding: '8px 14px', borderRadius: '20px', cursor: 'pointer',
+        }}>+ Add Guest</span>
       </div>
 
       <div style={{ padding: '16px' }}>
