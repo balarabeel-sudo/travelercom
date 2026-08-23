@@ -46,7 +46,7 @@ export default function AddGuest() {
   const [showTypePicker, setShowTypePicker] = useState(false)
   const [loadingTypes, setLoadingTypes] = useState(false)
 
-  const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
+  const [activePromo, setActivePromo] = useState<{ title: string; discount_type: string; discount_value: number } | null>(null)
   const [holidayDates, setHolidayDates] = useState<string[]>([])
 
   const [customerName, setCustomerName] = useState('')
@@ -75,13 +75,24 @@ export default function AddGuest() {
         .eq('owner_id', userData.user.id)
         .maybeSingle()
 
-      if (!company) { setLoading(false); return }
-      setCompanyId(company.id)
+      let resolvedCompanyId: string | null = company?.id || null
+      if (!resolvedCompanyId) {
+        const { data: staffRow } = await supabase
+          .from('company_staff')
+          .select('company_id')
+          .eq('user_id', userData.user.id)
+          .eq('status', 'active')
+          .maybeSingle()
+        if (staffRow) resolvedCompanyId = staffRow.company_id
+      }
+
+      if (!resolvedCompanyId) { setLoading(false); return }
+      setCompanyId(resolvedCompanyId)
 
       const { data: serviceRows } = await supabase
         .from('services')
         .select('id, title, category, commission_rate, price, photo_url')
-        .eq('company_id', company.id)
+        .eq('company_id', resolvedCompanyId)
 
       setServices(serviceRows || [])
       if (serviceRows && serviceRows.length > 0) setServiceId(serviceRows[0].id)
@@ -137,19 +148,11 @@ export default function AddGuest() {
       const today = new Date().toISOString().split('T')[0]
       const { data: promoRows } = await supabase
         .from('promotions')
-        .select('id, title, discount_type, discount_value, start_date, end_date, usage_limit')
+        .select('title, discount_type, discount_value, start_date, end_date')
         .eq('service_id', serviceId)
         .eq('active', true)
       const validPromo = (promoRows || []).find((p: any) => (!p.start_date || p.start_date <= today) && (!p.end_date || p.end_date >= today))
-      if (validPromo && validPromo.usage_limit) {
-        const { count } = await supabase
-          .from('bookings')
-          .select('id', { count: 'exact', head: true })
-          .eq('promotion_id', validPromo.id)
-        setActivePromo((count || 0) < validPromo.usage_limit ? (validPromo as any) : null)
-      } else {
-        setActivePromo(validPromo ? (validPromo as any) : null)
-      }
+      setActivePromo(validPromo ? (validPromo as any) : null)
 
       if (companyId) {
         const { data: holidayRows } = await supabase.from('company_holidays').select('date').eq('company_id', companyId)
@@ -256,7 +259,6 @@ export default function AddGuest() {
       ticket_code: ticketCode,
       checked_in: true,
       checked_in_at: new Date().toISOString(),
-      promotion_id: activePromo?.id || null,
       assigned_unit_number: assignedNumber || null,
     }).select('id').single()
 
