@@ -78,12 +78,23 @@ export default function Analytics() {
         .eq('owner_id', userData.user.id)
         .maybeSingle()
 
-      if (!company) { setLoading(false); return }
+      let companyId: string | null = company?.id || null
+      if (!companyId) {
+        const { data: staffRow } = await supabase
+          .from('company_staff')
+          .select('company_id')
+          .eq('user_id', userData.user.id)
+          .eq('status', 'active')
+          .maybeSingle()
+        if (staffRow) companyId = staffRow.company_id
+      }
+
+      if (!companyId) { setLoading(false); return }
 
       const { data: rows } = await supabase
         .from('bookings')
         .select('id, created_at, checked_in, check_out_date, booking_status, amount_paid, booking_source, payment_method, inventory_item_id, service_id, services(title), inventory_items(name)')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
         .order('created_at', { ascending: true })
 
       setBookings((rows || []) as any)
@@ -91,7 +102,7 @@ export default function Analytics() {
       const { data: promoRows } = await supabase
         .from('promotions')
         .select('id, service_id, title, discount_type, discount_value, start_date, end_date, active, services(title)')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
         .order('created_at', { ascending: false })
 
       setPromotions((promoRows || []) as any)
@@ -99,7 +110,7 @@ export default function Analytics() {
       const { data: items } = await supabase
         .from('inventory_items')
         .select('id, total_quantity')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
 
       const total = (items || []).reduce((sum, i: any) => sum + (i.total_quantity || 0), 0)
       setTotalRoomCount(total)
