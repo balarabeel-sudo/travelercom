@@ -62,6 +62,10 @@ export default function AcceptInvite() {
         const { data: co } = await supabase.from('companies').select('business_name').eq('id', companyId).maybeSingle()
         setCompanyName(co?.business_name || '')
         setStatus('already_done')
+        // This invite was already accepted in the past, but the metadata
+        // flag was never cleared — that's what keeps redirecting this
+        // account back here on every login. Clear it now.
+        await supabase.auth.updateUser({ data: { company_invite_id: null, company_id: null } })
         return
       }
 
@@ -108,6 +112,9 @@ export default function AcceptInvite() {
     // Establish a fresh, standard session using the new credentials —
     // more reliable than the original invite-link session going forward.
     const { error: signInErr } = await supabase.auth.signInWithPassword({ email: userEmail, password })
+    // Clear the invite flag now that setup is fully complete — otherwise
+    // every future login for this account would redirect back here again.
+    await supabase.auth.updateUser({ data: { company_invite_id: null, company_id: null } })
     setSavingPassword(false)
     if (signInErr) {
       // Password was saved even if this re-login hiccups — not fatal.
