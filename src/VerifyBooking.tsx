@@ -206,6 +206,20 @@ function VerifyBooking() {
       return
     }
 
+    // Best-effort activity log — a failure here shouldn't block the
+    // check-in itself, which already succeeded.
+    const { data: currentUserData } = await supabase.auth.getUser()
+    if (currentUserData.user) {
+      await supabase.from('audit_logs').insert({
+        actor_id: currentUserData.user.id,
+        action: 'verified_ticket',
+        module: 'tickets',
+        target_type: 'booking',
+        target_id: result.id,
+        company_id: result.company_id,
+      })
+    }
+
     setConfirming(false)
     setResult({ ...result, checked_in: true })
   }
