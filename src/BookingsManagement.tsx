@@ -162,6 +162,16 @@ function BookingsManagement() {
       return
     }
     setBookings((prev) => prev.map((b) => b.id === selectedBooking.id ? { ...b, booking_status: 'cancelled' } : b))
+    if (currentUserId && companyId) {
+      await supabase.from('audit_logs').insert({
+        actor_id: currentUserId,
+        action: 'cancelled_booking',
+        module: 'bookings',
+        target_type: 'booking',
+        target_id: selectedBooking.id,
+        company_id: companyId,
+      })
+    }
     setSelectedBooking(null)
   }
 
@@ -190,6 +200,14 @@ function BookingsManagement() {
       alert('Failed to assign task: ' + error.message)
       return
     }
+    await supabase.from('audit_logs').insert({
+      actor_id: currentUserId,
+      action: 'assigned_task',
+      module: 'tasks',
+      target_type: 'booking',
+      target_id: selectedBooking.id,
+      company_id: companyId,
+    })
     setAssignDone(true)
   }
 
