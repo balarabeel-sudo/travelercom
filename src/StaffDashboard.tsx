@@ -29,7 +29,7 @@ const MODULE_ACTIONS: Record<string, ActionConfig> = {
   bookings: { label: 'Bookings', icon: 'ticket', type: 'route', route: '/bookings-management' },
   tickets: { label: 'Tickets', icon: 'clipboard', type: 'route', route: '/verify-booking' },
   customers: { label: 'Guests', icon: 'users', type: 'route', route: '/guests' },
-  support: { label: 'Support', icon: 'headphones', type: 'contact' },
+  support: { label: 'Support', icon: 'headphones', type: 'route', route: '/support' },
   finance: { label: 'Finance', icon: 'cash', type: 'route', route: '/analytics' },
   refunds: { label: 'Refunds', icon: 'refresh', type: 'route', route: '/wallet' },
 }
@@ -121,6 +121,7 @@ export default function StaffDashboard() {
 
   const [bookingsToday, setBookingsToday] = useState<number | null>(null)
   const [tasks, setTasks] = useState<{ id: string; title: string; priority: string; status: string; created_at: string }[]>([])
+  const [activity, setActivity] = useState<{ id: string; action: string; module: string; created_at: string }[]>([])
 
   useEffect(() => {
     (async () => {
@@ -213,6 +214,14 @@ export default function StaffDashboard() {
         .limit(20)
       setTasks(taskRows || [])
 
+      const { data: activityRows } = await supabase
+        .from('audit_logs')
+        .select('id, action, module, created_at')
+        .eq('actor_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      setActivity(activityRows || [])
+
       setChecking(false)
     })()
   }, [navigate])
@@ -227,6 +236,21 @@ export default function StaffDashboard() {
       // revert on failure
       setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: 'open' } : t))
       alert('Could not update task: ' + error.message)
+      return
+    }
+    if (staff) {
+      const { data: userData } = await supabase.auth.getUser()
+      if (userData.user) {
+        await supabase.from('audit_logs').insert({
+          actor_id: userData.user.id,
+          action: 'completed_task',
+          module: 'tasks',
+          target_type: 'staff_task',
+          target_id: taskId,
+          company_id: staff.company_id,
+        })
+        setActivity((prev) => [{ id: `local-${taskId}`, action: 'completed_task', module: 'tasks', created_at: new Date().toISOString() }, ...prev])
+      }
     }
   }
 
@@ -385,7 +409,23 @@ export default function StaffDashboard() {
             </SectionCard>
 
             <SectionCard title="Recent Activity">
-              <EmptyState icon="clock" title="Nothing yet" subtitle="Your recent activity will appear here." />
+              {activity.length === 0 && (
+                <EmptyState icon="clock" title="Nothing yet" subtitle="Your recent activity will appear here." />
+              )}
+              {activity.map((a) => (
+                <div key={a.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0',
+                  borderBottom: `1px solid ${COLORS.border}`,
+                }}>
+                  <Icon name="clock" size={14} color={COLORS.textMuted} />
+                  <span style={{ flex: 1, fontSize: 12.5, color: COLORS.text }}>
+                    {a.action.replace(/_/g, ' ')}
+                  </span>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted }}>
+                    {new Date(a.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                  </span>
+                </div>
+              ))}
             </SectionCard>
           </>
         )}
