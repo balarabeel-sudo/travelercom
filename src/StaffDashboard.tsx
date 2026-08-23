@@ -120,6 +120,7 @@ export default function StaffDashboard() {
   const [effective, setEffective] = useState<Set<string>>(new Set())
 
   const [bookingsToday, setBookingsToday] = useState<number | null>(null)
+  const [tasks, setTasks] = useState<{ id: string; title: string; priority: string; status: string; created_at: string }[]>([])
 
   useEffect(() => {
     (async () => {
@@ -203,9 +204,31 @@ export default function StaffDashboard() {
         setBookingsToday(count ?? 0)
       }
 
+      const { data: taskRows } = await supabase
+        .from('staff_tasks')
+        .select('id, title, priority, status, created_at')
+        .eq('assigned_to', staffRow.id)
+        .order('status', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(20)
+      setTasks(taskRows || [])
+
       setChecking(false)
     })()
   }, [navigate])
+
+  const markTaskDone = async (taskId: string) => {
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: 'done' } : t))
+    const { error } = await supabase
+      .from('staff_tasks')
+      .update({ status: 'done', completed_at: new Date().toISOString() })
+      .eq('id', taskId)
+    if (error) {
+      // revert on failure
+      setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: 'open' } : t))
+      alert('Could not update task: ' + error.message)
+    }
+  }
 
   if (checking) {
     return (
@@ -333,7 +356,32 @@ export default function StaffDashboard() {
             )}
 
             <SectionCard title="My Tasks">
-              <EmptyState icon="checkCircle" title="You're all caught up" subtitle="You have no pending tasks right now." />
+              {tasks.length === 0 && (
+                <EmptyState icon="checkCircle" title="You're all caught up" subtitle="You have no pending tasks right now." />
+              )}
+              {tasks.map((t) => {
+                const priorityColor = t.priority === 'high' ? COLORS.red : t.priority === 'medium' ? '#F59E0B' : COLORS.textMuted
+                return (
+                  <div key={t.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
+                    borderBottom: `1px solid ${COLORS.border}`, opacity: t.status === 'done' ? 0.5 : 1,
+                  }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: priorityColor, flexShrink: 0 }} />
+                    <span style={{
+                      flex: 1, fontSize: 12.5, color: COLORS.text,
+                      textDecoration: t.status === 'done' ? 'line-through' : 'none',
+                    }}>{t.title}</span>
+                    {t.status === 'open' ? (
+                      <button onClick={() => markTaskDone(t.id)} style={{
+                        border: `1px solid ${COLORS.border}`, background: '#fff', borderRadius: 8,
+                        padding: '5px 10px', fontSize: 11, fontWeight: 700, color: COLORS.primary, cursor: 'pointer',
+                      }}>Done</button>
+                    ) : (
+                      <Icon name="checkCircle" size={15} color={COLORS.green} />
+                    )}
+                  </div>
+                )
+              })}
             </SectionCard>
 
             <SectionCard title="Recent Activity">
