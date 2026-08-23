@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
-import RequestRefundButton from './RequestRefundButton'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -44,6 +44,15 @@ function BookingsManagement() {
   const [filter, setFilter] = useState<FilterTab>('all')
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  const [companyId, setCompanyId] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [staffList, setStaffList] = useState<{ id: string; role_label: string | null; full_name: string }[]>([])
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [assignTo, setAssignTo] = useState('')
+  const [assignTitle, setAssignTitle] = useState('')
+  const [assignPriority, setAssignPriority] = useState<'high' | 'medium' | 'normal' | 'low'>('normal')
+  const [assignSaving, setAssignSaving] = useState(false)
+  const [assignDone, setAssignDone] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -59,15 +68,46 @@ function BookingsManagement() {
         .eq('owner_id', userData.user.id)
         .maybeSingle()
 
-      if (!company) {
+      let companyId: string | null = company?.id || null
+      if (!companyId) {
+        const { data: staffRow } = await supabase
+          .from('company_staff')
+          .select('company_id')
+          .eq('user_id', userData.user.id)
+          .eq('status', 'active')
+          .maybeSingle()
+        if (staffRow) companyId = staffRow.company_id
+      }
+
+      if (!companyId) {
         setLoading(false)
         return
+      }
+
+      setCompanyId(companyId)
+      setCurrentUserId(userData.user.id)
+
+      const { data: staffRows } = await supabase
+        .from('company_staff')
+        .select('id, role_label, user_id')
+        .eq('company_id', companyId)
+        .eq('status', 'active')
+
+      if (staffRows && staffRows.length > 0) {
+        const userIds = staffRows.map((s: any) => s.user_id)
+        // Best-effort: try to resolve a display name for each staff member.
+        // Falls back to their role label if no name source is available.
+        setStaffList(staffRows.map((s: any) => ({
+          id: s.id,
+          role_label: s.role_label,
+          full_name: s.role_label || 'Staff member',
+        })))
       }
 
       const { data } = await supabase
         .from('bookings')
         .select('id, ticket_code, customer_name, customer_phone, booking_status, checked_in, amount_paid, created_at, check_in_date, check_out_date, payment_method, booking_source, assigned_unit_number, services(title, category), inventory_items(name)')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
         .order('created_at', { ascending: false })
 
       setBookings((data as any) || [])
@@ -123,6 +163,34 @@ function BookingsManagement() {
     }
     setBookings((prev) => prev.map((b) => b.id === selectedBooking.id ? { ...b, booking_status: 'cancelled' } : b))
     setSelectedBooking(null)
+  }
+
+  const openAssignPanel = () => {
+    setAssignTo(staffList[0]?.id || '')
+    setAssignTitle(selectedBooking ? `Follow up: ${selectedBooking.customer_name || selectedBooking.ticket_code}` : '')
+    setAssignPriority('normal')
+    setAssignDone(false)
+    setAssignOpen(true)
+  }
+
+  const handleAssignTask = async () => {
+    if (!companyId || !currentUserId || !assignTo || !assignTitle.trim() || !selectedBooking) return
+    setAssignSaving(true)
+    const { error } = await supabase.from('staff_tasks').insert({
+      company_id: companyId,
+      assigned_to: assignTo,
+      assigned_by: currentUserId,
+      title: assignTitle.trim(),
+      related_booking_id: selectedBooking.id,
+      priority: assignPriority,
+      status: 'open',
+    })
+    setAssignSaving(false)
+    if (error) {
+      alert('Failed to assign task: ' + error.message)
+      return
+    }
+    setAssignDone(true)
   }
 
   return (
@@ -299,22 +367,65 @@ function BookingsManagement() {
               </div>
             )}
 
-            {getTab(selectedBooking) === 'pending' && (
-              <div style={{ marginTop: '10px' }}>
-                <RequestRefundButton
-                  bookingId={selectedBooking.id}
-                  amountPaid={Number(selectedBooking.amount_paid)}
-                  departureTime={selectedBooking.check_in_date}
-                  bookingStatus={selectedBooking.booking_status}
-                  requesterType="company"
-                  forceEligible={true}
-                  onRequested={() => setSelectedBooking(null)}
-                />
+            {staffList.length > 0 && !assignOpen && (
+              <div
+                onClick={openAssignPanel}
+                style={{
+                  marginTop: '10px', background: '#F5F3FF', color: '#7C3AED', textAlign: 'center',
+                  padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                  border: '1px solid #DDD6FE'
+                }}>
+                Assign to Staff
+              </div>
+            )}
+
+            {assignOpen && !assignDone && (
+              <div style={{ marginTop: '10px', background: '#F8FAFC', borderRadius: '10px', padding: '12px', border: `1px solid ${COLORS.border}` }}>
+                <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '8px' }}>Assign to Staff</p>
+
+                <select value={assignTo} onChange={(e) => setAssignTo(e.target.value)} style={{
+                  width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`,
+                  fontSize: '12.5px', marginBottom: '8px', background: '#fff',
+                }}>
+                  {staffList.map((s) => (
+                    <option key={s.id} value={s.id}>{s.full_name}</option>
+                  ))}
+                </select>
+
+                <input value={assignTitle} onChange={(e) => setAssignTitle(e.target.value)} placeholder="Task title"
+                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '12.5px', marginBottom: '8px' }} />
+
+                <select value={assignPriority} onChange={(e) => setAssignPriority(e.target.value as any)} style={{
+                  width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`,
+                  fontSize: '12.5px', marginBottom: '10px', background: '#fff',
+                }}>
+                  <option value="high">High priority</option>
+                  <option value="medium">Medium priority</option>
+                  <option value="normal">Normal priority</option>
+                  <option value="low">Low priority</option>
+                </select>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div onClick={() => setAssignOpen(false)} style={{
+                    flex: 1, textAlign: 'center', padding: '10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 700,
+                    color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, cursor: 'pointer',
+                  }}>Cancel</div>
+                  <div onClick={() => !assignSaving && handleAssignTask()} style={{
+                    flex: 1, textAlign: 'center', padding: '10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 700,
+                    color: '#fff', background: assignSaving ? '#94a3b8' : '#7C3AED', cursor: assignSaving ? 'not-allowed' : 'pointer',
+                  }}>{assignSaving ? 'Assigning...' : 'Assign'}</div>
+                </div>
+              </div>
+            )}
+
+            {assignDone && (
+              <div style={{ marginTop: '10px', background: '#DCFCE7', color: COLORS.green, textAlign: 'center', padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <Icon name="checkCircle" size={15} color={COLORS.green} /> Task assigned
               </div>
             )}
 
             <div
-              onClick={() => setSelectedBooking(null)}
+              onClick={() => { setSelectedBooking(null); setAssignOpen(false); setAssignDone(false) }}
               style={{
                 marginTop: '10px', background: COLORS.primary, color: 'white', textAlign: 'center',
                 padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer'
