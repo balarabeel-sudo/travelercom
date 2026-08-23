@@ -31,7 +31,7 @@ const MODULE_ACTIONS: Record<string, ActionConfig> = {
   customers: { label: 'Guests', icon: 'users', type: 'route', route: '/guests' },
   support: { label: 'Support', icon: 'headphones', type: 'contact' },
   finance: { label: 'Finance', icon: 'cash', type: 'route', route: '/analytics' },
-  // refunds: no built page yet — stays hidden until one exists
+  refunds: { label: 'Refunds', icon: 'refresh', type: 'route', route: '/wallet' },
 }
 
 // Display-only labels/icons for grouping the full permission catalog in
