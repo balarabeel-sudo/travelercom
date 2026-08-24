@@ -72,6 +72,23 @@ type Msg = {
   sender_type: string
   message: string
   created_at: string
+  attachment_url?: string | null
+}
+
+async function uploadSupportAttachment(ticketId: string, file: File): Promise<string | null> {
+  const path = `${ticketId}/${Date.now()}-${file.name}`
+  const { error } = await supabase.storage.from('support-attachments').upload(path, file)
+  if (error) { alert('Attachment upload failed: ' + error.message); return null }
+  return path
+}
+
+async function resolveSignedUrls(msgs: { id: string; attachment_url?: string | null }[]) {
+  const map: Record<string, string> = {}
+  await Promise.all(msgs.filter((m) => m.attachment_url).map(async (m) => {
+    const { data } = await supabase.storage.from('support-attachments').createSignedUrl(m.attachment_url as string, 3600)
+    if (data?.signedUrl) map[m.id] = data.signedUrl
+  }))
+  return map
 }
 
 type TabKey = 'open' | 'waiting' | 'resolved' | 'all'
@@ -88,11 +105,14 @@ function CustomerSupport({ userId }: { userId: string }) {
   const [category, setCategory] = useState(CATEGORIES[0])
   const [bookingCode, setBookingCode] = useState('')
   const [message, setMessage] = useState('')
+  const [newFile, setNewFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const [selected, setSelected] = useState<Ticket | null>(null)
   const [msgs, setMsgs] = useState<Msg[]>([])
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
   const [reply, setReply] = useState('')
+  const [replyFile, setReplyFile] = useState<File | null>(null)
   const [sendingReply, setSendingReply] = useState(false)
 
   const loadTickets = async () => {
@@ -112,12 +132,14 @@ function CustomerSupport({ userId }: { userId: string }) {
   const openTicket = async (t: Ticket) => {
     setSelected(t)
     setMsgs([])
+    setSignedUrls({})
     const { data } = await supabase
       .from('support_messages')
-      .select('id, sender_type, message, created_at')
+      .select('id, sender_type, message, created_at, attachment_url')
       .eq('ticket_id', t.id)
       .order('created_at', { ascending: true })
     setMsgs(data || [])
+    if (data && data.length) setSignedUrls(await resolveSignedUrls(data))
   }
 
   const submitTicket = async () => {
@@ -135,7 +157,7 @@ function CustomerSupport({ userId }: { userId: string }) {
       bookingId = b?.id || null
     }
 
-    const { error } = await supabase.from('support_tickets').insert({
+    const { data: newTicket, error } = await supabase.from('support_tickets').insert({
       requester_type: 'customer',
       user_id: userId,
       subject: subject.trim(),
@@ -143,7 +165,20 @@ function CustomerSupport({ userId }: { userId: string }) {
       category,
       booking_id: bookingId,
       status: 'open',
-    })
+    }).select('id').single()
+
+    if (!error && newTicket && newFile) {
+      const path = await uploadSupportAttachment(newTicket.id, newFile)
+      if (path) {
+        await supabase.from('support_messages').insert({
+          ticket_id: newTicket.id,
+          sender_id: userId,
+          sender_type: 'customer',
+          message: 'Sent an attachment',
+          attachment_url: path,
+        })
+      }
+    }
 
     setSubmitting(false)
     if (error) {
@@ -151,23 +186,32 @@ function CustomerSupport({ userId }: { userId: string }) {
       return
     }
     setShowNew(false)
-    setSubject(''); setCategory(CATEGORIES[0]); setBookingCode(''); setMessage('')
+    setSubject(''); setCategory(CATEGORIES[0]); setBookingCode(''); setMessage(''); setNewFile(null)
     loadTickets()
   }
 
   const sendReply = async () => {
-    if (!selected || !reply.trim()) return
+    if (!selected || (!reply.trim() && !replyFile)) return
     setSendingReply(true)
+    let attachPath: string | null = null
+    if (replyFile) attachPath = await uploadSupportAttachment(selected.id, replyFile)
     const { error } = await supabase.from('support_messages').insert({
       ticket_id: selected.id,
       sender_id: userId,
       sender_type: 'customer',
-      message: reply.trim(),
+      message: reply.trim() || 'Sent an attachment',
+      attachment_url: attachPath,
     })
     setSendingReply(false)
     if (error) { alert('Could not send: ' + error.message); return }
-    setMsgs((prev) => [...prev, { id: `local-${Date.now()}`, sender_type: 'customer', message: reply.trim(), created_at: new Date().toISOString() }])
+    const localId = `local-${Date.now()}`
+    setMsgs((prev) => [...prev, { id: localId, sender_type: 'customer', message: reply.trim() || 'Sent an attachment', created_at: new Date().toISOString(), attachment_url: attachPath }])
+    if (attachPath) {
+      const { data } = await supabase.storage.from('support-attachments').createSignedUrl(attachPath, 3600)
+      if (data?.signedUrl) setSignedUrls((prev) => ({ ...prev, [localId]: data.signedUrl }))
+    }
     setReply('')
+    setReplyFile(null)
   }
 
   const filtered = tickets.filter((t) => {
@@ -200,20 +244,37 @@ function CustomerSupport({ userId }: { userId: string }) {
               borderRadius: '14px', padding: '12px 14px',
             }}>
               <p style={{ fontSize: '12.5px', color: m.sender_type === 'customer' ? '#fff' : COLORS.text, lineHeight: 1.5 }}>{m.message}</p>
+              {m.attachment_url && signedUrls[m.id] && (
+                <a href={signedUrls[m.id]} target="_blank" rel="noreferrer">
+                  <img src={signedUrls[m.id]} alt="attachment" style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '8px', display: 'block' }} />
+                </a>
+              )}
               <p style={{ fontSize: '10px', color: m.sender_type === 'customer' ? '#DBEAFE' : COLORS.textMuted, marginTop: '6px' }}>{new Date(m.created_at).toLocaleString()}</p>
             </div>
           ))}
         </div>
 
         {selected.status !== 'resolved' && (
-          <div style={{ padding: '12px 16px', background: COLORS.card, borderTop: `1px solid ${COLORS.border}`, display: 'flex', gap: '8px' }}>
-            <input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Type a message..."
-              style={{ flex: 1, padding: '11px 14px', borderRadius: '20px', border: `1px solid ${COLORS.border}`, fontSize: '13px' }} />
-            <div onClick={() => !sendingReply && sendReply()} style={{
-              width: '42px', height: '42px', borderRadius: '50%', background: COLORS.primary,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-            }}>
-              <Icon name="mail" size={17} color="#fff" />
+          <div style={{ padding: '12px 16px', background: COLORS.card, borderTop: `1px solid ${COLORS.border}` }}>
+            {replyFile && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '11.5px', color: COLORS.textMuted }}>
+                <Icon name="image" size={13} color={COLORS.textMuted} /> {replyFile.name}
+                <span onClick={() => setReplyFile(null)} style={{ color: COLORS.red, cursor: 'pointer', fontWeight: 700 }}>Remove</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <label style={{ width: '42px', height: '42px', borderRadius: '50%', border: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                <Icon name="image" size={17} color={COLORS.textMuted} />
+                <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={(e) => setReplyFile(e.target.files?.[0] || null)} />
+              </label>
+              <input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Type a message..."
+                style={{ flex: 1, padding: '11px 14px', borderRadius: '20px', border: `1px solid ${COLORS.border}`, fontSize: '13px' }} />
+              <div onClick={() => !sendingReply && sendReply()} style={{
+                width: '42px', height: '42px', borderRadius: '50%', background: COLORS.primary,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+              }}>
+                <Icon name="mail" size={17} color="#fff" />
+              </div>
             </div>
           </div>
         )}
@@ -306,7 +367,16 @@ function CustomerSupport({ userId }: { userId: string }) {
               style={{ width: '100%', padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px' }} />
 
             <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Describe the issue..."
-              style={{ width: '100%', padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '100px', marginBottom: '14px' }} />
+              style={{ width: '100%', padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '100px', marginBottom: '10px' }} />
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', borderRadius: '10px', border: `1px dashed ${COLORS.border}`, cursor: 'pointer', marginBottom: '14px' }}>
+              <Icon name="image" size={16} color={COLORS.textMuted} />
+              <span style={{ fontSize: '12.5px', color: COLORS.textMuted, flex: 1 }}>
+                {newFile ? newFile.name : 'Attach photo, screenshot, or document (optional)'}
+              </span>
+              {newFile && <span onClick={(e) => { e.preventDefault(); setNewFile(null) }} style={{ color: COLORS.red, fontWeight: 700, fontSize: '11.5px' }}>Remove</span>}
+              <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={(e) => setNewFile(e.target.files?.[0] || null)} />
+            </label>
 
             <div style={{ display: 'flex', gap: '8px' }}>
               <div onClick={() => !submitting && setShowNew(false)} style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>Cancel</div>
@@ -332,11 +402,14 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
   const [category, setCategory] = useState(COMPANY_CATEGORIES[0])
   const [bookingCode, setBookingCode] = useState('')
   const [message, setMessage] = useState('')
+  const [newFile, setNewFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const [selected, setSelected] = useState<Ticket | null>(null)
   const [msgs, setMsgs] = useState<Msg[]>([])
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
   const [reply, setReply] = useState('')
+  const [replyFile, setReplyFile] = useState<File | null>(null)
   const [sendingReply, setSendingReply] = useState(false)
 
   const loadTickets = async () => {
@@ -356,12 +429,14 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
   const openTicket = async (t: Ticket) => {
     setSelected(t)
     setMsgs([])
+    setSignedUrls({})
     const { data } = await supabase
       .from('support_messages')
-      .select('id, sender_type, message, created_at')
+      .select('id, sender_type, message, created_at, attachment_url')
       .eq('ticket_id', t.id)
       .order('created_at', { ascending: true })
     setMsgs(data || [])
+    if (data && data.length) setSignedUrls(await resolveSignedUrls(data))
   }
 
   const submitTicket = async () => {
@@ -379,7 +454,7 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
       bookingId = b?.id || null
     }
 
-    const { error } = await supabase.from('support_tickets').insert({
+    const { data: newTicket, error } = await supabase.from('support_tickets').insert({
       requester_type: 'company',
       user_id: userId,
       company_id: companyId,
@@ -388,7 +463,20 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
       category,
       booking_id: bookingId,
       status: 'open',
-    })
+    }).select('id').single()
+
+    if (!error && newTicket && newFile) {
+      const path = await uploadSupportAttachment(newTicket.id, newFile)
+      if (path) {
+        await supabase.from('support_messages').insert({
+          ticket_id: newTicket.id,
+          sender_id: userId,
+          sender_type: 'company',
+          message: 'Sent an attachment',
+          attachment_url: path,
+        })
+      }
+    }
 
     setSubmitting(false)
     if (error) {
@@ -396,23 +484,32 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
       return
     }
     setShowNew(false)
-    setSubject(''); setCategory(COMPANY_CATEGORIES[0]); setBookingCode(''); setMessage('')
+    setSubject(''); setCategory(COMPANY_CATEGORIES[0]); setBookingCode(''); setMessage(''); setNewFile(null)
     loadTickets()
   }
 
   const sendReply = async () => {
-    if (!selected || !reply.trim()) return
+    if (!selected || (!reply.trim() && !replyFile)) return
     setSendingReply(true)
+    let attachPath: string | null = null
+    if (replyFile) attachPath = await uploadSupportAttachment(selected.id, replyFile)
     const { error } = await supabase.from('support_messages').insert({
       ticket_id: selected.id,
       sender_id: userId,
       sender_type: 'company',
-      message: reply.trim(),
+      message: reply.trim() || 'Sent an attachment',
+      attachment_url: attachPath,
     })
     setSendingReply(false)
     if (error) { alert('Could not send: ' + error.message); return }
-    setMsgs((prev) => [...prev, { id: `local-${Date.now()}`, sender_type: 'company', message: reply.trim(), created_at: new Date().toISOString() }])
+    const localId = `local-${Date.now()}`
+    setMsgs((prev) => [...prev, { id: localId, sender_type: 'company', message: reply.trim() || 'Sent an attachment', created_at: new Date().toISOString(), attachment_url: attachPath }])
+    if (attachPath) {
+      const { data } = await supabase.storage.from('support-attachments').createSignedUrl(attachPath, 3600)
+      if (data?.signedUrl) setSignedUrls((prev) => ({ ...prev, [localId]: data.signedUrl }))
+    }
     setReply('')
+    setReplyFile(null)
   }
 
   const counts = {
@@ -448,20 +545,37 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
               borderRadius: '14px', padding: '12px 14px',
             }}>
               <p style={{ fontSize: '12.5px', color: m.sender_type === 'company' ? '#fff' : COLORS.text, lineHeight: 1.5 }}>{m.message}</p>
+              {m.attachment_url && signedUrls[m.id] && (
+                <a href={signedUrls[m.id]} target="_blank" rel="noreferrer">
+                  <img src={signedUrls[m.id]} alt="attachment" style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '8px', display: 'block' }} />
+                </a>
+              )}
               <p style={{ fontSize: '10px', color: m.sender_type === 'company' ? '#DBEAFE' : COLORS.textMuted, marginTop: '6px' }}>{new Date(m.created_at).toLocaleString()}</p>
             </div>
           ))}
         </div>
 
         {selected.status !== 'resolved' && (
-          <div style={{ padding: '12px 16px', background: COLORS.card, borderTop: `1px solid ${COLORS.border}`, display: 'flex', gap: '8px' }}>
-            <input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Type a message..."
-              style={{ flex: 1, padding: '11px 14px', borderRadius: '20px', border: `1px solid ${COLORS.border}`, fontSize: '13px' }} />
-            <div onClick={() => !sendingReply && sendReply()} style={{
-              width: '42px', height: '42px', borderRadius: '50%', background: COLORS.primary,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-            }}>
-              <Icon name="mail" size={17} color="#fff" />
+          <div style={{ padding: '12px 16px', background: COLORS.card, borderTop: `1px solid ${COLORS.border}` }}>
+            {replyFile && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '11.5px', color: COLORS.textMuted }}>
+                <Icon name="image" size={13} color={COLORS.textMuted} /> {replyFile.name}
+                <span onClick={() => setReplyFile(null)} style={{ color: COLORS.red, cursor: 'pointer', fontWeight: 700 }}>Remove</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <label style={{ width: '42px', height: '42px', borderRadius: '50%', border: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                <Icon name="image" size={17} color={COLORS.textMuted} />
+                <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={(e) => setReplyFile(e.target.files?.[0] || null)} />
+              </label>
+              <input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Type a message..."
+                style={{ flex: 1, padding: '11px 14px', borderRadius: '20px', border: `1px solid ${COLORS.border}`, fontSize: '13px' }} />
+              <div onClick={() => !sendingReply && sendReply()} style={{
+                width: '42px', height: '42px', borderRadius: '50%', background: COLORS.primary,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+              }}>
+                <Icon name="mail" size={17} color="#fff" />
+              </div>
             </div>
           </div>
         )}
@@ -560,7 +674,16 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
               style={{ width: '100%', padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px' }} />
 
             <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Describe the issue..."
-              style={{ width: '100%', padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '100px', marginBottom: '14px' }} />
+              style={{ width: '100%', padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '100px', marginBottom: '10px' }} />
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', borderRadius: '10px', border: `1px dashed ${COLORS.border}`, cursor: 'pointer', marginBottom: '14px' }}>
+              <Icon name="image" size={16} color={COLORS.textMuted} />
+              <span style={{ fontSize: '12.5px', color: COLORS.textMuted, flex: 1 }}>
+                {newFile ? newFile.name : 'Attach screenshot, document, or receipt (optional)'}
+              </span>
+              {newFile && <span onClick={(e) => { e.preventDefault(); setNewFile(null) }} style={{ color: COLORS.red, fontWeight: 700, fontSize: '11.5px' }}>Remove</span>}
+              <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={(e) => setNewFile(e.target.files?.[0] || null)} />
+            </label>
 
             <div style={{ display: 'flex', gap: '8px' }}>
               <div onClick={() => !submitting && setShowNew(false)} style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>Cancel</div>
