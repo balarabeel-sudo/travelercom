@@ -38,6 +38,16 @@ type Msg = {
   message: string
   is_internal: boolean
   created_at: string
+  attachment_url?: string | null
+}
+
+async function resolveSignedUrls(msgs: { id: string; attachment_url?: string | null }[]) {
+  const map: Record<string, string> = {}
+  await Promise.all(msgs.filter((m) => m.attachment_url).map(async (m) => {
+    const { data } = await supabase.storage.from('support-attachments').createSignedUrl(m.attachment_url as string, 3600)
+    if (data?.signedUrl) map[m.id] = data.signedUrl
+  }))
+  return map
 }
 
 type Admin = { id: string; full_name: string | null; email: string | null }
@@ -70,6 +80,7 @@ export default function AdminSupport() {
 
   const [selected, setSelected] = useState<Ticket | null>(null)
   const [msgs, setMsgs] = useState<Msg[]>([])
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
   const [reply, setReply] = useState('')
   const [isInternal, setIsInternal] = useState(false)
   const [sending, setSending] = useState(false)
@@ -127,25 +138,37 @@ export default function AdminSupport() {
   const openTicket = async (t: Ticket) => {
     setSelected(t)
     setMsgs([])
+    setSignedUrls({})
     setReply('')
     setIsInternal(false)
     const { data } = await supabase
       .from('support_messages')
-      .select('id, sender_id, sender_type, message, is_internal, created_at')
+      .select('id, sender_id, sender_type, message, is_internal, created_at, attachment_url')
       .eq('ticket_id', t.id)
       .order('created_at', { ascending: true })
     setMsgs(data || [])
+    if (data && data.length) setSignedUrls(await resolveSignedUrls(data))
   }
 
+  const [replyFile, setReplyFile] = useState<File | null>(null)
+
   const sendMessage = async () => {
-    if (!selected || !reply.trim() || !currentAdminId) return
+    if (!selected || (!reply.trim() && !replyFile) || !currentAdminId) return
     setSending(true)
+    let attachPath: string | null = null
+    if (replyFile) {
+      const path = `${selected.id}/${Date.now()}-${replyFile.name}`
+      const { error: upErr } = await supabase.storage.from('support-attachments').upload(path, replyFile)
+      if (upErr) { setSending(false); alert('Attachment upload failed: ' + upErr.message); return }
+      attachPath = path
+    }
     const { error } = await supabase.from('support_messages').insert({
       ticket_id: selected.id,
       sender_id: currentAdminId,
       sender_type: 'staff',
-      message: reply.trim(),
+      message: reply.trim() || 'Sent an attachment',
       is_internal: isInternal,
+      attachment_url: attachPath,
     })
     if (!error && !isInternal && selected.status === 'open') {
       await supabase.from('support_tickets').update({ status: 'waiting' }).eq('id', selected.id)
@@ -153,8 +176,14 @@ export default function AdminSupport() {
     }
     setSending(false)
     if (error) { alert('Failed to send: ' + error.message); return }
-    setMsgs((prev) => [...prev, { id: `local-${Date.now()}`, sender_id: currentAdminId, sender_type: 'staff', message: reply.trim(), is_internal: isInternal, created_at: new Date().toISOString() }])
+    const localId = `local-${Date.now()}`
+    setMsgs((prev) => [...prev, { id: localId, sender_id: currentAdminId, sender_type: 'staff', message: reply.trim() || 'Sent an attachment', is_internal: isInternal, created_at: new Date().toISOString(), attachment_url: attachPath }])
+    if (attachPath) {
+      const { data } = await supabase.storage.from('support-attachments').createSignedUrl(attachPath, 3600)
+      if (data?.signedUrl) setSignedUrls((prev) => ({ ...prev, [localId]: data.signedUrl }))
+    }
     setReply('')
+    setReplyFile(null)
   }
 
   const updateTicket = async (fields: Partial<Ticket>) => {
@@ -246,6 +275,11 @@ export default function AdminSupport() {
                 </div>
               )}
               <p style={{ fontSize: '12.5px', color: m.is_internal ? '#78350F' : m.sender_type === 'staff' ? '#fff' : COLORS.text, lineHeight: 1.5 }}>{m.message}</p>
+              {m.attachment_url && signedUrls[m.id] && (
+                <a href={signedUrls[m.id]} target="_blank" rel="noreferrer">
+                  <img src={signedUrls[m.id]} alt="attachment" style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '8px', display: 'block' }} />
+                </a>
+              )}
               <p style={{ fontSize: '10px', color: m.is_internal ? '#92400E' : m.sender_type === 'staff' ? '#DBEAFE' : COLORS.textMuted, marginTop: '6px' }}>{new Date(m.created_at).toLocaleString()}</p>
             </div>
           ))}
@@ -254,10 +288,22 @@ export default function AdminSupport() {
         <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '12px' }}>
           <textarea value={reply} onChange={(e) => setReply(e.target.value)} placeholder={isInternal ? 'Internal note (staff only)...' : 'Reply to requester...'}
             style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '64px', color: COLORS.text, marginBottom: '10px' }} />
+          {replyFile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', fontSize: '11.5px', color: COLORS.textMuted }}>
+              <Icon name="image" size={13} color={COLORS.textMuted} /> {replyFile.name}
+              <span onClick={() => setReplyFile(null)} style={{ color: COLORS.red, cursor: 'pointer', fontWeight: 700 }}>Remove</span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div onClick={() => setIsInternal(!isInternal)} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-              <Icon name={isInternal ? 'checkCircle' : 'square'} size={16} color={isInternal ? COLORS.amber : COLORS.textMuted} />
-              <span style={{ fontSize: '12px', fontWeight: 700, color: isInternal ? COLORS.amber : COLORS.textMuted }}>Internal Note</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div onClick={() => setIsInternal(!isInternal)} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <Icon name={isInternal ? 'checkCircle' : 'square'} size={16} color={isInternal ? COLORS.amber : COLORS.textMuted} />
+                <span style={{ fontSize: '12px', fontWeight: 700, color: isInternal ? COLORS.amber : COLORS.textMuted }}>Internal Note</span>
+              </div>
+              <label style={{ display: 'flex', cursor: 'pointer' }}>
+                <Icon name="image" size={16} color={COLORS.textMuted} />
+                <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={(e) => setReplyFile(e.target.files?.[0] || null)} />
+              </label>
             </div>
             <div onClick={() => !sending && sendMessage()} style={{
               padding: '9px 18px', borderRadius: '8px', background: isInternal ? COLORS.amber : COLORS.primary,
