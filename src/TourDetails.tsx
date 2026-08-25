@@ -23,6 +23,8 @@ type TourDetail = {
   destination: string
   price: number
   seats_available: number | null
+  gate_fee: number | null
+  vehicle_fee: number | null
   company_id: string
   tour_type: string | null
   companies: { business_name: string } | null
@@ -46,6 +48,8 @@ function TourDetails() {
 
   const [tourDate, setTourDate] = useState('')
   const [travelers, setTravelers] = useState(1)
+  const [addGateFee, setAddGateFee] = useState(false)
+  const [addVehicleFee, setAddVehicleFee] = useState(false)
   const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
 
   const [booking, setBooking] = useState(false)
@@ -71,7 +75,7 @@ function TourDetails() {
 
       const { data: svc } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, tour_type, companies(business_name)')
+        .select('id, title, description, destination, price, seats_available, company_id, photo_url, tour_type, gate_fee, vehicle_fee, companies(business_name)')
         .eq('id', id)
         .maybeSingle()
       setService(svc as any)
@@ -112,7 +116,9 @@ function TourDetails() {
     return Math.max(0, calculatedTotal - activePromo.discount_value)
   })()
 
-  const activePrice = discountedTotal
+  const addOnsTotal = (addGateFee ? (service?.gate_fee ?? 0) : 0) + (addVehicleFee ? (service?.vehicle_fee ?? 0) : 0)
+
+  const activePrice = discountedTotal + addOnsTotal
   const seatsLeft = service?.seats_available ?? null
 
   const handleBookNow = async () => {
@@ -154,6 +160,7 @@ function TourDetails() {
       customer_name: displayName || null,
       check_in_date: tourDate,
       promotion_id: activePromo?.id || null,
+      booking_details: [addGateFee ? 'Gate Fee add-on' : null, addVehicleFee ? 'Vehicle Fee add-on' : null].filter(Boolean).join(', ') || null,
     }).select('id').single()
 
     if (bookingErr) {
@@ -348,6 +355,25 @@ function TourDetails() {
             </span>
           </div>
 
+          {(service.gate_fee || service.vehicle_fee) && (
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', marginTop: '14px' }}>
+              {service.gate_fee != null && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={addGateFee} onChange={(e) => setAddGateFee(e.target.checked)} />
+                  <span style={{ fontSize: '12.5px', color: COLORS.text, flex: 1 }}>Add Gate Fee</span>
+                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>₦{Number(service.gate_fee).toLocaleString()}</span>
+                </label>
+              )}
+              {service.vehicle_fee != null && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={addVehicleFee} onChange={(e) => setAddVehicleFee(e.target.checked)} />
+                  <span style={{ fontSize: '12.5px', color: COLORS.text, flex: 1 }}>Add Vehicle Fee</span>
+                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>₦{Number(service.vehicle_fee).toLocaleString()}</span>
+                </label>
+              )}
+            </div>
+          )}
+
           {activePromo && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: '6px', background: '#F5F3FF',
@@ -361,12 +387,12 @@ function TourDetails() {
           )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '12px', marginTop: '12px', borderTop: `1px solid ${COLORS.border}` }}>
-            <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>{travelers} traveler{travelers > 1 ? 's' : ''} × ₦{service.price.toLocaleString()}</span>
+            <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>{travelers} traveler{travelers > 1 ? 's' : ''} × ₦{service.price.toLocaleString()}{addOnsTotal > 0 ? ' + add-ons' : ''}</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {activePromo && (
                 <span style={{ fontSize: '11.5px', color: COLORS.textMuted, textDecoration: 'line-through' }}>₦{calculatedTotal.toLocaleString()}</span>
               )}
-              <span style={{ fontSize: '14px', fontWeight: 800, color: COLORS.primary }}>₦{discountedTotal.toLocaleString()}</span>
+              <span style={{ fontSize: '14px', fontWeight: 800, color: COLORS.primary }}>₦{activePrice.toLocaleString()}</span>
             </span>
           </div>
         </div>
