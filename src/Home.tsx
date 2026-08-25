@@ -89,19 +89,6 @@ function Home() {
   }[]>([])
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
   const [banners, setBanners] = useState<{ id: string; title: string; message: string; image_url: string | null; link_url: string | null }[]>([])
-
-  useEffect(() => {
-    const loadBanners = async () => {
-      const { data } = await supabase
-        .from('platform_banners')
-        .select('id, title, message, image_url, link_url')
-        .eq('active', true)
-        .order('created_at', { ascending: false })
-      setBanners(data || [])
-    }
-    loadBanners()
-  }, [])
-
   useEffect(() => {
     const loadUser = async () => {
       const { data, error } = await supabase.auth.getUser()
@@ -129,6 +116,13 @@ function Home() {
       }
 
       setAccountType(isCompany ? 'company' : 'personal')
+      const { data: bannerRows } = await supabase
+        .from('platform_banners')
+        .select('id, title, message, image_url, link_url')
+        .eq('active', true)
+        .in('target_audience', isCompany ? ['all', 'company'] : ['all', 'personal'])
+        .order('created_at', { ascending: false })
+      setBanners(bannerRows || [])
       setDisplayName(meta.full_name || '')
 
       // Ensure a profiles row exists for this user (required for companies/wallets/bookings FK)
@@ -386,6 +380,45 @@ if (accountType === 'company') {
             </div>
           )}
         </div>
+        {banners.length > 0 && (
+          <div style={{ padding: '0 16px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
+              {banners.map((b) => (
+                <div
+                  key={b.id}
+                  onClick={() => {
+                    if (!b.link_url) return
+                    if (b.link_url.startsWith('http')) window.location.href = b.link_url
+                    else navigate(b.link_url)
+                  }}
+                  style={{
+                    minWidth: '280px',
+                    flexShrink: 0,
+                    background: b.image_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, #ea580c)`,
+                    borderRadius: '18px',
+                    padding: '20px',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 8px 20px rgba(249,115,22,0.25)',
+                    cursor: b.link_url ? 'pointer' : 'default',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    minHeight: '90px',
+                  }}>
+                  {b.image_url && (
+                    <img src={b.image_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} />
+                  )}
+                  <div style={{ flex: 1, position: 'relative' }}>
+                    <p style={{ fontSize: '15px', fontWeight: 800, marginBottom: '4px' }}>{b.title}</p>
+                    <p style={{ fontSize: '12px', opacity: 0.95 }}>{b.message}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {companyApproval !== 'approved' && (
           <div
