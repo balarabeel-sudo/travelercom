@@ -19,10 +19,10 @@ const COLORS = {
   blueBg: '#EFF6FF',
 }
 
-type Banner = { id: string; title: string; message: string; image_url: string | null; link_url: string | null; active: boolean; created_at: string }
+type Banner = { id: string; title: string; message: string; image_url: string | null; link_url: string | null; target_audience: 'all' | 'personal' | 'company'; active: boolean; created_at: string }
 type Notice = { id: string; title: string; message: string; target_audience: 'all' | 'personal' | 'company'; active: boolean; created_at: string }
 
-const EMPTY_BANNER_FORM = { title: '', message: '', image_url: '', link_url: '' }
+const EMPTY_BANNER_FORM = { title: '', message: '', image_url: '', link_url: '', target_audience: 'all' as 'all' | 'personal' | 'company' }
 const EMPTY_NOTICE_FORM = { title: '', message: '', target_audience: 'all' as 'all' | 'personal' | 'company' }
 const PAGE_SIZE = 5
 
@@ -64,7 +64,7 @@ function BannersTab() {
 
   function openNew() { setForm(EMPTY_BANNER_FORM); setEditingId(null); setShowForm(true) }
   function openEdit(b: Banner) {
-    setForm({ title: b.title, message: b.message, image_url: b.image_url || '', link_url: b.link_url || '' })
+    setForm({ title: b.title, message: b.message, image_url: b.image_url || '', link_url: b.link_url || '', target_audience: b.target_audience })
     setEditingId(b.id); setShowForm(true)
   }
 
@@ -72,7 +72,7 @@ function BannersTab() {
     if (!form.title.trim() || !form.message.trim()) { setError('Title da message dole ne.'); return }
     setSaving(true); setError('')
     const { data: userData } = await supabase.auth.getUser()
-    const payload = { title: form.title.trim(), message: form.message.trim(), image_url: form.image_url.trim() || null, link_url: form.link_url.trim() || null }
+    const payload = { title: form.title.trim(), message: form.message.trim(), image_url: form.image_url.trim() || null, link_url: form.link_url.trim() || null, target_audience: form.target_audience }
     const { error } = editingId
       ? await supabase.from('platform_banners').update(payload).eq('id', editingId)
       : await supabase.from('platform_banners').insert({ ...payload, active: true, created_by: userData?.user?.id })
@@ -143,6 +143,9 @@ function BannersTab() {
                   </span>
                 </div>
                 <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '4px', lineHeight: 1.4 }}>{b.message}</p>
+                <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '4px' }}>
+                  {b.target_audience === 'all' ? 'All users' : b.target_audience === 'personal' ? 'Personal users only' : 'Companies only'}
+                </p>
                 <div style={{ display: 'flex', gap: '7px', marginTop: '10px', flexWrap: 'wrap' as const }}>
                   <div onClick={() => openEdit(b)} style={{ padding: '6px 12px', borderRadius: '7px', border: `1px solid ${COLORS.blue}`, fontSize: '11.5px', fontWeight: 700, color: COLORS.blue, cursor: 'pointer' }}>Edit</div>
                   <div onClick={() => toggleActive(b)} style={{ padding: '6px 12px', borderRadius: '7px', border: `1px solid ${COLORS.border}`, fontSize: '11.5px', fontWeight: 700, color: COLORS.text, cursor: 'pointer' }}>{b.active ? 'Hide' : 'Show'}</div>
@@ -185,9 +188,24 @@ function BannersTab() {
             <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Title" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', color: COLORS.text }} />
             <textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Message" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '60px', marginBottom: '10px', color: COLORS.text }} />
             <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="Image URL" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', color: COLORS.text }} />
-            <input value={form.link_url} onChange={(e) => setForm({ ...form, link_url: e.target.value })} placeholder="Link URL (optional)" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', color: COLORS.text }} />
-            {error && <p style={{ color: COLORS.red, fontSize: '12px', marginBottom: '8px' }}>{error}</p>}
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <input value={form.link_url} onChange={(e) => setForm({ ...form, link_url: e.target.value })} placeholder="Link URL (optional) — e.g. /hotels or https://..." style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', color: COLORS.text }} />
+            <label style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '6px', display: 'block' }}>Audience</label>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
+              {(['all', 'personal', 'company'] as const).map((aud) => (
+                <div key={aud} onClick={() => setForm({ ...form, target_audience: aud })}
+                  style={{
+                    flex: 1, textAlign: 'center' as const, padding: '8px', borderRadius: '8px', cursor: 'pointer',
+                    border: `1px solid ${form.target_audience === aud ? COLORS.primary : COLORS.border}`,
+                    background: form.target_audience === aud ? COLORS.blueBg : 'transparent',
+                    fontSize: '12px', fontWeight: 700,
+                    color: form.target_audience === aud ? COLORS.primary : COLORS.textMuted,
+                  }}>
+                  {aud === 'all' ? 'All' : aud === 'personal' ? 'Personal' : 'Company'}
+                </div>
+              ))}
+            </div>
+            {error && <p style={{ color: COLORS.red, fontSize: '12px', marginTop: '8px', marginBottom: '8px' }}>{error}</p>}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
               <div onClick={() => !saving && save()} style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', background: COLORS.primary, color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}>{saving ? '...' : 'Save'}</div>
               <div onClick={() => !saving && setShowForm(false)} style={{ flex: 1, textAlign: 'center' as const, padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, fontSize: '13.5px', cursor: 'pointer' }}>Cancel</div>
             </div>
