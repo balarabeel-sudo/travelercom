@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import NotificationBell from './NotificationBell'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -290,9 +291,12 @@ export default function StaffDashboard() {
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: 480, margin: '0 auto', paddingBottom: 90 }}>
 
       <div style={{ padding: '18px 20px 14px 20px', background: COLORS.card, borderBottom: `1px solid ${COLORS.border}` }}>
-        <p style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}>
-          <span style={{ color: COLORS.primary }}>TRAVELER</span><span style={{ color: COLORS.secondary }}>.COM</span>
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <p style={{ fontSize: 15, fontWeight: 800 }}>
+            <span style={{ color: COLORS.primary }}>TRAVELER</span><span style={{ color: COLORS.secondary }}>.COM</span>
+          </p>
+          <NotificationBell iconColor={COLORS.text} />
+        </div>
         {section === 'home' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Avatar label={userName} size={44} />
