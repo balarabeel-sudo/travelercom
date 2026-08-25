@@ -46,6 +46,8 @@ function AddListing() {
   const [duration, setDuration] = useState('')
   const [price, setPrice] = useState('')
   const [quantity, setQuantity] = useState('')
+  const [gateFee, setGateFee] = useState('')
+  const [vehicleFee, setVehicleFee] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState('')
   const [amenities, setAmenities] = useState<string[]>([])
@@ -137,6 +139,8 @@ function AddListing() {
       photo_url: photoUrl,
       amenities: (category === 'hotel' || isTransport) && amenities.length > 0 ? amenities : null,
       tour_type: category === 'tour' && tourType ? tourType : null,
+      gate_fee: category === 'tour' && gateFee ? parseFloat(gateFee) : null,
+      vehicle_fee: category === 'tour' && vehicleFee ? parseFloat(vehicleFee) : null,
       event_type: category === 'event_center' && eventType ? eventType : null,
     })
 
@@ -337,7 +341,16 @@ function AddListing() {
             </Field>
           )}
 
-          {category === 'event_center' && (
+          {category === 'tour' && (
+            <>
+              <Field label="Gate Fee — optional add-on (₦)">
+                <input type="number" placeholder="e.g. 2000" value={gateFee} onChange={(e) => setGateFee(e.target.value)} style={inputStyle} />
+              </Field>
+              <Field label="Vehicle Fee — optional add-on (₦)">
+                <input type="number" placeholder="e.g. 5000" value={vehicleFee} onChange={(e) => setVehicleFee(e.target.value)} style={inputStyle} />
+              </Field>
+            </>
+          )}
             <Field label="Event Type">
               <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
                 {EVENT_TYPES.map((t) => (
