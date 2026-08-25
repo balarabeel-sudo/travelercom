@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import NotificationBell from './NotificationBell'
 import { releaseExpiredUnits } from './inventoryUtils'
 
 const COLORS = {
@@ -337,15 +338,18 @@ if (accountType === 'company') {
             </h1>
             <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Company: {displayName}</p>
           </div>
-          <div
-         onClick={() => navigate('/company-profile')}  
-            title="Company Profile"
-            style={{
-              width: '34px', height: '34px', borderRadius: '50%', background: COLORS.secondary,
-              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '15px', fontWeight: 800, cursor: 'pointer'
-            }}>
-            {displayName?.charAt(0).toUpperCase() || 'C'}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <NotificationBell iconColor={COLORS.text} />
+            <div
+              onClick={() => navigate('/company-profile')}
+              title="Company Profile"
+              style={{
+                width: '34px', height: '34px', borderRadius: '50%', background: COLORS.secondary,
+                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '15px', fontWeight: 800, cursor: 'pointer'
+              }}>
+              {displayName?.charAt(0).toUpperCase() || 'C'}
+            </div>
           </div>
         </div>
 
@@ -552,7 +556,7 @@ const services = [
           TRAVELER<span style={{ color: COLORS.secondary }}>.COM</span>
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ cursor: 'pointer', display: 'flex' }}><Icon name="bell" size={19} color={COLORS.text} /></div>
+          <NotificationBell iconColor={COLORS.text} />
           <div
             onClick={handleLogout}
             title="Logout"
