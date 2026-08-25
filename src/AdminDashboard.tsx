@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import NotificationBell from './NotificationBell'
 import AdminUsers from './AdminUsers'
 import AdminCompanies from './AdminCompanies'
 import AdminBookings from './AdminBookings'
@@ -599,8 +600,11 @@ function AdminDashboard() {
           <p style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.5px' }}>TRAVELER.COM — FOUNDER</p>
           <h1 style={{ fontSize: '16.5px', fontWeight: 800, color: COLORS.text }}>{currentLabel}</h1>
         </div>
-        <div onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}>
-          <Icon name="x" size={20} color={COLORS.textMuted} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <NotificationBell iconColor={COLORS.text} />
+          <div onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}>
+            <Icon name="x" size={20} color={COLORS.textMuted} />
+          </div>
         </div>
       </div>
 
