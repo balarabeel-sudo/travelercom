@@ -52,6 +52,24 @@ async function resolveSignedUrls(msgs: { id: string; attachment_url?: string | n
 
 type Admin = { id: string; full_name: string | null; email: string | null }
 
+type CompanyContext = {
+  business_name: string
+  city: string | null
+  phone: string | null
+  email: string | null
+  plan: string | null
+  verification_status: string | null
+  bookingsCount: number
+}
+
+type BookingContext = {
+  ticket_code: string
+  customer_name: string | null
+  booking_status: string
+  amount_paid: number
+  created_at: string
+}
+
 type FilterKey = 'all' | 'customer' | 'company' | 'open' | 'waiting' | 'resolved'
 
 function priorityMeta(p: string) {
@@ -85,6 +103,10 @@ export default function AdminSupport() {
   const [isInternal, setIsInternal] = useState(false)
   const [sending, setSending] = useState(false)
   const [currentAdminId, setCurrentAdminId] = useState<string | null>(null)
+  const [companyCtx, setCompanyCtx] = useState<CompanyContext | null>(null)
+  const [bookingCtx, setBookingCtx] = useState<BookingContext | null>(null)
+  const [showCompanyPanel, setShowCompanyPanel] = useState(false)
+  const [showBookingPanel, setShowBookingPanel] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentAdminId(data.user?.id || null))
@@ -141,6 +163,11 @@ export default function AdminSupport() {
     setSignedUrls({})
     setReply('')
     setIsInternal(false)
+    setCompanyCtx(null)
+    setBookingCtx(null)
+    setShowCompanyPanel(false)
+    setShowBookingPanel(false)
+
     const { data } = await supabase
       .from('support_messages')
       .select('id, sender_id, sender_type, message, is_internal, created_at, attachment_url')
@@ -148,6 +175,23 @@ export default function AdminSupport() {
       .order('created_at', { ascending: true })
     setMsgs(data || [])
     if (data && data.length) setSignedUrls(await resolveSignedUrls(data))
+
+    if (t.company_id) {
+      const [{ data: co }, { count }] = await Promise.all([
+        supabase.from('companies').select('business_name, city, phone, email, plan, verification_status').eq('id', t.company_id).maybeSingle(),
+        supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('company_id', t.company_id),
+      ])
+      if (co) setCompanyCtx({ ...co, bookingsCount: count ?? 0 })
+    }
+
+    if (t.booking_id) {
+      const { data: bk } = await supabase
+        .from('bookings')
+        .select('ticket_code, customer_name, booking_status, amount_paid, created_at')
+        .eq('id', t.booking_id)
+        .maybeSingle()
+      if (bk) setBookingCtx(bk)
+    }
   }
 
   const [replyFile, setReplyFile] = useState<File | null>(null)
@@ -248,6 +292,63 @@ export default function AdminSupport() {
               {admins.map((a) => <option key={a.id} value={a.id}>{a.full_name || a.email}</option>)}
             </select>
           </div>
+
+          {(companyCtx || bookingCtx) && (
+            <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' as const }}>
+              {companyCtx && (
+                <div onClick={() => setShowCompanyPanel(!showCompanyPanel)} style={{
+                  display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 12px', borderRadius: '8px',
+                  border: `1px solid ${COLORS.primary}`, cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: COLORS.primary,
+                }}>
+                  <Icon name="building" size={13} color={COLORS.primary} /> View Company
+                </div>
+              )}
+              {bookingCtx && (
+                <div onClick={() => setShowBookingPanel(!showBookingPanel)} style={{
+                  display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 12px', borderRadius: '8px',
+                  border: `1px solid ${COLORS.purple}`, cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: COLORS.purple,
+                }}>
+                  <Icon name="ticket" size={13} color={COLORS.purple} /> View Booking
+                </div>
+              )}
+            </div>
+          )}
+
+          {showCompanyPanel && companyCtx && (
+            <div style={{ marginTop: '10px', background: '#F8FAFC', borderRadius: '10px', padding: '12px', border: `1px solid ${COLORS.border}` }}>
+              <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text, marginBottom: '8px' }}>{companyCtx.business_name}</p>
+              {[
+                ['City', companyCtx.city || '—'],
+                ['Phone', companyCtx.phone || '—'],
+                ['Email', companyCtx.email || '—'],
+                ['Plan', companyCtx.plan || 'free'],
+                ['Verification', companyCtx.verification_status || '—'],
+                ['Total Bookings', String(companyCtx.bookingsCount)],
+              ].map(([label, value]) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
+                  <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{label}</span>
+                  <span style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.text }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {showBookingPanel && bookingCtx && (
+            <div style={{ marginTop: '10px', background: '#F8FAFC', borderRadius: '10px', padding: '12px', border: `1px solid ${COLORS.border}` }}>
+              <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text, marginBottom: '8px' }}>{bookingCtx.ticket_code}</p>
+              {[
+                ['Customer', bookingCtx.customer_name || '—'],
+                ['Status', bookingCtx.booking_status],
+                ['Amount Paid', `₦${bookingCtx.amount_paid?.toLocaleString?.() ?? bookingCtx.amount_paid}`],
+                ['Booked On', new Date(bookingCtx.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })],
+              ].map(([label, value]) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0' }}>
+                  <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>{label}</span>
+                  <span style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.text }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {error && (
