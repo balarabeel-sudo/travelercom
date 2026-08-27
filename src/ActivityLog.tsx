@@ -26,6 +26,7 @@ type LogRow = {
 const MODULES: { key: string; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'company_staff', label: 'Staff' },
+  { key: 'listings', label: 'Listings' },
   { key: 'marketing', label: 'Marketing' },
   { key: 'bookings', label: 'Bookings' },
   { key: 'finance', label: 'Finance' },
@@ -41,6 +42,8 @@ const ACTION_ICONS: Record<string, string> = {
   // Bookings
   assigned_task: 'clipboard', completed_task: 'checkCircle', cancelled_booking: 'x',
   verified_ticket: 'ticket',
+  // Listings
+  created_listing: 'plus', updated_listing: 'edit', deleted_listing: 'trash',
   // Marketing
   created_promotion: 'tag', updated_promotion: 'edit', deleted_promotion: 'trash',
   // Finance
@@ -75,6 +78,9 @@ function actionLabel(a: string) {
     completed_task: 'completed a task',
     cancelled_booking: 'cancelled a booking',
     verified_ticket: 'verified a ticket',
+    created_listing: 'created a listing',
+    updated_listing: 'updated a listing',
+    deleted_listing: 'deleted a listing',
     created_promotion: 'created a promotion',
     updated_promotion: 'updated a promotion',
     deleted_promotion: 'deleted a promotion',
