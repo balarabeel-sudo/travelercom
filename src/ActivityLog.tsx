@@ -11,6 +11,7 @@ const COLORS = {
 type LogRow = {
   id: string
   action: string
+  module: string
   target_type: string
   target_id: string | null
   created_at: string
@@ -19,10 +20,41 @@ type LogRow = {
   actor_email?: string | null
 }
 
+// Modules the Company Activity Log covers. Add new module keys here as
+// new parts of the company dashboard start calling log_audit().
+const MODULES: { key: string; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'company_staff', label: 'Staff' },
+  { key: 'marketing', label: 'Marketing' },
+  { key: 'bookings', label: 'Bookings' },
+  { key: 'finance', label: 'Finance' },
+  { key: 'support', label: 'Support' },
+  { key: 'settings', label: 'Settings' },
+]
+
 const ACTION_ICONS: Record<string, string> = {
+  // Staff & Access
   invite: '✉', resend_invite: '↻', cancel_invite: '✕', accept_invite: '✓',
   change_role: '🔄', grant_permission: '➕', revoke_permission: '➖',
   clear_override: '↩', suspend: '⏸', activate: '▶', revoke_access: '🚫',
+  // Bookings
+  assigned_task: '📋', completed_task: '✅', cancelled_booking: '✕',
+  verified_ticket: '🎫',
+  // Marketing
+  created_promotion: '🏷', updated_promotion: '✎', deleted_promotion: '🗑',
+  // Finance
+  requested_refund: '↩', requested_withdrawal: '💵',
+  // Support
+  replied_ticket: '💬', resolved_ticket: '✅',
+  // Settings
+  updated_settings: '⚙',
+}
+
+// Fallback: turn an unknown snake_case action into readable text,
+// so newly-logged actions from other modules show something sensible
+// even before a hand-written label is added below.
+function humanize(a: string) {
+  return a.replace(/_/g, ' ')
 }
 
 function actionLabel(a: string) {
@@ -38,8 +70,20 @@ function actionLabel(a: string) {
     suspend: 'suspended a staff member',
     activate: 'reactivated a staff member',
     revoke_access: "revoked a staff member's access",
+    assigned_task: 'assigned a task',
+    completed_task: 'completed a task',
+    cancelled_booking: 'cancelled a booking',
+    verified_ticket: 'verified a ticket',
+    created_promotion: 'created a promotion',
+    updated_promotion: 'updated a promotion',
+    deleted_promotion: 'deleted a promotion',
+    requested_refund: 'requested a refund',
+    requested_withdrawal: 'requested a withdrawal',
+    replied_ticket: 'replied to a support ticket',
+    resolved_ticket: 'resolved a support ticket',
+    updated_settings: 'updated company settings',
   }
-  return map[a] || a
+  return map[a] || humanize(a)
 }
 
 export default function ActivityLog({ companyId, onBack }: { companyId?: string; onBack?: () => void }) {
@@ -47,7 +91,7 @@ export default function ActivityLog({ companyId, onBack }: { companyId?: string;
   const [logs, setLogs] = useState<LogRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [actionFilter, setActionFilter] = useState<string>('all')
+  const [moduleFilter, setModuleFilter] = useState<string>('all')
 
   useEffect(() => {
     if (companyId) { setResolvedCompanyId(companyId); return }
@@ -62,13 +106,15 @@ export default function ActivityLog({ companyId, onBack }: { companyId?: string;
   const load = useCallback(async () => {
     if (!resolvedCompanyId) return
     setLoading(true)
+    // No module filter here — this page now shows activity across the
+    // whole company, not just Staff & Access. Filtering by module happens
+    // client-side via the chips below.
     const { data: logRows } = await supabase
       .from('audit_logs')
-      .select('id, action, target_type, target_id, created_at, actor_id')
+      .select('id, action, module, target_type, target_id, created_at, actor_id')
       .eq('company_id', resolvedCompanyId)
-      .eq('module', 'company_staff')
       .order('created_at', { ascending: false })
-      .limit(200)
+      .limit(300)
 
     const rows = logRows || []
     const actorIds = [...new Set(rows.map((r) => r.actor_id))]
@@ -91,11 +137,16 @@ export default function ActivityLog({ companyId, onBack }: { companyId?: string;
   useEffect(() => { load() }, [load])
 
   const filtered = logs.filter((l) => {
-    if (actionFilter !== 'all' && l.action !== actionFilter) return false
+    if (moduleFilter !== 'all' && l.module !== moduleFilter) return false
     if (search.trim()) {
       const q = search.toLowerCase()
       const actorText = (l.actor_name || l.actor_email || '').toLowerCase()
-      if (!actorText.includes(q) && !l.action.toLowerCase().includes(q) && !l.target_type.toLowerCase().includes(q)) return false
+      if (
+        !actorText.includes(q) &&
+        !l.action.toLowerCase().includes(q) &&
+        !l.target_type.toLowerCase().includes(q) &&
+        !l.module.toLowerCase().includes(q)
+      ) return false
     }
     return true
   })
@@ -115,32 +166,32 @@ export default function ActivityLog({ companyId, onBack }: { companyId?: string;
           <button onClick={onBack} style={iconBtn}>‹</button>
           <div>
             <div style={{ fontSize: 19, fontWeight: 800, color: COLORS.text }}>Activity Log</div>
-            <div style={{ fontSize: 12, color: COLORS.textMuted }}>Full history of staff & access changes</div>
+            <div style={{ fontSize: 12, color: COLORS.textMuted }}>Full history of activity across your company</div>
           </div>
         </div>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by staff name or action…"
+          placeholder="Search by staff name, action, or module…"
           style={{ width: '100%', marginTop: 14, padding: 11, borderRadius: 10, border: `1px solid ${COLORS.border}`, fontSize: 13.5 }}
         />
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginTop: 10, paddingBottom: 2 }}>
-          {['all', 'invite', 'suspend', 'activate', 'revoke_access', 'grant_permission', 'revoke_permission', 'change_role'].map((a) => (
+          {MODULES.map((m) => (
             <button
-              key={a}
-              onClick={() => setActionFilter(a)}
+              key={m.key}
+              onClick={() => setModuleFilter(m.key)}
               style={{
                 whiteSpace: 'nowrap',
                 padding: '7px 12px',
                 borderRadius: 999,
-                border: `1px solid ${actionFilter === a ? COLORS.purple : COLORS.border}`,
-                background: actionFilter === a ? COLORS.purpleBg : '#fff',
-                color: actionFilter === a ? COLORS.purple : COLORS.textMuted,
+                border: `1px solid ${moduleFilter === m.key ? COLORS.purple : COLORS.border}`,
+                background: moduleFilter === m.key ? COLORS.purpleBg : '#fff',
+                color: moduleFilter === m.key ? COLORS.purple : COLORS.textMuted,
                 fontSize: 11.5,
                 fontWeight: 700,
               }}
             >
-              {a === 'all' ? 'All' : actionLabel(a)}
+              {m.label}
             </button>
           ))}
         </div>
@@ -181,8 +232,10 @@ export default function ActivityLog({ companyId, onBack }: { companyId?: string;
                   <div style={{ fontSize: 13, color: COLORS.text }}>
                     <b>{l.actor_name || l.actor_email || 'Someone'}</b> {actionLabel(l.action)}
                   </div>
-                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2 }}>
-                    {new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span>{new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span style={{ opacity: 0.5 }}>•</span>
+                    <span style={{ textTransform: 'capitalize' }}>{MODULES.find((m) => m.key === l.module)?.label || l.module}</span>
                   </div>
                 </div>
               </div>
