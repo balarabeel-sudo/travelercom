@@ -160,7 +160,7 @@ function AddListing() {
     return (
       <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
         <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-          <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
+          <span onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Listing</h1>
         </div>
         <div style={{ padding: '40px 24px', textAlign: 'center' }}>
@@ -189,7 +189,7 @@ function AddListing() {
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
       <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-        <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
+        <span onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
         <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Listing</h1>
       </div>
 
@@ -351,6 +351,8 @@ function AddListing() {
               </Field>
             </>
           )}
+
+          {category === 'event_center' && (
             <Field label="Event Type">
               <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
                 {EVENT_TYPES.map((t) => (
