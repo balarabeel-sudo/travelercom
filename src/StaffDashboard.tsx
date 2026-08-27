@@ -22,9 +22,10 @@ const COLORS = {
 }
 
 // Maps a permission "module" (from company_permissions.module) to a real
-// destination in the app. Modules with no built destination yet (finance,
-// refunds, platform) are intentionally left out — they'll appear here
-// automatically once those pages exist, since this list drives what's shown.
+// destination in the app. A module with no entry here stays hidden from
+// Quick Actions even if the staff member has that permission — add it
+// here as soon as its page exists. As of 8/27/2026 "platform" has no
+// built page yet and is intentionally left out.
 type ActionConfig = { label: string; icon: string; type: 'route' | 'contact'; route?: string }
 const MODULE_ACTIONS: Record<string, ActionConfig> = {
   bookings: { label: 'Bookings', icon: 'ticket', type: 'route', route: '/bookings-management' },
@@ -33,6 +34,9 @@ const MODULE_ACTIONS: Record<string, ActionConfig> = {
   support: { label: 'Support', icon: 'headphones', type: 'route', route: '/support' },
   finance: { label: 'Finance', icon: 'cash', type: 'route', route: '/analytics' },
   refunds: { label: 'Refunds', icon: 'refresh', type: 'route', route: '/wallet' },
+  company_staff: { label: 'Staff', icon: 'users', type: 'route', route: '/staff' },
+  analytics: { label: 'Analytics', icon: 'barChart', type: 'route', route: '/analytics' },
+  marketing: { label: 'Marketing', icon: 'megaphone', type: 'route', route: '/promotions' },
 }
 
 // Display-only labels/icons for grouping the full permission catalog in
@@ -46,6 +50,9 @@ const MODULE_LABELS: Record<string, { label: string; icon: string }> = {
   refunds: { label: 'Refunds', icon: 'refresh' },
   support: { label: 'Support', icon: 'headphones' },
   platform: { label: 'Platform', icon: 'globe' },
+  company_staff: { label: 'Staff', icon: 'users' },
+  analytics: { label: 'Analytics', icon: 'barChart' },
+  marketing: { label: 'Marketing', icon: 'megaphone' },
 }
 function moduleMeta(mod: string) {
   return MODULE_LABELS[mod] || { label: mod.charAt(0).toUpperCase() + mod.slice(1), icon: 'box' }
