@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#7c3aed', bg: '#F8FAFC', card: '#FFFFFF', text: '#1A1A1A',
@@ -34,20 +35,20 @@ const MODULES: { key: string; label: string }[] = [
 
 const ACTION_ICONS: Record<string, string> = {
   // Staff & Access
-  invite: '✉', resend_invite: '↻', cancel_invite: '✕', accept_invite: '✓',
-  change_role: '🔄', grant_permission: '➕', revoke_permission: '➖',
-  clear_override: '↩', suspend: '⏸', activate: '▶', revoke_access: '🚫',
+  invite: 'userPlus', resend_invite: 'refresh', cancel_invite: 'x', accept_invite: 'check',
+  change_role: 'shield', grant_permission: 'plus', revoke_permission: 'minus',
+  clear_override: 'refresh', suspend: 'lock', activate: 'check', revoke_access: 'lock',
   // Bookings
-  assigned_task: '📋', completed_task: '✅', cancelled_booking: '✕',
-  verified_ticket: '🎫',
+  assigned_task: 'clipboard', completed_task: 'checkCircle', cancelled_booking: 'x',
+  verified_ticket: 'ticket',
   // Marketing
-  created_promotion: '🏷', updated_promotion: '✎', deleted_promotion: '🗑',
+  created_promotion: 'tag', updated_promotion: 'edit', deleted_promotion: 'trash',
   // Finance
-  requested_refund: '↩', requested_withdrawal: '💵',
+  requested_refund: 'refresh', requested_withdrawal: 'cash',
   // Support
-  replied_ticket: '💬', resolved_ticket: '✅',
+  replied_ticket: 'chat', resolved_ticket: 'checkCircle',
   // Settings
-  updated_settings: '⚙',
+  updated_settings: 'settings',
 }
 
 // Fallback: turn an unknown snake_case action into readable text,
@@ -163,7 +164,7 @@ export default function ActivityLog({ companyId, onBack }: { companyId?: string;
     <div style={{ background: COLORS.bg, minHeight: '100vh', paddingBottom: 32 }}>
       <div style={{ background: COLORS.card, padding: '16px', borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={onBack} style={iconBtn}>‹</button>
+          <button onClick={onBack} style={iconBtn}><Icon name="arrowLeft" size={18} color={COLORS.text} /></button>
           <div>
             <div style={{ fontSize: 19, fontWeight: 800, color: COLORS.text }}>Activity Log</div>
             <div style={{ fontSize: 12, color: COLORS.textMuted }}>Full history of activity across your company</div>
@@ -226,7 +227,11 @@ export default function ActivityLog({ companyId, onBack }: { companyId?: string;
                     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
                   }}
                 >
-                  {ACTION_ICONS[l.action] || '•'}
+                  {ACTION_ICONS[l.action] ? (
+                    <Icon name={ACTION_ICONS[l.action]} size={15} color={COLORS.purple} />
+                  ) : (
+                    <Icon name="fileText" size={15} color={COLORS.purple} />
+                  )}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, color: COLORS.text }}>
