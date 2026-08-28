@@ -22,7 +22,7 @@ const COLORS = {
 }
 
 type Role = { id: string; name: string; description: string | null }
-type StaffMember = { user_id: string; role_id: string | null; invited_at: string | null; suspended: boolean; email: string | null; full_name: string | null }
+type StaffMember = { user_id: string; role_id: string | null; invited_at: string | null; suspended: boolean; email: string | null; full_name: string | null; is_super_admin?: boolean }
 type Invite = { id: string; email: string; role_id: string; status: 'pending' | 'accepted' | 'revoked'; created_at: string }
 type Permission = { id: string; module: string; action: string; description: string | null }
 type RolePermission = { role_id: string; permission_id: string }
@@ -96,7 +96,17 @@ export default function AdminStaff() {
     }
     setOverview(overviewData || null)
     setRoles(rolesData || [])
-    setStaff((staffData as StaffMember[]) || [])
+    let staffWithSuperFlag = (staffData as StaffMember[]) || []
+    if (staffWithSuperFlag.length > 0) {
+      const { data: superFlags } = await supabase
+        .from('admins')
+        .select('user_id, is_super_admin')
+        .in('user_id', staffWithSuperFlag.map((s) => s.user_id))
+      const superMap: Record<string, boolean> = {}
+      for (const row of superFlags || []) superMap[row.user_id] = !!row.is_super_admin
+      staffWithSuperFlag = staffWithSuperFlag.map((s) => ({ ...s, is_super_admin: !!superMap[s.user_id] }))
+    }
+    setStaff(staffWithSuperFlag)
     setInvites(invitesData || [])
     setAllPermissions(permsData || [])
     setRolePermissions(rolePermsData || [])
@@ -183,12 +193,17 @@ export default function AdminStaff() {
     setActivity(data || [])
   }
 
-  function roleName(id: string | null) {
+  function roleName(s: StaffMember) {
+    if (s.is_super_admin) return 'Founder'
+    return roleNameById(s.role_id)
+  }
+
+  function roleNameById(id: string | null) {
     return roles.find((r) => r.id === id)?.name || id || 'Unknown role'
   }
 
   function displayName(s: StaffMember) {
-    return s.full_name || roleName(s.role_id)
+    return s.full_name || roleName(s)
   }
 
   const filteredInvites = invites.filter((i) => inviteFilter === 'all' || i.status === inviteFilter)
@@ -272,7 +287,7 @@ export default function AdminStaff() {
                     </div>
                   </div>
                   <span style={{ fontSize: '11px', fontWeight: 700, padding: '5px 11px', borderRadius: '20px', background: COLORS.blueBg, color: COLORS.blue, whiteSpace: 'nowrap' as const, flexShrink: 0 }}>
-                    {roleName(s.role_id)}
+                    {roleName(s)}
                   </span>
                 </div>
 
@@ -331,7 +346,7 @@ export default function AdminStaff() {
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{inv.email}</p>
-                      <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '2px' }}>{roleName(inv.role_id)}</p>
+                      <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '2px' }}>{roleNameById(inv.role_id)}</p>
                       <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Icon name="mail" size={10} color={COLORS.textMuted} /> Invited on {new Date(inv.created_at).toLocaleDateString()}
                       </p>
@@ -379,7 +394,7 @@ export default function AdminStaff() {
               <span onClick={() => setOverridesFor(null)} style={{ cursor: 'pointer' }}><Icon name="x" size={16} color={COLORS.textMuted} /></span>
             </div>
             <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '14px' }}>
-              Role: {roleName(overridesFor.role_id)}. Grant or revoke a specific permission beyond their role, or reset to the role default.
+              Role: {roleName(overridesFor)}. Grant or revoke a specific permission beyond their role, or reset to the role default.
             </p>
 
             {overridesLoading ? (
