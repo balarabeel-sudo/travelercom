@@ -32,6 +32,8 @@ type Company = {
   plan: string | null
   verification_status: string | null
   created_at: string
+  bookings_count?: number
+  total_revenue?: number
 }
 
 type Summary = {
@@ -55,6 +57,10 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }>
   verified: { bg: COLORS.greenBg, color: COLORS.green, label: 'Verified' },
   rejected: { bg: COLORS.redBg, color: COLORS.red, label: 'Rejected' },
   suspended: { bg: COLORS.purpleBg, color: COLORS.purple, label: 'Suspended' },
+}
+
+function formatNaira(n: number) {
+  return '₦' + n.toLocaleString(undefined, { maximumFractionDigits: 0 })
 }
 
 function useIsDesktop() {
@@ -139,7 +145,22 @@ export default function AdminCompanies() {
       setErrorMsg("Couldn't load companies — make sure admin_companies_round1_setup.sql has been run.")
       return
     }
-    setCompanies((data as Company[]) || [])
+    let rows = (data as Company[]) || []
+    if (rows.length > 0) {
+      const { data: bookingRows } = await supabase
+        .from('bookings')
+        .select('company_id, amount_paid')
+        .in('company_id', rows.map((c) => c.id))
+      const agg: Record<string, { count: number; revenue: number }> = {}
+      for (const b of bookingRows || []) {
+        if (!b.company_id) continue
+        if (!agg[b.company_id]) agg[b.company_id] = { count: 0, revenue: 0 }
+        agg[b.company_id].count += 1
+        agg[b.company_id].revenue += Number(b.amount_paid) || 0
+      }
+      rows = rows.map((c) => ({ ...c, bookings_count: agg[c.id]?.count || 0, total_revenue: agg[c.id]?.revenue || 0 }))
+    }
+    setCompanies(rows)
     setTotalCount(count || 0)
   }
 
@@ -293,15 +314,26 @@ export default function AdminCompanies() {
         <div style={{ background: COLORS.card, borderRadius: '14px', border: `1px solid ${COLORS.border}` }}>
           {companies.map((c, idx) => (
             <div key={c.id} onClick={() => setSelected(c)}
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 15px', cursor: 'pointer', borderBottom: idx === companies.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
+              style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '13px 15px', cursor: 'pointer', borderBottom: idx === companies.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
               <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: COLORS.primary, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, flexShrink: 0 }}>
                 {c.business_name.charAt(0).toUpperCase()}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{c.business_name}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{c.business_name}</p>
+                  {c.verification_status === 'verified' && <Icon name="check" size={13} color={COLORS.green} />}
+                </div>
                 <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '1px' }}>{c.business_type || 'No type set'} · {c.city || 'No city set'}</p>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
+                  <span style={{ fontSize: '11px', color: COLORS.textMuted }}>{(c.bookings_count ?? 0).toLocaleString()} Bookings</span>
+                  <span style={{ fontSize: '11px', color: COLORS.textMuted }}>{formatNaira(c.total_revenue ?? 0)} Revenue</span>
+                </div>
+                <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '3px' }}>Joined {new Date(c.created_at).toLocaleDateString()}</p>
               </div>
-              <StatusBadge status={c.verification_status} />
+              <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '6px' }}>
+                <StatusBadge status={c.verification_status} />
+                <Icon name="arrowUpRight" size={13} color={COLORS.textMuted} />
+              </div>
             </div>
           ))}
         </div>
