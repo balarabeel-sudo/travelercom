@@ -107,7 +107,7 @@ export default function Promotions() {
   const handleAdd = async () => {
     if (!companyId || !serviceId || !title.trim() || !discountValue) return
     setSaving(true)
-    await supabase.from('promotions').insert({
+    const { data: inserted } = await supabase.from('promotions').insert({
       company_id: companyId,
       service_id: serviceId,
       title: title.trim(),
@@ -118,7 +118,21 @@ export default function Promotions() {
       start_date: startDate || null,
       end_date: endDate || null,
       active: true,
-    })
+    }).select('id').single()
+    if (inserted) {
+      const { data: userData } = await supabase.auth.getUser()
+      if (userData?.user) {
+        await supabase.rpc('log_audit', {
+          p_action: 'created_promotion',
+          p_module: 'marketing',
+          p_target_type: 'promotion',
+          p_target_id: inserted.id,
+          p_previous: null,
+          p_new: { title: title.trim(), discount_type: discountType, discount_value: parseFloat(discountValue) },
+          p_company_id: companyId,
+        })
+      }
+    }
     setTitle('')
     setDescription('')
     setDiscountValue('')
@@ -132,11 +146,35 @@ export default function Promotions() {
 
   const toggleActive = async (promo: Promotion) => {
     await supabase.from('promotions').update({ active: !promo.active }).eq('id', promo.id)
+    const { data: userData } = await supabase.auth.getUser()
+    if (userData?.user && companyId) {
+      await supabase.rpc('log_audit', {
+        p_action: 'updated_promotion',
+        p_module: 'marketing',
+        p_target_type: 'promotion',
+        p_target_id: promo.id,
+        p_previous: { active: promo.active },
+        p_new: { active: !promo.active },
+        p_company_id: companyId,
+      })
+    }
     load()
   }
 
   const deletePromotion = async (id: string) => {
     await supabase.from('promotions').delete().eq('id', id)
+    const { data: userData } = await supabase.auth.getUser()
+    if (userData?.user && companyId) {
+      await supabase.rpc('log_audit', {
+        p_action: 'deleted_promotion',
+        p_module: 'marketing',
+        p_target_type: 'promotion',
+        p_target_id: id,
+        p_previous: null,
+        p_new: null,
+        p_company_id: companyId,
+      })
+    }
     load()
   }
 
