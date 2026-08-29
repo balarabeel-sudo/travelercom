@@ -122,7 +122,7 @@ function AddListing() {
       photoUrl = urlData.publicUrl
     }
 
-    const { error } = await supabase.from('services').insert({
+    const { data: newListing, error } = await supabase.from('services').insert({
       company_id: companyId,
       category: category,
       title: title.trim(),
@@ -142,12 +142,26 @@ function AddListing() {
       gate_fee: category === 'tour' && gateFee ? parseFloat(gateFee) : null,
       vehicle_fee: category === 'tour' && vehicleFee ? parseFloat(vehicleFee) : null,
       event_type: category === 'event_center' && eventType ? eventType : null,
-    })
+    }).select('id').single()
 
     setSubmitting(false)
     if (error) {
       setErrorMsg(error.message)
     } else {
+      if (newListing) {
+        const { data: userData } = await supabase.auth.getUser()
+        if (userData?.user) {
+          await supabase.rpc('log_audit', {
+            p_action: 'created_listing',
+            p_module: 'listings',
+            p_target_type: 'service',
+            p_target_id: newListing.id,
+            p_previous: null,
+            p_new: { title: title.trim(), category },
+            p_company_id: companyId,
+          })
+        }
+      }
       setSuccess(true)
     }
   }
