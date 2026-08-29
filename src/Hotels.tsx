@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import NotificationBell from './NotificationBell'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -18,6 +19,57 @@ const COLORS = {
 const AMENITY_ICON: Record<string, string> = {
   WiFi: 'wifi', Parking: 'parking', Restaurant: 'restaurant', Pool: 'pool', Gym: 'gym',
   'Airport Pickup': 'plane', 'Conference Hall': 'building', Laundry: 'laundry', AC: 'snowflake', Breakfast: 'coffee',
+}
+
+// Nigeria's 36 states + FCT, mapped to the primary city used in destination text.
+// Used only to filter existing real listings by state — no data is invented here.
+const NIGERIA_STATES: { name: string; city: string }[] = [
+  { name: 'Abia', city: 'Umuahia' },
+  { name: 'Adamawa', city: 'Yola' },
+  { name: 'Akwa Ibom', city: 'Uyo' },
+  { name: 'Anambra', city: 'Awka' },
+  { name: 'Bauchi', city: 'Bauchi' },
+  { name: 'Bayelsa', city: 'Yenagoa' },
+  { name: 'Benue', city: 'Makurdi' },
+  { name: 'Borno', city: 'Maiduguri' },
+  { name: 'Cross River', city: 'Calabar' },
+  { name: 'Delta', city: 'Asaba' },
+  { name: 'Ebonyi', city: 'Abakaliki' },
+  { name: 'Edo', city: 'Benin' },
+  { name: 'Ekiti', city: 'Ado Ekiti' },
+  { name: 'Enugu', city: 'Enugu' },
+  { name: 'FCT (Abuja)', city: 'Abuja' },
+  { name: 'Gombe', city: 'Gombe' },
+  { name: 'Imo', city: 'Owerri' },
+  { name: 'Jigawa', city: 'Dutse' },
+  { name: 'Kaduna', city: 'Kaduna' },
+  { name: 'Kano', city: 'Kano' },
+  { name: 'Katsina', city: 'Katsina' },
+  { name: 'Kebbi', city: 'Birnin Kebbi' },
+  { name: 'Kogi', city: 'Lokoja' },
+  { name: 'Kwara', city: 'Ilorin' },
+  { name: 'Lagos', city: 'Lagos' },
+  { name: 'Nasarawa', city: 'Lafia' },
+  { name: 'Niger', city: 'Minna' },
+  { name: 'Ogun', city: 'Abeokuta' },
+  { name: 'Ondo', city: 'Akure' },
+  { name: 'Osun', city: 'Osogbo' },
+  { name: 'Oyo', city: 'Ibadan' },
+  { name: 'Plateau', city: 'Jos' },
+  { name: 'Rivers', city: 'Port Harcourt' },
+  { name: 'Sokoto', city: 'Sokoto' },
+  { name: 'Taraba', city: 'Jalingo' },
+  { name: 'Yobe', city: 'Damaturu' },
+  { name: 'Zamfara', city: 'Gusau' },
+]
+
+// Word label derived from the real average rating (same idea as Booking.com's score words) — not invented data.
+function ratingLabel(r: number) {
+  if (r >= 4.5) return 'Excellent'
+  if (r >= 4) return 'Very Good'
+  if (r >= 3.5) return 'Good'
+  if (r >= 3) return 'Average'
+  return 'Fair'
 }
 
 type Hotel = {
@@ -45,6 +97,9 @@ function Hotels() {
   const [destination, setDestination] = useState('')
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
+
+  const [stateFilter, setStateFilter] = useState('all')
+  const [showStateFilter, setShowStateFilter] = useState(false)
 
   const [sortBy, setSortBy] = useState<SortKey>('recommended')
   const [showSort, setShowSort] = useState(false)
@@ -115,19 +170,33 @@ function Hotels() {
     }
   }
 
+  const clearFilters = () => {
+    setDestination('')
+    setMinPrice('')
+    setMaxPrice('')
+    setAmenityFilter(null)
+    setStateFilter('all')
+    fetchHotels()
+  }
+
   const allAmenities = Array.from(new Set(hotels.flatMap((h) => h.amenities || [])))
 
-  let visible = amenityFilter ? hotels.filter((h) => (h.amenities || []).includes(amenityFilter)) : hotels
-  visible = [...visible].sort((a, b) => {
+  // State filter is applied client-side against the already-loaded real listings.
+  const selectedCity = stateFilter === 'all' ? null : (NIGERIA_STATES.find((s) => s.name === stateFilter)?.city || null)
+  let filteredHotels = selectedCity ? hotels.filter((h) => h.destination.toLowerCase().includes(selectedCity.toLowerCase())) : hotels
+  filteredHotels = amenityFilter ? filteredHotels.filter((h) => (h.amenities || []).includes(amenityFilter)) : filteredHotels
+
+  const visible = [...filteredHotels].sort((a, b) => {
     if (sortBy === 'price_low') return a.price - b.price
     if (sortBy === 'price_high') return b.price - a.price
     if (sortBy === 'rating') return (b.avgRating ?? -1) - (a.avgRating ?? -1)
     return 0
   })
 
-  const lowestPriceId = hotels.length > 1 ? [...hotels].sort((a, b) => a.price - b.price)[0].id : null
+  // "Best" badges are recomputed from whatever is currently filtered.
+  const lowestPriceId = filteredHotels.length > 1 ? [...filteredHotels].sort((a, b) => a.price - b.price)[0].id : null
   const topRatedId = (() => {
-    const rated = hotels.filter((h) => h.avgRating !== null)
+    const rated = filteredHotels.filter((h) => h.avgRating !== null)
     if (rated.length < 2) return null
     return [...rated].sort((a, b) => (b.avgRating ?? 0) - (a.avgRating ?? 0))[0].id
   })()
@@ -139,39 +208,82 @@ function Hotels() {
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
 
-      <div style={{ padding: '16px 20px', background: COLORS.card, position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer', marginTop: '2px' }}>←</span>
-            <div>
-              <h1 style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>Hotels & Stays</h1>
-              <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Find the best places to stay</p>
-            </div>
+      {/* ---------- HEADER ---------- */}
+      <div style={{ padding: '16px 20px', background: COLORS.card, position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}>
+            <Icon name="arrowLeft" size={20} color={COLORS.text} />
           </div>
-          <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-            <span style={{ color: COLORS.textMuted, display: 'flex' }}><Icon name="heart" size={18} color={COLORS.textMuted} /></span>
+          <div>
+            <h1 style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>Hotels & Stays</h1>
+            <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Find the best places to stay</p>
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <Icon name="heart" size={20} color={COLORS.text} />
+          <NotificationBell iconColor={COLORS.text} />
         </div>
       </div>
 
       <div style={{ padding: '16px' }}>
+
+        {/* ---------- SEARCH CARD ---------- */}
         <div style={{ background: COLORS.card, borderRadius: '16px', padding: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', marginBottom: '14px' }}>
-          <input type="text" placeholder="Destination (e.g. Kano, Nigeria)" value={destination} onChange={(e) => setDestination(e.target.value)} style={inputStyle} />
-          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-            <input type="number" placeholder="Min price (₦)" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-            <input type="number" placeholder="Max price (₦)" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+          <div style={{ background: '#F0F9FF', border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Icon name="mapPin" size={16} color={COLORS.primary} />
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginBottom: '2px' }}>Destination</p>
+              <input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="e.g. Kano, Nigeria" style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: '14px', fontWeight: 700, color: COLORS.text, width: '100%', padding: 0 }} />
+            </div>
           </div>
+
           <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-            <button onClick={fetchHotels} style={{ flex: 1, padding: '12px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <div style={{ flex: 1, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icon name="tag" size={15} color={COLORS.primary} />
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '10px', color: COLORS.textMuted }}>Min price (₦)</p>
+                <input type="number" placeholder="Any price" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: '13px', fontWeight: 700, color: COLORS.text, width: '100%', padding: 0 }} />
+              </div>
+            </div>
+            <div style={{ flex: 1, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icon name="tag" size={15} color={COLORS.primary} />
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '10px', color: COLORS.textMuted }}>Max price (₦)</p>
+                <input type="number" placeholder="Any price" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: '13px', fontWeight: 700, color: COLORS.text, width: '100%', padding: 0 }} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+            <button onClick={fetchHotels} style={{ flex: 1, padding: '13px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
               <Icon name="search" size={15} color="white" /> Search Hotels
             </button>
-            <button onClick={() => { setDestination(''); setMinPrice(''); setMaxPrice(''); setAmenityFilter(null); fetchHotels() }} style={{ padding: '12px 16px', background: COLORS.bg, color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
+            <button onClick={clearFilters} style={{ padding: '13px 16px', background: COLORS.bg, color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
               Clear
             </button>
           </div>
         </div>
 
+        {/* ---------- STATE + QUICK FILTERS ---------- */}
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '14px' }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <span onClick={() => setShowStateFilter(!showStateFilter)} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '20px', cursor: 'pointer', background: stateFilter === 'all' ? COLORS.card : COLORS.primary, color: stateFilter === 'all' ? COLORS.text : 'white', border: `1px solid ${stateFilter === 'all' ? COLORS.border : COLORS.primary}`, whiteSpace: 'nowrap' }}>
+              <Icon name="mapPin" size={13} color={stateFilter === 'all' ? COLORS.text : 'white'} />
+              {stateFilter === 'all' ? 'All States' : stateFilter} ⌄
+            </span>
+            {showStateFilter && (
+              <div style={{ position: 'absolute', left: 0, top: '38px', background: COLORS.card, borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 30, width: '220px', maxHeight: '280px', overflowY: 'auto' }}>
+                <div onClick={() => { setStateFilter('all'); setShowStateFilter(false) }} style={{ padding: '10px 14px', fontSize: '12.5px', fontWeight: stateFilter === 'all' ? 700 : 500, color: stateFilter === 'all' ? COLORS.primary : COLORS.text, cursor: 'pointer', borderBottom: `1px solid ${COLORS.border}` }}>
+                  All States
+                </div>
+                {NIGERIA_STATES.map((s) => (
+                  <div key={s.name} onClick={() => { setStateFilter(s.name); setShowStateFilter(false) }} style={{ padding: '10px 14px', fontSize: '12.5px', fontWeight: stateFilter === s.name ? 700 : 500, color: stateFilter === s.name ? COLORS.primary : COLORS.text, cursor: 'pointer' }}>
+                    {s.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <FilterChip icon="star" label="Top Rated" active={sortBy === 'rating'} onClick={() => setSortBy(sortBy === 'rating' ? 'recommended' : 'rating')} />
           <FilterChip icon="cash" label={sortBy === 'price_low' ? 'Price ↑' : sortBy === 'price_high' ? 'Price ↓' : 'Price'} active={sortBy === 'price_low' || sortBy === 'price_high'} onClick={() => setSortBy(sortBy === 'price_low' ? 'price_high' : sortBy === 'price_high' ? 'recommended' : 'price_low')} />
           {allAmenities.length > 0 && (
@@ -192,6 +304,7 @@ function Hotels() {
           </div>
         )}
 
+        {/* ---------- RESULT COUNT + SORT ---------- */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>
             {loading ? 'Searching...' : `${visible.length} hotel${visible.length !== 1 ? 's' : ''} found${destination.trim() ? ` in ${destination.trim()}` : ''}`}
@@ -212,67 +325,67 @@ function Hotels() {
           </div>
         </div>
 
+        {/* ---------- RESULTS ---------- */}
         {loading ? (
           <p style={{ textAlign: 'center', color: COLORS.textMuted, fontSize: '13px', padding: '30px 0' }}>Loading...</p>
         ) : visible.length === 0 ? (
           <div style={{ background: COLORS.card, borderRadius: '16px', padding: '30px', textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '13px' }}>No hotels found</p>
-            <p style={{ fontSize: '12px', marginTop: '4px' }}>Try a different destination or clear your filters.</p>
+            <p style={{ fontSize: '12px', marginTop: '4px' }}>Try a different destination, state, or clear your filters.</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {visible.map((h) => (
-              <div key={h.id} onClick={() => navigate(`/hotels/${h.id}`)} style={{ background: COLORS.card, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer' }}>
-                <div style={{ position: 'relative', height: '160px' }}>
-                  <div style={{ width: '100%', height: '100%', background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '34px' }}>
-                    {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="hotel" size={34} color="white" />}
+              <div key={h.id} onClick={() => navigate(`/hotels/${h.id}`)} style={{ background: COLORS.card, borderRadius: '16px', padding: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer', display: 'flex', gap: '12px' }}>
+                <div style={{ position: 'relative', width: '130px', height: '160px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0 }}>
+                  <div style={{ width: '100%', height: '100%', background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="hotel" size={28} color="white" />}
                   </div>
-                  <div onClick={(e) => toggleFavorite(e, h.id)} style={{ position: 'absolute', top: '10px', right: '10px', width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8' }}>
-                    <Icon name="heart" size={15} color={favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(h.id)} />
+                  <div onClick={(e) => toggleFavorite(e, h.id)} style={{ position: 'absolute', top: '8px', right: '8px', width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8' }}>
+                    <Icon name="heart" size={14} color={favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(h.id)} />
                   </div>
                   {h.id === lowestPriceId && (
-                    <span style={{ position: 'absolute', top: '10px', left: '10px', background: COLORS.secondary, color: 'white', fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '20px' }}>Best Value</span>
+                    <span style={{ position: 'absolute', top: '8px', left: '8px', background: COLORS.secondary, color: 'white', fontSize: '9.5px', fontWeight: 700, padding: '4px 8px', borderRadius: '20px' }}>Best Value</span>
                   )}
                   {h.id === topRatedId && h.id !== lowestPriceId && (
-                    <span style={{ position: 'absolute', top: '10px', left: '10px', background: COLORS.primary, color: 'white', fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '20px' }}>Top Rated</span>
+                    <span style={{ position: 'absolute', top: '8px', left: '8px', background: COLORS.primary, color: 'white', fontSize: '9.5px', fontWeight: 700, padding: '4px 8px', borderRadius: '20px' }}>Top Rated</span>
                   )}
                 </div>
 
-                <div style={{ padding: '14px' }}>
-                  <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{h.title}</p>
-                  <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon name="mapPin" size={11} color={COLORS.textMuted} /> {h.destination}</p>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '14.5px', fontWeight: 800, color: COLORS.text }}>{h.title}</p>
+                  <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon name="mapPin" size={11} color={COLORS.textMuted} /> {h.destination}</p>
 
                   {h.avgRating !== null && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-                      <span style={{ background: '#DCFCE7', color: COLORS.green, fontSize: '11.5px', fontWeight: 800, padding: '2px 7px', borderRadius: '6px' }}>{h.avgRating.toFixed(1)}</span>
-                      <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>({h.reviewCount} review{h.reviewCount !== 1 ? 's' : ''})</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ background: '#DCFCE7', color: COLORS.green, fontSize: '11px', fontWeight: 800, padding: '2px 6px', borderRadius: '6px' }}>{h.avgRating.toFixed(1)}</span>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.primary }}>{ratingLabel(h.avgRating)}</span>
+                      <span style={{ fontSize: '11px', color: COLORS.textMuted }}>({h.reviewCount.toLocaleString()})</span>
                     </div>
                   )}
 
                   {h.amenities && h.amenities.length > 0 && (
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
-                      {h.amenities.slice(0, 4).map((a) => (
-                        <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
-                          <Icon name={AMENITY_ICON[a] || 'check'} size={11} color={COLORS.textMuted} /> {a}
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '8px' }}>
+                      {h.amenities.slice(0, 3).map((a) => (
+                        <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9.5px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '3px 7px', borderRadius: '20px' }}>
+                          <Icon name={AMENITY_ICON[a] || 'check'} size={10} color={COLORS.textMuted} /> {a}
                         </span>
                       ))}
-                      {h.amenities.length > 4 && (
-                        <span style={{ fontSize: '10px', color: COLORS.textMuted, alignSelf: 'center' }}>+{h.amenities.length - 4} more</span>
+                      {h.amenities.length > 3 && (
+                        <span style={{ fontSize: '9.5px', color: COLORS.textMuted, alignSelf: 'center' }}>+{h.amenities.length - 3} more</span>
                       )}
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '12px' }}>
-                    <div>
-                      <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()} <span style={{ fontSize: '11px', color: COLORS.textMuted, fontWeight: 400 }}>/night</span></p>
-                      {h.seats_available !== null && (
-                        <p style={{ fontSize: '11px', fontWeight: 700, color: h.seats_available === 0 ? '#DC2626' : COLORS.green }}>
-                          {h.seats_available === 0 ? 'Fully booked' : `${h.seats_available} rooms available`}
-                        </p>
-                      )}
-                    </div>
-                    <span style={{ padding: '9px 18px', background: COLORS.secondary, color: 'white', borderRadius: '9px', fontWeight: 700, fontSize: '12.5px' }}>View Details</span>
+                  <div style={{ marginTop: '8px' }}>
+                    <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()} <span style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 400 }}>/night</span></p>
+                    {h.seats_available !== null && (
+                      <p style={{ fontSize: '10.5px', fontWeight: 700, color: h.seats_available === 0 ? '#DC2626' : COLORS.green }}>
+                        {h.seats_available === 0 ? 'Fully booked' : `${h.seats_available} rooms available`}
+                      </p>
+                    )}
                   </div>
+                  <span style={{ display: 'inline-block', marginTop: '8px', padding: '8px 16px', background: COLORS.secondary, color: 'white', borderRadius: '9px', fontWeight: 700, fontSize: '12px' }}>View Details</span>
                 </div>
               </div>
             ))}
@@ -295,10 +408,6 @@ function FilterChip({ icon, label, active, onClick }: { icon: string; label: str
       <Icon name={icon} size={13} color={active ? 'white' : COLORS.text} /> {label}
     </span>
   )
-}
-
-const inputStyle = {
-  width: '100%', padding: '11px', border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '13.5px', boxSizing: 'border-box' as const,
 }
 
 export default Hotels
