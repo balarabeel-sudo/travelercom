@@ -114,6 +114,7 @@ export default function AdminCompanies() {
   const [pageSize, setPageSize] = useState(10)
 
   const [selected, setSelected] = useState<Company | null>(null)
+  const [viewingCompany, setViewingCompany] = useState<Company | null>(null)
   const [reasonInput, setReasonInput] = useState('')
   const [showReasonBox, setShowReasonBox] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
@@ -198,8 +199,16 @@ export default function AdminCompanies() {
 
   return (
     <div style={{ padding: isDesktop ? '24px 28px' : '16px', maxWidth: '1400px', margin: '0 auto', overflowY: 'auto' as const, height: '100%' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', flexWrap: 'wrap' as const, alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '4px' }}>
+      {viewingCompany ? (
+        <CompanyDetailsView
+          company={viewingCompany}
+          isDesktop={isDesktop}
+          onBack={() => setViewingCompany(null)}
+          onAction={(c) => setSelected(c)}
+        />
+      ) : (
+      <>
+        <div style={{ display: 'flex', flexWrap: 'wrap' as const, alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '4px' }}>
         <div>
           <h2 style={{ fontSize: isDesktop ? '20px' : '17px', fontWeight: 800, color: COLORS.text }}>Companies &amp; Partners</h2>
           <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>Manage and verify all registered companies and partners on the platform.</p>
@@ -313,7 +322,7 @@ export default function AdminCompanies() {
       ) : (
         <div style={{ background: COLORS.card, borderRadius: '14px', border: `1px solid ${COLORS.border}` }}>
           {companies.map((c, idx) => (
-            <div key={c.id} onClick={() => setSelected(c)}
+            <div key={c.id} onClick={() => setViewingCompany(c)}
               style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '13px 15px', cursor: 'pointer', borderBottom: idx === companies.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
               <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: COLORS.primary, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, flexShrink: 0 }}>
                 {c.business_name.charAt(0).toUpperCase()}
@@ -359,6 +368,8 @@ export default function AdminCompanies() {
               style={{ padding: '6px 11px', borderRadius: '7px', border: `1px solid ${COLORS.border}`, background: COLORS.card, fontSize: '12px', fontWeight: 700, color: page === totalPages ? COLORS.textMuted : COLORS.text, cursor: page === totalPages ? 'default' : 'pointer' }}>›</button>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* Detail sheet */}
@@ -487,6 +498,197 @@ export default function AdminCompanies() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ============ Company Details drill-down (Round 2) ============
+const PERIODS = [
+  { key: 'all', label: 'All Time' },
+  { key: 'today', label: 'Today' },
+  { key: '7d', label: '7 Days' },
+  { key: '30d', label: '30 Days' },
+  { key: 'month', label: 'This Month' },
+]
+
+function periodStartDate(key: string): Date | null {
+  const now = new Date()
+  if (key === 'today') return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (key === '7d') return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  if (key === '30d') return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  if (key === 'month') return new Date(now.getFullYear(), now.getMonth(), 1)
+  return null
+}
+
+function CompanyDetailsView({
+  company, isDesktop, onBack, onAction,
+}: {
+  company: Company
+  isDesktop: boolean
+  onBack: () => void
+  onAction: (c: Company) => void
+}) {
+  const [period, setPeriod] = useState('all')
+  const [bookings, setBookings] = useState<{ id: string; amount_paid: number | null; booking_status: string | null; created_at: string }[]>([])
+  const [refundsCount, setRefundsCount] = useState(0)
+  const [activity, setActivity] = useState<{ id: string; action: string; module: string; created_at: string; actor_name?: string | null }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      const { data: bookingRows } = await supabase
+        .from('bookings')
+        .select('id, amount_paid, booking_status, created_at')
+        .eq('company_id', company.id)
+        .order('created_at', { ascending: false })
+
+      const { data: refundRows } = await supabase
+        .from('refund_requests')
+        .select('id, bookings!inner(company_id)')
+        .eq('bookings.company_id', company.id)
+
+      const { data: logRows } = await supabase
+        .from('audit_logs')
+        .select('id, action, module, created_at, actor_id')
+        .eq('company_id', company.id)
+        .order('created_at', { ascending: false })
+        .limit(6)
+
+      let logsWithNames = logRows || []
+      const actorIds = [...new Set(logsWithNames.map((l) => l.actor_id).filter(Boolean))]
+      if (actorIds.length > 0) {
+        const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', actorIds)
+        const nameMap: Record<string, string> = {}
+        for (const p of profs || []) nameMap[p.id] = p.full_name || ''
+        logsWithNames = logsWithNames.map((l) => ({ ...l, actor_name: nameMap[l.actor_id] }))
+      }
+
+      if (!cancelled) {
+        setBookings(bookingRows || [])
+        setRefundsCount((refundRows || []).length)
+        setActivity(logsWithNames)
+        setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [company.id])
+
+  const start = periodStartDate(period)
+  const filteredBookings = start ? bookings.filter((b) => new Date(b.created_at) >= start) : bookings
+  const totalBookings = filteredBookings.length
+  const totalRevenue = filteredBookings.reduce((sum, b) => sum + (Number(b.amount_paid) || 0), 0)
+  const pendingBookings = filteredBookings.filter((b) => b.booking_status === 'pending').length
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+        <span onClick={onBack} style={{ cursor: 'pointer', display: 'flex' }}>
+          <Icon name="arrowLeft" size={19} color={COLORS.text} />
+        </span>
+        <h2 style={{ fontSize: isDesktop ? '19px' : '16px', fontWeight: 800, color: COLORS.text }}>Company Details</h2>
+      </div>
+
+      {/* Company header card */}
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '16px', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '13px', background: COLORS.primary, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 700, flexShrink: 0 }}>
+            {company.business_name.charAt(0).toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{company.business_name}</p>
+              {company.verification_status === 'verified' && <Icon name="check" size={14} color={COLORS.green} />}
+            </div>
+            <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>{company.business_type || 'No type set'} · {company.city || 'No city set'}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+              <StatusBadge status={company.verification_status} />
+              <span style={{ fontSize: '11px', color: COLORS.textMuted }}>Joined {new Date(company.created_at).toLocaleDateString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick actions */}
+        <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
+          <button onClick={() => onAction(company)}
+            style={{ flex: 1, padding: '10px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: '9px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' }}>
+            {company.verification_status === 'pending' ? 'Verify' : company.verification_status === 'suspended' ? 'Restore' : 'Manage'}
+          </button>
+          <button onClick={() => onAction(company)}
+            style={{ flex: 1, padding: '10px', background: COLORS.card, color: COLORS.red, border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' }}>
+            {company.verification_status === 'suspended' ? 'Suspended' : 'Suspend'}
+          </button>
+          <button onClick={() => alert('Editing company info is coming soon.')}
+            style={{ flex: 1, padding: '10px', background: COLORS.card, color: COLORS.text, border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' }}>
+            Edit
+          </button>
+        </div>
+      </div>
+
+      {/* Overview */}
+      <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text, marginBottom: '8px' }}>Performance Overview</p>
+      <div style={{ display: 'flex', gap: '7px', overflowX: 'auto' as const, marginBottom: '10px', paddingBottom: '2px' }}>
+        {PERIODS.map((p) => (
+          <button key={p.key} onClick={() => setPeriod(p.key)}
+            style={{ whiteSpace: 'nowrap' as const, padding: '6px 12px', borderRadius: '999px', border: `1px solid ${period === p.key ? COLORS.primary : COLORS.border}`, background: period === p.key ? COLORS.primary : COLORS.card, color: period === p.key ? 'white' : COLORS.textMuted, fontSize: '11.5px', fontWeight: 700, cursor: 'pointer' }}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+        <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '12px' }}>
+          <p style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 700 }}>TOTAL BOOKINGS</p>
+          <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text, marginTop: '3px' }}>{totalBookings.toLocaleString()}</p>
+        </div>
+        <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '12px' }}>
+          <p style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 700 }}>REVENUE</p>
+          <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text, marginTop: '3px' }}>{formatNaira(totalRevenue)}</p>
+        </div>
+        <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '12px' }}>
+          <p style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 700 }}>PENDING BOOKINGS</p>
+          <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text, marginTop: '3px' }}>{pendingBookings.toLocaleString()}</p>
+        </div>
+        <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '12px' }}>
+          <p style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 700 }}>REFUNDS</p>
+          <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text, marginTop: '3px' }}>{refundsCount.toLocaleString()}</p>
+        </div>
+      </div>
+
+      {/* Company Information */}
+      <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text, marginBottom: '8px' }}>Company Information</p>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '4px 14px', marginBottom: '16px' }}>
+        {[
+          ['Company Type', company.business_type || 'Not set'],
+          ['Business Email', company.email || 'Not set'],
+          ['Phone Number', company.phone || 'Not set'],
+          ['City', company.city || 'Not set'],
+          ['Address', company.address || 'Not set'],
+        ].map(([label, value], i) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i === 4 ? 'none' : `1px solid ${COLORS.border}` }}>
+            <span style={{ fontSize: '12px', color: COLORS.textMuted }}>{label}</span>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text, textAlign: 'right' as const, maxWidth: '60%' }}>{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Recent Activity */}
+      <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text, marginBottom: '8px' }}>Recent Activity</p>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '4px 14px', marginBottom: '20px' }}>
+        {loading && <p style={{ fontSize: '12px', color: COLORS.textMuted, padding: '14px 0', textAlign: 'center' as const }}>Loading…</p>}
+        {!loading && activity.length === 0 && (
+          <p style={{ fontSize: '12px', color: COLORS.textMuted, padding: '14px 0', textAlign: 'center' as const }}>No activity logged yet.</p>
+        )}
+        {activity.map((a, i) => (
+          <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i === activity.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
+            <div>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text }}>{a.action.replace(/_/g, ' ')}</p>
+              <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '1px' }}>{a.actor_name || 'Someone'} · {new Date(a.created_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
