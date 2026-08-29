@@ -247,13 +247,28 @@ function Wallet() {
       .eq('user_id', userId)
       .maybeSingle()
 
-    await supabase.from('transactions').insert({
+    const { data: newTxn } = await supabase.from('transactions').insert({
       user_id: userId,
       wallet_id: walletRow?.id,
       transaction_type: 'withdrawal',
       amount: amt,
       status: 'pending',
-    })
+    }).select('id').single()
+
+    if (newTxn) {
+      const { data: userData } = await supabase.auth.getUser()
+      if (userData?.user) {
+        await supabase.rpc('log_audit', {
+          p_action: 'requested_withdrawal',
+          p_module: 'finance',
+          p_target_type: 'transaction',
+          p_target_id: newTxn.id,
+          p_previous: null,
+          p_new: { amount: amt },
+          p_company_id: companyId,
+        })
+      }
+    }
 
     setWithdrawing(false)
     setBalance(newBalance)
