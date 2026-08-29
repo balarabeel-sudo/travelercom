@@ -203,7 +203,7 @@ function BookingsManagement() {
     await supabase.from('audit_logs').insert({
       actor_id: currentUserId,
       action: 'assigned_task',
-      module: 'tasks',
+      module: 'bookings',
       target_type: 'booking',
       target_id: selectedBooking.id,
       company_id: companyId,
