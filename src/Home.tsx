@@ -89,6 +89,7 @@ function Home() {
   }[]>([])
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
   const [banners, setBanners] = useState<{ id: string; title: string; message: string; image_url: string | null; link_url: string | null }[]>([])
+  const [heroSlide, setHeroSlide] = useState(0)
   useEffect(() => {
     const loadUser = async () => {
       const { data, error } = await supabase.auth.getUser()
@@ -285,6 +286,13 @@ function Home() {
       await supabase.from('favorites').insert({ user_id: userData.user.id, service_id: serviceId })
     }
   }
+
+  useEffect(() => {
+    const total = 1 + banners.length
+    if (total <= 1) return
+    const timer = setInterval(() => setHeroSlide((prev) => (prev + 1) % total), 5000)
+    return () => clearInterval(timer)
+  }, [banners.length])
 
   if (loading) {
     return (
@@ -574,6 +582,13 @@ const services = [
 
   // No real listings yet for tours/events — will be populated once companies start adding services
 
+  // First slide is always the default welcome message; any active banners follow
+  const heroSlides: ({ type: 'default' } | { type: 'banner'; banner: typeof banners[number] })[] = [
+    { type: 'default' },
+    ...banners.map((b) => ({ type: 'banner' as const, banner: b })),
+  ]
+  const currentSlide = heroSlides[heroSlide] || heroSlides[0]
+
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
 
@@ -615,21 +630,68 @@ const services = [
         </div>
       </div>
 
-      {/* ---------- HERO SECTION ---------- */}
-      <div style={{
-        margin: '16px',
-        borderRadius: '20px',
-        padding: '24px 20px',
-        background: `linear-gradient(135deg, ${COLORS.primary}, #0369a1)`,
-        color: 'white',
-        boxShadow: '0 8px 24px rgba(14,165,233,0.25)'
-      }}>
-        <h2 style={{ fontSize: '21px', fontWeight: 800, lineHeight: 1.3, marginBottom: '6px' }}>
-          Explore Nigeria With Confidence
-        </h2>
-        <p style={{ fontSize: '13px', opacity: 0.9 }}>
-          Hotels, Transport, Flights & Tours in One Platform
-        </p>
+      {/* ---------- HERO SECTION (rotating: default + active banners) ---------- */}
+      <div style={{ margin: '16px' }}>
+        <div
+          onClick={() => {
+            if (currentSlide.type !== 'banner' || !currentSlide.banner.link_url) return
+            if (currentSlide.banner.link_url.startsWith('http')) window.location.href = currentSlide.banner.link_url
+            else navigate(currentSlide.banner.link_url)
+          }}
+          style={{
+            borderRadius: '20px',
+            padding: '24px 20px',
+            minHeight: '108px',
+            position: 'relative',
+            overflow: 'hidden',
+            background: `linear-gradient(135deg, ${COLORS.primary}, #0369a1)`,
+            color: 'white',
+            boxShadow: '0 8px 24px rgba(14,165,233,0.25)',
+            cursor: currentSlide.type === 'banner' && currentSlide.banner.link_url ? 'pointer' : 'default',
+          }}>
+          {currentSlide.type === 'banner' && currentSlide.banner.image_url && (
+            <img src={currentSlide.banner.image_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} />
+          )}
+          <div style={{ position: 'relative' }}>
+            {currentSlide.type === 'default' ? (
+              <>
+                <h2 style={{ fontSize: '21px', fontWeight: 800, lineHeight: 1.3, marginBottom: '6px' }}>
+                  Explore Nigeria With Confidence
+                </h2>
+                <p style={{ fontSize: '13px', opacity: 0.9 }}>
+                  Hotels, Transport, Flights & Tours in One Platform
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 style={{ fontSize: '17px', fontWeight: 800, lineHeight: 1.3, marginBottom: '6px' }}>
+                  {currentSlide.banner.title}
+                </h2>
+                <p style={{ fontSize: '13px', opacity: 0.95 }}>
+                  {currentSlide.banner.message}
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+        {heroSlides.length > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '10px' }}>
+            {heroSlides.map((_, i) => (
+              <div
+                key={i}
+                onClick={() => setHeroSlide(i)}
+                style={{
+                  width: i === heroSlide ? '18px' : '6px',
+                  height: '6px',
+                  borderRadius: '3px',
+                  background: i === heroSlide ? COLORS.primary : COLORS.border,
+                  cursor: 'pointer',
+                  transition: 'width 0.2s',
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ---------- QUICK SERVICES GRID ---------- */}
@@ -690,7 +752,8 @@ const services = [
               key={d.city}
               onClick={() => navigate(`/search?city=${d.city}`)}
               style={{
-                minWidth: '140px',borderRadius: '16px',
+                minWidth: '155px',
+                borderRadius: '16px',
                 overflow: 'hidden',
                 background: COLORS.card,
                 boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
@@ -698,13 +761,13 @@ const services = [
                 flexShrink: 0
               }}>
               <div style={{
-                height: '90px',
+                height: '100px',
                 background: `linear-gradient(135deg, ${d.color}, ${COLORS.primary})`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-                <Icon name={d.icon} size={30} color="white" />
+                <Icon name={d.icon} size={32} color="white" />
               </div>
               <div style={{ padding: '10px' }}>
                 <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '2px' }}>
@@ -751,7 +814,7 @@ const services = [
                 key={h.id}
                 onClick={() => navigate(`/hotels/${h.id}`)}
                 style={{
-                  width: '190px',
+                  width: '165px',
                   flexShrink: 0,
                   background: COLORS.card,
                   borderRadius: '16px',
@@ -759,7 +822,7 @@ const services = [
                   boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
                   cursor: 'pointer'
                 }}>
-                <div style={{ position: 'relative', height: '110px' }}>
+                <div style={{ position: 'relative', height: '100px' }}>
                   <div style={{
                     width: '100%',
                     height: '100%',
@@ -868,47 +931,6 @@ const services = [
         )}
       </div>
 
-      {/* ---------- PLATFORM BANNERS ---------- */}
-      {banners.length > 0 && (
-        <div style={{ padding: '0 16px', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
-            {banners.map((b) => (
-              <div
-                key={b.id}
-                onClick={() => {
-                  if (!b.link_url) return
-                  if (b.link_url.startsWith('http')) window.location.href = b.link_url
-                  else navigate(b.link_url)
-                }}
-                style={{
-                  minWidth: '280px',
-                  flexShrink: 0,
-                  background: b.image_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, #ea580c)`,
-                  borderRadius: '18px',
-                  padding: '20px',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  boxShadow: '0 8px 20px rgba(249,115,22,0.25)',
-                  cursor: b.link_url ? 'pointer' : 'default',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  minHeight: '90px',
-                }}>
-                {b.image_url && (
-                  <img src={b.image_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} />
-                )}
-                <div style={{ flex: 1, position: 'relative' }}>
-                  <p style={{ fontSize: '15px', fontWeight: 800, marginBottom: '4px' }}>{b.title}</p>
-                  <p style={{ fontSize: '12px', opacity: 0.95 }}>{b.message}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ---------- RECENT BOOKINGS ---------- */}
       <div style={{ padding: '0 16px', marginBottom: '24px' }}>
         <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>
@@ -948,7 +970,7 @@ function TripCard({ icon, route, company, date, price, photoUrl, isFavorite, onT
     <div
       onClick={onClick}
       style={{
-        width: '190px',
+        width: '165px',
         flexShrink: 0,
         background: COLORS.card,
         borderRadius: '16px',
@@ -956,7 +978,7 @@ function TripCard({ icon, route, company, date, price, photoUrl, isFavorite, onT
         boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
         cursor: 'pointer'
       }}>
-      <div style={{ position: 'relative', height: '90px' }}>
+      <div style={{ position: 'relative', height: '100px' }}>
         <div style={{
           width: '100%',
           height: '100%',
@@ -966,7 +988,7 @@ function TripCard({ icon, route, company, date, price, photoUrl, isFavorite, onT
           justifyContent: 'center',
           fontSize: '26px',
         }}>
-          {photoUrl ? <img src={photoUrl} alt={route} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name={icon} size={26} color="white" />}
+          {photoUrl ? <img src={photoUrl} alt={route} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name={icon} size={28} color="white" />}
         </div>
         <div
           onClick={onToggleFavorite}
