@@ -62,6 +62,18 @@ export default function Settings() {
       opening_time: openingTime || null,
       closing_time: closingTime || null,
     }).eq('id', companyId)
+    const { data: userData } = await supabase.auth.getUser()
+    if (userData?.user) {
+      await supabase.rpc('log_audit', {
+        p_action: 'updated_settings',
+        p_module: 'settings',
+        p_target_type: 'company',
+        p_target_id: companyId,
+        p_previous: null,
+        p_new: { opening_time: openingTime || null, closing_time: closingTime || null },
+        p_company_id: companyId,
+      })
+    }
     setSavingHours(false)
     setHoursSaved(true)
     setTimeout(() => setHoursSaved(false), 2000)
@@ -72,6 +84,18 @@ export default function Settings() {
     const newVal = !allowUnitSelection
     setAllowUnitSelection(newVal)
     await supabase.from('companies').update({ allow_unit_selection: newVal }).eq('id', companyId)
+    const { data: userData } = await supabase.auth.getUser()
+    if (userData?.user) {
+      await supabase.rpc('log_audit', {
+        p_action: 'updated_settings',
+        p_module: 'settings',
+        p_target_type: 'company',
+        p_target_id: companyId,
+        p_previous: { allow_unit_selection: !newVal },
+        p_new: { allow_unit_selection: newVal },
+        p_company_id: companyId,
+      })
+    }
   }
 
   const handleChangePassword = async () => {
