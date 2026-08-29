@@ -5,6 +5,7 @@ import Icon from './Icons'
 import NotificationBell from './NotificationBell'
 import AdminUsers from './AdminUsers'
 import AdminCompanies from './AdminCompanies'
+import AdminHotels from './AdminHotels'
 import AdminBookings from './AdminBookings'
 import AdminFinance from './AdminFinance'
 import AdminWallet from './AdminWallet'
@@ -483,6 +484,7 @@ function AdminDashboard() {
       {section === 'overview' && <OverviewPanel />}
       {section === 'users' && <AdminUsers />}
       {section === 'companies' && <AdminCompanies />}
+      {section === 'hotels' && <AdminHotels />}
       {section === 'bookings' && <AdminBookings />}
       {section === 'finance' && <AdminFinance />}
       {section === 'wallet' && <AdminWallet />}
