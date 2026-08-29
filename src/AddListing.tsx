@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 
@@ -32,10 +32,13 @@ const TRAVEL_AMENITIES_LIST = Object.keys(TRAVEL_AMENITY_ICON)
 
 function AddListing() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const editId = searchParams.get('edit')
   const [loading, setLoading] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [category, setCategory] = useState<string | null>(null)
   const [approvalStatus, setApprovalStatus] = useState<string>('pending')
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState('')
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -69,11 +72,33 @@ function AddListing() {
         setCompanyId(company.id)
         setCategory(company.business_type)
         setApprovalStatus(company.approval_status)
+
+        if (editId) {
+          const { data: listing } = await supabase.from('services').select('*').eq('id', editId).eq('company_id', company.id).maybeSingle()
+          if (listing) {
+            setCategory(listing.category)
+            setTitle(listing.title || '')
+            setDescription(listing.description || '')
+            setOrigin(listing.origin || '')
+            setDestination(listing.destination || '')
+            setDepartureTime(listing.departure_time ? new Date(listing.departure_time).toISOString().slice(0, 16) : '')
+            setArrivalTime(listing.arrival_time ? new Date(listing.arrival_time).toISOString().slice(0, 16) : '')
+            setDuration(listing.duration_minutes ? String(listing.duration_minutes) : '')
+            setPrice(listing.price ? String(listing.price) : '')
+            setQuantity(listing.seats_available ? String(listing.seats_available) : '')
+            setGateFee(listing.gate_fee ? String(listing.gate_fee) : '')
+            setVehicleFee(listing.vehicle_fee ? String(listing.vehicle_fee) : '')
+            setAmenities(listing.amenities || [])
+            setTourType(listing.tour_type || '')
+            setEventType(listing.event_type || '')
+            setExistingPhotoUrl(listing.photo_url || '')
+          }
+        }
       }
       setLoading(false)
     }
     load()
-  }, [navigate])
+  }, [navigate, editId])
 
   const isTransport = category === 'bus' || category === 'train' || category === 'flight'
   const quantityLabel = category === 'hotel' ? 'Rooms Available' : isTransport ? 'Seats Available' : 'Slots Available'
@@ -122,7 +147,10 @@ function AddListing() {
       photoUrl = urlData.publicUrl
     }
 
-    const { data: newListing, error } = await supabase.from('services').insert({
+    // In edit mode, keep the existing photo unless the user picked a new one
+    if (!photoFile && editId) photoUrl = existingPhotoUrl || null
+
+    const payload = {
       company_id: companyId,
       category: category,
       title: title.trim(),
@@ -135,27 +163,30 @@ function AddListing() {
       price: parseFloat(price),
       commission_rate: COMMISSION_BY_CATEGORY[category] ?? 3,
       seats_available: quantity ? parseInt(quantity, 10) : null,
-      status: 'active',
       photo_url: photoUrl,
       amenities: (category === 'hotel' || isTransport) && amenities.length > 0 ? amenities : null,
       tour_type: category === 'tour' && tourType ? tourType : null,
       gate_fee: category === 'tour' && gateFee ? parseFloat(gateFee) : null,
       vehicle_fee: category === 'tour' && vehicleFee ? parseFloat(vehicleFee) : null,
       event_type: category === 'event_center' && eventType ? eventType : null,
-    }).select('id').single()
+    }
+
+    const { data: savedListing, error } = editId
+      ? await supabase.from('services').update(payload).eq('id', editId).select('id').single()
+      : await supabase.from('services').insert({ ...payload, status: 'active' }).select('id').single()
 
     setSubmitting(false)
     if (error) {
       setErrorMsg(error.message)
     } else {
-      if (newListing) {
+      if (savedListing) {
         const { data: userData } = await supabase.auth.getUser()
         if (userData?.user) {
           await supabase.rpc('log_audit', {
-            p_action: 'created_listing',
+            p_action: editId ? 'updated_listing' : 'created_listing',
             p_module: 'listings',
             p_target_type: 'service',
-            p_target_id: newListing.id,
+            p_target_id: savedListing.id,
             p_previous: null,
             p_new: { title: title.trim(), category },
             p_company_id: companyId,
@@ -191,9 +222,9 @@ function AddListing() {
       <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}><Icon name="checkCircle" size={44} color={COLORS.green} /></div>
-          <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.green, marginBottom: '8px' }}>Listing Added!</p>
-          <button onClick={() => navigate('/home')} style={{ padding: '12px 24px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
-            Back to Dashboard
+          <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.green, marginBottom: '8px' }}>{editId ? 'Listing Updated!' : 'Listing Added!'}</p>
+          <button onClick={() => navigate('/my-listings')} style={{ padding: '12px 24px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
+            Back to My Listings
           </button>
         </div>
       </div>
@@ -204,7 +235,7 @@ function AddListing() {
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
       <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
         <span onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
-        <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Listing</h1>
+        <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>{editId ? 'Edit Listing' : 'Add Listing'}</h1>
       </div>
 
       <div style={{ padding: '20px 16px' }}>
@@ -222,8 +253,8 @@ function AddListing() {
               width: '100%', height: '140px', border: `2px dashed ${COLORS.border}`, borderRadius: '10px',
               cursor: 'pointer', overflow: 'hidden', background: COLORS.bg,
             }}>
-              {photoPreview ? (
-                <img src={photoPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {photoPreview || existingPhotoUrl ? (
+                <img src={photoPreview || existingPhotoUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 <span style={{ fontSize: '13px', color: COLORS.textMuted, display: 'flex', alignItems: 'center', gap: '6px' }}><Icon name="camera" size={16} color={COLORS.textMuted} /> Tap to upload photo</span>
               )}
@@ -402,7 +433,7 @@ function AddListing() {
               color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '14px',
               cursor: submitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
             }}>
-            {submitting ? 'Adding...' : (<><Icon name="plus" size={14} color="white" strokeWidth={2.5} /> Add Listing</>)}
+            {submitting ? (editId ? 'Updating...' : 'Adding...') : editId ? (<><Icon name="check" size={14} color="white" strokeWidth={2.5} /> Update Listing</>) : (<><Icon name="plus" size={14} color="white" strokeWidth={2.5} /> Add Listing</>)}
           </button>
         </div>
       </div>
