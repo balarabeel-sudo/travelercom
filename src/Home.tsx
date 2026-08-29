@@ -466,12 +466,16 @@ if (accountType === 'company') {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
             {analytics.map((a) => {
               const change = a.statKey && periodStats ? periodStats.changes[a.statKey as keyof typeof periodStats.changes] : null
+              const clickable = a.label === 'Active Listings'
               return (
-                <div key={a.label} style={{
+                <div key={a.label}
+                  onClick={clickable ? () => navigate('/my-listings') : undefined}
+                  style={{
                   background: COLORS.card,
                   borderRadius: '14px',
                   padding: '16px',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+                  cursor: clickable ? 'pointer' : 'default',
                 }}>
                   <div style={{ marginBottom: '8px' }}>
                     <Icon name={a.icon} size={22} color={COLORS.primary} />
@@ -480,7 +484,7 @@ if (accountType === 'company') {
                   <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{a.label}</p>
                   {companyPlan === 'business_suite' && change !== null && (
                     <p style={{ fontSize: '10.5px', fontWeight: 700, marginTop: '6px', color: change >= 0 ? '#16A34A' : '#DC2626' }}>
-                      {change >= 0 ? '↑' : '↓'} {Math.abs(change)}% vs last {timeFilter === 'week' ? '7 days' : timeFilter === 'month' ? '30 days' : '12 months'}
+                      {change >= 0 ? '↑' : '↓'} {Math.abs(change)}%
                     </p>
                   )}
                 </div>
