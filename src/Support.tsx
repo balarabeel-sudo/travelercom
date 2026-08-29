@@ -483,6 +483,20 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
       alert('Could not submit ticket: ' + error.message)
       return
     }
+    if (newTicket) {
+      const { data: userData } = await supabase.auth.getUser()
+      if (userData?.user) {
+        await supabase.rpc('log_audit', {
+          p_action: 'created_ticket',
+          p_module: 'support',
+          p_target_type: 'support_ticket',
+          p_target_id: newTicket.id,
+          p_previous: null,
+          p_new: { subject: subject.trim(), category },
+          p_company_id: companyId,
+        })
+      }
+    }
     setShowNew(false)
     setSubject(''); setCategory(COMPANY_CATEGORIES[0]); setBookingCode(''); setMessage(''); setNewFile(null)
     loadTickets()
@@ -507,6 +521,18 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
     if (attachPath) {
       const { data } = await supabase.storage.from('support-attachments').createSignedUrl(attachPath, 3600)
       if (data?.signedUrl) setSignedUrls((prev) => ({ ...prev, [localId]: data.signedUrl }))
+    }
+    const { data: userData } = await supabase.auth.getUser()
+    if (userData?.user) {
+      await supabase.rpc('log_audit', {
+        p_action: 'replied_ticket',
+        p_module: 'support',
+        p_target_type: 'support_ticket',
+        p_target_id: selected.id,
+        p_previous: null,
+        p_new: null,
+        p_company_id: companyId,
+      })
     }
     setReply('')
     setReplyFile(null)
