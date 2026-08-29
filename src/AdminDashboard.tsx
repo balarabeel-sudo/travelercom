@@ -6,6 +6,10 @@ import NotificationBell from './NotificationBell'
 import AdminUsers from './AdminUsers'
 import AdminCompanies from './AdminCompanies'
 import AdminHotels from './AdminHotels'
+import AdminTransport from './AdminTransport'
+import AdminFlights from './AdminFlights'
+import AdminTours from './AdminTours'
+import AdminEventCenters from './AdminEventCenters'
 import AdminBookings from './AdminBookings'
 import AdminFinance from './AdminFinance'
 import AdminWallet from './AdminWallet'
@@ -60,7 +64,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 type SectionKey =
-  | 'overview' | 'users' | 'companies' | 'hotels' | 'transport' | 'flights' | 'bookings'
+  | 'overview' | 'users' | 'companies' | 'hotels' | 'transport' | 'flights' | 'tours' | 'events' | 'bookings'
   | 'finance' | 'wallet' | 'refunds' | 'withdrawals' | 'approvals'
   | 'support' | 'analytics' | 'marketing'
   | 'platform' | 'staff' | 'audit' | 'notifications' | 'settings'
@@ -77,6 +81,8 @@ const NAV: NavGroup[] = [
       { key: 'hotels', label: 'Hotels', icon: 'hotel' },
       { key: 'transport', label: 'Transport', icon: 'bus' },
       { key: 'flights', label: 'Flights', icon: 'plane' },
+      { key: 'tours', label: 'Tours', icon: 'map' },
+      { key: 'events', label: 'Event Centers', icon: 'tent' },
       { key: 'bookings', label: 'Bookings', icon: 'ticket' },
     ]
   },
@@ -115,6 +121,8 @@ const SECTION_PERMISSION: Partial<Record<SectionKey, string | string[]>> = {
   hotels: ['companies.view', 'verification.view'],
   transport: ['companies.view', 'verification.view'],
   flights: ['companies.view', 'verification.view'],
+  tours: ['companies.view', 'verification.view'],
+  events: ['companies.view', 'verification.view'],
   bookings: 'bookings.view',
   finance: 'finance.view',
   wallet: 'wallet.view',
@@ -485,6 +493,10 @@ function AdminDashboard() {
       {section === 'users' && <AdminUsers />}
       {section === 'companies' && <AdminCompanies />}
       {section === 'hotels' && <AdminHotels />}
+      {section === 'transport' && <AdminTransport />}
+      {section === 'flights' && <AdminFlights />}
+      {section === 'tours' && <AdminTours />}
+      {section === 'events' && <AdminEventCenters />}
       {section === 'bookings' && <AdminBookings />}
       {section === 'finance' && <AdminFinance />}
       {section === 'wallet' && <AdminWallet />}
