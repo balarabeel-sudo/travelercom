@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Logo, AccountTypeCard, COLORS } from './AuthComponents'
+import { AccountTypeCard, COLORS } from './AuthComponents'
 
 function AccountType() {
   const navigate = useNavigate()
@@ -15,11 +15,9 @@ function AccountType() {
       padding: '24px',
       textAlign: 'center',
     }}>
-      <Logo size={64} />
-
       <h1 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '4px', marginTop: '14px' }}>
         Welcome to<br />
-        <span style={{ color: COLORS.primary }}>TRAVELER</span><span style={{ color: COLORS.secondary }}>.COM</span>
+        <span style={{ color: COLORS.primary, fontSize: '15px' }}>traveler</span><span style={{ color: COLORS.secondary, fontSize: '15px' }}>.com</span>
       </h1>
       <p style={{ color: COLORS.text, fontSize: '15px', fontWeight: 700, marginBottom: '4px', marginTop: '14px' }}>
         Choose your account type
