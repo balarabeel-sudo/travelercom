@@ -326,65 +326,63 @@ function Tours() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {visible.map((t) => (
-              <div key={t.id} onClick={() => navigate(`/tour/${t.id}`)} style={{ background: COLORS.card, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer' }}>
-                <div style={{ position: 'relative', height: '190px' }}>
+              <div key={t.id} onClick={() => navigate(`/tour/${t.id}`)} style={{ background: COLORS.card, borderRadius: '16px', padding: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer', display: 'flex', gap: '12px' }}>
+                <div style={{ position: 'relative', width: '125px', height: '150px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0 }}>
                   <div style={{ width: '100%', height: '100%', background: t.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {t.photo_url ? <img src={t.photo_url} alt={t.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="map" size={30} color="white" />}
+                    {t.photo_url ? <img src={t.photo_url} alt={t.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="map" size={26} color="white" />}
                   </div>
-                  <div onClick={(e) => toggleFavorite(e, t.id)} style={{ position: 'absolute', top: '10px', right: '10px', width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(t.id) ? COLORS.secondary : '#94a3b8' }}>
-                    <Icon name="heart" size={15} color={favoriteIds.has(t.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(t.id)} />
+                  <div onClick={(e) => toggleFavorite(e, t.id)} style={{ position: 'absolute', top: '8px', right: '8px', width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(t.id) ? COLORS.secondary : '#94a3b8' }}>
+                    <Icon name="heart" size={14} color={favoriteIds.has(t.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(t.id)} />
                   </div>
                   {t.id === lowestPriceId && (
-                    <span style={{ position: 'absolute', top: '10px', left: '10px', background: COLORS.secondary, color: 'white', fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '20px' }}>Best Value</span>
+                    <span style={{ position: 'absolute', top: '8px', left: '8px', background: COLORS.secondary, color: 'white', fontSize: '9.5px', fontWeight: 700, padding: '4px 8px', borderRadius: '20px' }}>Best Value</span>
                   )}
                   {t.id === topRatedId && t.id !== lowestPriceId && (
-                    <span style={{ position: 'absolute', top: '10px', left: '10px', background: COLORS.primary, color: 'white', fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '20px' }}>Top Rated</span>
+                    <span style={{ position: 'absolute', top: '8px', left: '8px', background: COLORS.primary, color: 'white', fontSize: '9.5px', fontWeight: 700, padding: '4px 8px', borderRadius: '20px' }}>Top Rated</span>
                   )}
                 </div>
 
-                <div style={{ padding: '14px' }}>
-                  <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{t.title}</p>
-                  <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon name="mapPin" size={11} color={COLORS.textMuted} /> {t.destination}</p>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '14.5px', fontWeight: 800, color: COLORS.text }}>{t.title}</p>
+                  <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon name="mapPin" size={11} color={COLORS.textMuted} /> {t.destination}</p>
 
                   {t.avgRating !== null && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-                      <Icon name="star" size={12} color="#D4A017" />
-                      <span style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>{t.avgRating.toFixed(1)}</span>
-                      <span style={{ fontSize: '11.5px', color: COLORS.primary, fontWeight: 600 }}>({t.reviewCount.toLocaleString()} review{t.reviewCount !== 1 ? 's' : ''})</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px' }}>
+                      <Icon name="star" size={11} color="#D4A017" />
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{t.avgRating.toFixed(1)}</span>
+                      <span style={{ fontSize: '11px', color: COLORS.primary, fontWeight: 600 }}>({t.reviewCount.toLocaleString()})</span>
                     </div>
                   )}
 
                   {t.description && (
-                    <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '6px' }}>{t.description}</p>
+                    <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>{t.description}</p>
                   )}
 
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '7px' }}>
                     {t.tour_type && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
-                        <Icon name={TOUR_TYPE_ICON[t.tour_type] || 'map'} size={11} color={COLORS.textMuted} /> {t.tour_type}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9.5px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '3px 7px', borderRadius: '20px' }}>
+                        <Icon name={TOUR_TYPE_ICON[t.tour_type] || 'map'} size={10} color={COLORS.textMuted} /> {t.tour_type}
                       </span>
                     )}
-                    {t.amenities && t.amenities.slice(0, 3).map((a) => (
-                      <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
-                        <Icon name={TOUR_AMENITY_ICON[a] || 'check'} size={11} color={COLORS.textMuted} /> {a}
+                    {t.amenities && t.amenities.slice(0, 2).map((a) => (
+                      <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9.5px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '3px 7px', borderRadius: '20px' }}>
+                        <Icon name={TOUR_AMENITY_ICON[a] || 'check'} size={10} color={COLORS.textMuted} /> {a}
                       </span>
                     ))}
-                    {t.amenities && t.amenities.length > 3 && (
-                      <span style={{ fontSize: '10px', color: COLORS.textMuted, alignSelf: 'center' }}>+{t.amenities.length - 3} more</span>
+                    {t.amenities && t.amenities.length > 2 && (
+                      <span style={{ fontSize: '9.5px', color: COLORS.textMuted, alignSelf: 'center' }}>+{t.amenities.length - 2} more</span>
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '10px' }}>
-                    <div>
-                      <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary }}>₦{Number(t.price).toLocaleString()} <span style={{ fontSize: '11px', color: COLORS.textMuted, fontWeight: 400 }}>/person</span></p>
-                      {t.seats_available !== null && (
-                        <p style={{ fontSize: '11px', fontWeight: 700, color: t.seats_available === 0 ? '#DC2626' : COLORS.green }}>
-                          {t.seats_available === 0 ? 'Fully booked' : `${t.seats_available} slots available`}
-                        </p>
-                      )}
-                    </div>
-                    <span style={{ padding: '9px 18px', background: COLORS.secondary, color: 'white', borderRadius: '9px', fontWeight: 700, fontSize: '12.5px' }}>View Details</span>
+                  <div style={{ marginTop: '8px' }}>
+                    <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(t.price).toLocaleString()} <span style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 400 }}>/person</span></p>
+                    {t.seats_available !== null && (
+                      <p style={{ fontSize: '10.5px', fontWeight: 700, color: t.seats_available === 0 ? '#DC2626' : COLORS.green }}>
+                        {t.seats_available === 0 ? 'Fully booked' : `${t.seats_available} slots available`}
+                      </p>
+                    )}
                   </div>
+                  <span style={{ display: 'inline-block', marginTop: '8px', padding: '8px 16px', background: COLORS.secondary, color: 'white', borderRadius: '9px', fontWeight: 700, fontSize: '12px' }}>View Details</span>
                 </div>
               </div>
             ))}
