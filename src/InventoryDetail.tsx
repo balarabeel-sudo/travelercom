@@ -33,6 +33,8 @@ type Unit = {
   expected_completion: string | null
 }
 
+const UNIT_ICON: Record<string, string> = { Room: 'bed', Seat: 'seat', Slot: 'map', Ticket: 'ticket' }
+
 export default function InventoryDetail() {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -255,7 +257,7 @@ export default function InventoryDetail() {
                 </div>
               </div>
               <div style={{ background: '#F5F3FF', borderRadius: '10px', padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ display: 'flex' }}><Icon name="info" size={12} color={COLORS.purple} /></span>
+                <Icon name="info" size={13} color={COLORS.purple} />
                 <p style={{ fontSize: '11px', color: COLORS.purple }}>Changing the total will affect availability.</p>
               </div>
             </div>
@@ -318,7 +320,7 @@ export default function InventoryDetail() {
                 return (
                   <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                     <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: st.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Icon name="bed" size={15} color={st.color} />
+                      <Icon name={UNIT_ICON[unitLabel] || 'box'} size={15} color={st.color} />
                     </div>
                     <div style={{ flex: 1 }}>
                       <p style={{ fontSize: '13.5px', fontWeight: 800, color: st.color }}>{u.unit_number}</p>
@@ -332,12 +334,14 @@ export default function InventoryDetail() {
 
             {showTip && (
               <div style={{ background: '#f0fdf4', borderRadius: '14px', padding: '14px', marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <span style={{ display: 'flex' }}><Icon name="shield" size={18} color={COLORS.green} /></span>
+                <Icon name="shield" size={18} color={COLORS.green} />
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Keep your inventory updated</p>
                   <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>Accurate inventory helps you avoid double bookings and improve guest experience.</p>
                 </div>
-                <div onClick={() => setShowTip(false)} style={{ cursor: 'pointer', color: COLORS.textMuted, display: 'flex' }}><Icon name="x" size={14} color={COLORS.textMuted} /></div>
+                <div onClick={() => setShowTip(false)} style={{ cursor: 'pointer', display: 'flex' }}>
+                  <Icon name="x" size={14} color={COLORS.textMuted} />
+                </div>
               </div>
             )}
           </>
@@ -400,7 +404,7 @@ export default function InventoryDetail() {
                       )}
                     </div>
                     <div onClick={() => reopenUnit(u.id)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f0fdf4', color: COLORS.green, fontSize: '11.5px', fontWeight: 700, padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                      <Icon name="check" size={12} color={COLORS.green} strokeWidth={2.5} /> Reopen
+                      <Icon name="checkCircle" size={12} color={COLORS.green} /> Reopen
                     </div>
                   </div>
                 </div>
@@ -454,12 +458,12 @@ function TabButton({ icon, label, active, onClick }: { icon: string; label: stri
     <div
       onClick={onClick}
       style={{
-        flex: 1, textAlign: 'center', padding: '10px 3px', borderRadius: '10px', cursor: 'pointer',
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+        textAlign: 'center', padding: '10px 3px', borderRadius: '10px', cursor: 'pointer',
         background: active ? COLORS.purple : COLORS.card, color: active ? 'white' : COLORS.textMuted,
-        fontWeight: 700, fontSize: '11.5px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
+        fontWeight: 700, fontSize: '11.5px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
       }}>
-      <Icon name={icon} size={15} color={active ? 'white' : COLORS.textMuted} />
+      <Icon name={icon} size={13} color={active ? 'white' : COLORS.textMuted} />
       {label}
     </div>
   )
