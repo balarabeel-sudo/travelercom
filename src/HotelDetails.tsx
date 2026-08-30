@@ -36,6 +36,9 @@ const AMENITY_ICON: Record<string, string> = {
   Catering: 'restaurant', 'Sound System': 'speaker', Seating: 'seat',
 }
 
+type Step = 'details' | 'guest' | 'dates' | 'summary' | 'payment'
+const STEP_ORDER: Step[] = ['details', 'guest', 'dates', 'summary', 'payment']
+
 type RoomType = {
   id: string
   name: string
@@ -74,6 +77,16 @@ function HotelDetails() {
   const [ticketCode, setTicketCode] = useState('')
   const [assignedUnitNumber, setAssignedUnitNumber] = useState('')
 
+  // --- Booking wizard ---
+  const [step, setStep] = useState<Step>('details')
+  // Guest info is prefilled from the account and shown for confirmation only —
+  // it is not written to the database (bookings table has no email/phone columns).
+  const [gName, setGName] = useState('')
+  const [gEmail, setGEmail] = useState('')
+  const [gPhone, setGPhone] = useState('')
+  const [guestErrors, setGuestErrors] = useState<{ name?: string; email?: string; phone?: string }>({})
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'paystack'>('wallet')
+
   useEffect(() => {
     const load = async () => {
       const { data: userData, error } = await supabase.auth.getUser()
@@ -83,6 +96,9 @@ function HotelDetails() {
       }
       setUserId(userData.user.id)
       setDisplayName(userData.user.user_metadata?.full_name || '')
+      setGName(userData.user.user_metadata?.full_name || '')
+      setGEmail(userData.user.email || '')
+      setGPhone(userData.user.phone || userData.user.user_metadata?.phone || '')
 
       const { data: wallet } = await supabase
         .from('wallets')
@@ -222,6 +238,25 @@ function HotelDetails() {
   })()
 
   const activePrice = discountedTotal
+
+  const validateGuest = () => {
+    const errors: { name?: string; email?: string; phone?: string } = {}
+    if (!gName.trim()) errors.name = 'Name cannot be empty.'
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gEmail.trim())) errors.email = 'Enter a valid email address.'
+    if (gPhone.replace(/\D/g, '').length < 7) errors.phone = 'Enter a valid phone number.'
+    setGuestErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const goBack = () => {
+    const idx = STEP_ORDER.indexOf(step)
+    if (idx <= 0) navigate('/hotels')
+    else setStep(STEP_ORDER[idx - 1])
+  }
+
+  const canContinueFromDetails = usingRoomTypes
+    ? !!selectedRoomTypeId && (service?.companies?.allow_unit_selection === false || !!selectedUnitId)
+    : true
 
   const handleBookNow = async () => {
     if (!service) return
@@ -368,20 +403,37 @@ function HotelDetails() {
           <p style={{ fontSize: '17px', fontWeight: 800, color: COLORS.green, marginBottom: '6px' }}>Booking Confirmed!</p>
           <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '20px' }}>{service.title}</p>
 
-          <div style={{ background: COLORS.bg, borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
-            <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>YOUR TICKET CODE</p>
-            <p style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, letterSpacing: '1px' }}>{ticketCode}</p>
-            {assignedUnitNumber && (
-              <>
-                <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '12px', marginBottom: '4px' }}>YOUR ROOM</p>
-                <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.primary }}>Room {assignedUnitNumber}</p>
-              </>
-            )}
+          <div style={{ background: COLORS.bg, borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'left' as const }}>
+            <div style={{ textAlign: 'center' as const, marginBottom: '12px' }}>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>YOUR TICKET CODE</p>
+              <p style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, letterSpacing: '1px' }}>{ticketCode}</p>
+              {assignedUnitNumber && (
+                <>
+                  <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '10px', marginBottom: '4px' }}>YOUR ROOM</p>
+                  <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.primary }}>Room {assignedUnitNumber}</p>
+                </>
+              )}
+            </div>
+            <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: '10px', display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+              <SummaryRow label="Guest" value={gName} />
+              <SummaryRow label="Check-in" value={checkInDate} />
+              <SummaryRow label="Check-out" value={checkOutDate} />
+              <SummaryRow label="Nights" value={String(nights)} />
+              <SummaryRow label="Room" value={selectedRoom?.name || 'Standard'} />
+              <SummaryRow label="Total paid" value={`₦${activePrice.toLocaleString()}`} bold />
+              <SummaryRow label="Status" value="Confirmed" valueColor={COLORS.green} />
+            </div>
           </div>
 
-          <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '20px' }}>
+          <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '14px' }}>
             Show this code to the hotel staff on arrival. You can cancel within 15 minutes from "My Bookings".
           </p>
+
+          <button
+            onClick={() => navigate('/bookings')}
+            style={{ width: '100%', padding: '13px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' }}>
+            View Booking
+          </button>
 
           <button
             onClick={() => navigate('/home')}
@@ -404,11 +456,20 @@ function HotelDetails() {
         background: COLORS.card,
         boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
       }}>
-        <span onClick={() => navigate('/hotels')} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
-        <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Hotel Details</h1>
+        <span onClick={goBack} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
+        <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>
+          {step === 'details' && 'Hotel Details'}
+          {step === 'guest' && 'Guest Information'}
+          {step === 'dates' && 'Select Your Stay'}
+          {step === 'summary' && 'Booking Summary'}
+          {step === 'payment' && 'Payment'}
+        </h1>
       </div>
 
+      {step !== 'details' && <ProgressBar step={step} />}
+
       <div style={{ padding: '16px' }}>
+      {step === 'details' && (<>
         <div style={{
           height: '180px',
           borderRadius: '16px',
@@ -554,8 +615,38 @@ function HotelDetails() {
           </div>
         )}
 
+        <button
+          onClick={() => setStep('guest')}
+          disabled={!canContinueFromDetails}
+          style={{
+            width: '100%', padding: '15px', background: canContinueFromDetails ? COLORS.secondary : '#94a3b8',
+            color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px',
+            cursor: canContinueFromDetails ? 'pointer' : 'not-allowed',
+          }}>
+          Book Now
+        </button>
+      </>)}
+
+      {step === 'guest' && (
+        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+          <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '16px' }}>
+            We've filled this in from your account — please confirm it's correct.
+          </p>
+
+          <FormField label="Full Name" value={gName} onChange={setGName} error={guestErrors.name} placeholder="Your full name" />
+          <FormField label="Email Address" value={gEmail} onChange={setGEmail} error={guestErrors.email} placeholder="you@example.com" type="email" />
+          <FormField label="Phone Number" value={gPhone} onChange={setGPhone} error={guestErrors.phone} placeholder="080..." type="tel" last />
+
+          <button
+            onClick={() => { if (validateGuest()) setStep('dates') }}
+            style={{ width: '100%', padding: '15px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' }}>
+            Continue
+          </button>
+        </div>
+      )}
+
+      {step === 'dates' && (<>
         <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-          <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Check-in / Check-out</p>
           <div style={{ display: 'flex', gap: '10px', marginBottom: nights > 0 ? '10px' : 0 }}>
             <div style={{ flex: 1 }}>
               <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>Check-in</p>
@@ -578,6 +669,9 @@ function HotelDetails() {
               />
             </div>
           </div>
+          {checkOutDate && checkInDate && nights <= 0 && (
+            <p style={{ fontSize: '11.5px', color: COLORS.red, marginBottom: '8px' }}>Check-out must be after check-in.</p>
+          )}
           {activePromo && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: '6px', background: '#F5F3FF',
@@ -602,10 +696,92 @@ function HotelDetails() {
           )}
         </div>
 
-        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '12px', color: COLORS.textMuted }}>Your wallet balance</span>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>₦{walletBalance.toLocaleString()}</span>
+        <button
+          onClick={() => setStep('summary')}
+          disabled={nights <= 0}
+          style={{ width: '100%', padding: '15px', background: nights > 0 ? COLORS.secondary : '#94a3b8', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: nights > 0 ? 'pointer' : 'not-allowed' }}>
+          Continue
+        </button>
+      </>)}
+
+      {step === 'summary' && (<>
+        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
+          <div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Hotel</p>
+            <SummaryRow label="Name" value={service.title} />
+            <SummaryRow label="Location" value={service.destination} />
+          </div>
+          <div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Guest</p>
+            <SummaryRow label="Name" value={gName} />
+            <SummaryRow label="Email" value={gEmail} />
+            <SummaryRow label="Phone" value={gPhone} />
+          </div>
+          <div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Stay</p>
+            <SummaryRow label="Check-in" value={checkInDate} />
+            <SummaryRow label="Check-out" value={checkOutDate} />
+            <SummaryRow label="Nights" value={String(nights)} />
+            <SummaryRow label="Room" value={selectedRoom?.name || 'Standard'} />
+          </div>
+          <div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Price Breakdown</p>
+            <SummaryRow label={`Room × ${nights} night${nights > 1 ? 's' : ''}`} value={`₦${calculatedTotal.toLocaleString()}`} />
+            {activePromo && (
+              <SummaryRow label={activePromo.title} value={`− ₦${(calculatedTotal - discountedTotal).toLocaleString()}`} valueColor={COLORS.green} />
+            )}
+            <div style={{ borderTop: `1px solid ${COLORS.border}`, marginTop: '4px', paddingTop: '8px' }}>
+              <SummaryRow label="Total Amount" value={`₦${discountedTotal.toLocaleString()}`} bold />
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setStep('payment')}
+          style={{ width: '100%', padding: '15px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' }}>
+          Proceed to Payment
+        </button>
+      </>)}
+
+      {step === 'payment' && (<>
+        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Amount to Pay</span>
+            <span style={{ fontSize: '18px', fontWeight: 800, color: COLORS.primary }}>₦{activePrice.toLocaleString()}</span>
+          </div>
+
+          <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '8px' }}>Payment Method</p>
+
+          <div
+            onClick={() => setPaymentMethod('wallet')}
+            style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px',
+              borderRadius: '10px', border: `2px solid ${paymentMethod === 'wallet' ? COLORS.primary : COLORS.border}`,
+              marginBottom: '8px', cursor: 'pointer',
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Icon name="wallet" size={18} color={COLORS.primary} />
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>Wallet</p>
+                <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Balance: ₦{walletBalance.toLocaleString()}</p>
+              </div>
+            </div>
+            <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: `2px solid ${paymentMethod === 'wallet' ? COLORS.primary : COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {paymentMethod === 'wallet' && <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: COLORS.primary }} />}
+            </div>
+          </div>
+
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px',
+            borderRadius: '10px', border: `2px solid ${COLORS.border}`, opacity: 0.5,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Icon name="cash" size={18} color={COLORS.textMuted} />
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>Paystack (Card/Bank Transfer)</p>
+                <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Coming soon</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -628,11 +804,11 @@ function HotelDetails() {
 
         <button
           onClick={handleBookNow}
-          disabled={booking || (usingRoomTypes && !selectedUnitId) || nights <= 0}
+          disabled={booking || paymentMethod !== 'wallet'}
           style={{
             width: '100%',
             padding: '15px',
-            background: booking || (usingRoomTypes && !selectedUnitId) || nights <= 0 ? '#94a3b8' : COLORS.secondary,
+            background: booking || paymentMethod !== 'wallet' ? '#94a3b8' : COLORS.secondary,
             color: 'white',
             border: 'none',
             borderRadius: '12px',
@@ -640,9 +816,70 @@ function HotelDetails() {
             fontSize: '15px',
             cursor: booking ? 'not-allowed' : 'pointer'
           }}>
-          {booking ? 'Processing...' : `Book Now — ₦${activePrice.toLocaleString()}`}
+          {booking ? 'Processing...' : `Pay Now — ₦${activePrice.toLocaleString()}`}
         </button>
+      </>)}
       </div>
+    </div>
+  )
+}
+
+function ProgressBar({ step }: { step: Step }) {
+  const COLORS_LOCAL = { primary: '#0EA5E9', border: '#E2E8F0', textMuted: '#64748B', text: '#1A1A1A' }
+  const labels: { key: Step; label: string }[] = [
+    { key: 'guest', label: 'Guest' },
+    { key: 'dates', label: 'Dates' },
+    { key: 'summary', label: 'Review' },
+    { key: 'payment', label: 'Payment' },
+  ]
+  const currentIdx = labels.findIndex((l) => l.key === step)
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', background: COLORS_LOCAL.border && '#FFFFFF', gap: '4px' }}>
+      {labels.map((l, i) => (
+        <div key={l.key} style={{ display: 'flex', alignItems: 'center', flex: i < labels.length - 1 ? 1 : 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{
+              width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: i <= currentIdx ? COLORS_LOCAL.primary : COLORS_LOCAL.border,
+              color: i <= currentIdx ? 'white' : COLORS_LOCAL.textMuted,
+              fontSize: '10px', fontWeight: 700, flexShrink: 0,
+            }}>
+              {i + 1}
+            </div>
+            <span style={{ fontSize: '10.5px', fontWeight: 700, color: i <= currentIdx ? COLORS_LOCAL.text : COLORS_LOCAL.textMuted, whiteSpace: 'nowrap' as const }}>{l.label}</span>
+          </div>
+          {i < labels.length - 1 && <div style={{ flex: 1, height: '1px', background: i < currentIdx ? COLORS_LOCAL.primary : COLORS_LOCAL.border, margin: '0 6px' }} />}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function FormField({ label, value, onChange, error, placeholder, type = 'text', last }: {
+  label: string; value: string; onChange: (v: string) => void; error?: string; placeholder?: string; type?: string; last?: boolean
+}) {
+  const COLORS_LOCAL = { border: '#E2E8F0', text: '#1A1A1A', textMuted: '#64748B', red: '#dc2626' }
+  return (
+    <div style={{ marginBottom: last ? '18px' : '14px' }}>
+      <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS_LOCAL.textMuted, marginBottom: '5px' }}>{label}</p>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ width: '100%', padding: '11px', borderRadius: '9px', border: `1px solid ${error ? COLORS_LOCAL.red : COLORS_LOCAL.border}`, fontSize: '13.5px', boxSizing: 'border-box' as const }}
+      />
+      {error && <p style={{ fontSize: '11px', color: COLORS_LOCAL.red, marginTop: '4px' }}>{error}</p>}
+    </div>
+  )
+}
+
+function SummaryRow({ label, value, bold, valueColor }: { label: string; value: string; bold?: boolean; valueColor?: string }) {
+  const COLORS_LOCAL = { text: '#1A1A1A', textMuted: '#64748B', primary: '#0EA5E9' }
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+      <span style={{ fontSize: bold ? '13.5px' : '12.5px', color: COLORS_LOCAL.textMuted }}>{label}</span>
+      <span style={{ fontSize: bold ? '15px' : '12.5px', fontWeight: bold ? 800 : 600, color: valueColor || (bold ? COLORS_LOCAL.primary : COLORS_LOCAL.text) }}>{value}</span>
     </div>
   )
 }
