@@ -283,7 +283,7 @@ export default function InventoryManagement() {
 
           {holidays.length === 0 ? (
             <div style={{ background: '#F5F3FF', borderRadius: '10px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ display: 'flex' }}><Icon name="info" size={13} color={COLORS.purple} /></span>
+              <Icon name="info" size={14} color={COLORS.purple} />
               <p style={{ fontSize: '11.5px', color: COLORS.purple }}>No public holiday dates set. Weekday/Weekend pricing will still apply.</p>
             </div>
           ) : (
@@ -316,7 +316,7 @@ export default function InventoryManagement() {
               {photoPreview ? (
                 <img src={photoPreview} alt="preview" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
               ) : (
-                <span style={{ display: 'flex' }}><Icon name={formLabels.icon} size={20} color={COLORS.purple} /></span>
+                <Icon name={formLabels.icon} size={20} color={COLORS.textMuted} />
               )}
               <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>{photoPreview ? 'Change photo' : `Tap to add a ${formLabels.singular.toLowerCase()} photo (optional)`}</span>
               <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
