@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import NotificationBell from './NotificationBell'
 import { ListCardSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
 
@@ -19,6 +20,48 @@ const COLORS = {
 const TRAVEL_AMENITY_ICON: Record<string, string> = {
   WiFi: 'wifi', AC: 'snowflake', 'Charging Port': 'plug', Meals: 'food', 'Reclining Seats': 'seat', Toilet: 'toilet', Refundable: 'refresh', 'Baggage Allowance': 'luggage',
 }
+
+// Nigeria's 36 states + FCT, mapped to the primary city used in origin/destination text.
+// Used only to filter existing real listings by state — no data is invented here.
+const NIGERIA_STATES: { name: string; city: string }[] = [
+  { name: 'Abia', city: 'Umuahia' },
+  { name: 'Adamawa', city: 'Yola' },
+  { name: 'Akwa Ibom', city: 'Uyo' },
+  { name: 'Anambra', city: 'Awka' },
+  { name: 'Bauchi', city: 'Bauchi' },
+  { name: 'Bayelsa', city: 'Yenagoa' },
+  { name: 'Benue', city: 'Makurdi' },
+  { name: 'Borno', city: 'Maiduguri' },
+  { name: 'Cross River', city: 'Calabar' },
+  { name: 'Delta', city: 'Asaba' },
+  { name: 'Ebonyi', city: 'Abakaliki' },
+  { name: 'Edo', city: 'Benin' },
+  { name: 'Ekiti', city: 'Ado Ekiti' },
+  { name: 'Enugu', city: 'Enugu' },
+  { name: 'FCT (Abuja)', city: 'Abuja' },
+  { name: 'Gombe', city: 'Gombe' },
+  { name: 'Imo', city: 'Owerri' },
+  { name: 'Jigawa', city: 'Dutse' },
+  { name: 'Kaduna', city: 'Kaduna' },
+  { name: 'Kano', city: 'Kano' },
+  { name: 'Katsina', city: 'Katsina' },
+  { name: 'Kebbi', city: 'Birnin Kebbi' },
+  { name: 'Kogi', city: 'Lokoja' },
+  { name: 'Kwara', city: 'Ilorin' },
+  { name: 'Lagos', city: 'Lagos' },
+  { name: 'Nasarawa', city: 'Lafia' },
+  { name: 'Niger', city: 'Minna' },
+  { name: 'Ogun', city: 'Abeokuta' },
+  { name: 'Ondo', city: 'Akure' },
+  { name: 'Osun', city: 'Osogbo' },
+  { name: 'Oyo', city: 'Ibadan' },
+  { name: 'Plateau', city: 'Jos' },
+  { name: 'Rivers', city: 'Port Harcourt' },
+  { name: 'Sokoto', city: 'Sokoto' },
+  { name: 'Taraba', city: 'Jalingo' },
+  { name: 'Yobe', city: 'Damaturu' },
+  { name: 'Zamfara', city: 'Gusau' },
+]
 
 type TripItem = {
   id: string
@@ -46,9 +89,13 @@ function Train() {
   const [items, setItems] = useState<TripItem[]>([])
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
 
+  const [origin, setOrigin] = useState('')
   const [destination, setDestination] = useState('')
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
+
+  const [stateFilter, setStateFilter] = useState('all')
+  const [showStateFilter, setShowStateFilter] = useState(false)
 
   const [sortBy, setSortBy] = useState<SortKey>('recommended')
   const [showSort, setShowSort] = useState(false)
@@ -63,6 +110,7 @@ function Train() {
       .eq('status', 'active')
       .order('created_at', { ascending: false })
 
+    if (origin.trim()) query = query.ilike('origin', `%${origin.trim()}%`)
     if (destination.trim()) query = query.ilike('destination', `%${destination.trim()}%`)
     if (minPrice) query = query.gte('price', parseFloat(minPrice))
     if (maxPrice) query = query.lte('price', parseFloat(maxPrice))
@@ -123,16 +171,39 @@ function Train() {
     }
   }
 
-  const visible = [...items].sort((a, b) => {
+  const swapLocations = () => {
+    const o = origin
+    setOrigin(destination)
+    setDestination(o)
+  }
+
+  const clearFilters = () => {
+    setOrigin('')
+    setDestination('')
+    setMinPrice('')
+    setMaxPrice('')
+    setStateFilter('all')
+    fetchItems()
+  }
+
+  const selectedCity = stateFilter === 'all' ? null : (NIGERIA_STATES.find((s) => s.name === stateFilter)?.city || null)
+  const filteredItems = selectedCity
+    ? items.filter((h) => {
+        const c = selectedCity.toLowerCase()
+        return (h.origin || '').toLowerCase().includes(c) || h.destination.toLowerCase().includes(c)
+      })
+    : items
+
+  const visible = [...filteredItems].sort((a, b) => {
     if (sortBy === 'price_low') return a.price - b.price
     if (sortBy === 'price_high') return b.price - a.price
     if (sortBy === 'rating') return (b.avgRating ?? -1) - (a.avgRating ?? -1)
     return 0
   })
 
-  const lowestPriceId = items.length > 1 ? [...items].sort((a, b) => a.price - b.price)[0].id : null
+  const lowestPriceId = filteredItems.length > 1 ? [...filteredItems].sort((a, b) => a.price - b.price)[0].id : null
   const topRatedId = (() => {
-    const rated = items.filter((h) => h.avgRating !== null)
+    const rated = filteredItems.filter((h) => h.avgRating !== null)
     if (rated.length < 2) return null
     return [...rated].sort((a, b) => (b.avgRating ?? 0) - (a.avgRating ?? 0))[0].id
   })()
@@ -144,41 +215,92 @@ function Train() {
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
 
-      <div style={{ padding: '16px 20px', background: COLORS.card, position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer', marginTop: '2px' }}>←</span>
-            <div>
-              <h1 style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text, display: 'flex', alignItems: 'center', gap: '6px' }}><Icon name="train" size={18} color={COLORS.text} /> Railway</h1>
-              <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Search and book train tickets</p>
-            </div>
+      {/* ---------- HEADER ---------- */}
+      <div style={{ padding: '16px 20px', background: COLORS.card, position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}>
+            <Icon name="arrowLeft" size={20} color={COLORS.text} />
           </div>
-          <span style={{ color: COLORS.textMuted, display: 'flex' }}><Icon name="heart" size={18} color={COLORS.textMuted} /></span>
+          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `linear-gradient(135deg, ${COLORS.primary}, #1e40af)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="train" size={20} color="white" />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>Railway</h1>
+            <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Search and book train tickets easily</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <Icon name="heart" size={20} color={COLORS.text} />
+          <NotificationBell iconColor={COLORS.text} />
         </div>
       </div>
 
       <div style={{ padding: '16px' }}>
+
+        {/* ---------- SEARCH CARD ---------- */}
         <div style={{ background: COLORS.card, borderRadius: '16px', padding: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', marginBottom: '14px' }}>
-          <input type="text" placeholder="Destination (e.g. Abuja)" value={destination} onChange={(e) => setDestination(e.target.value)} style={inputStyle} />
-          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-            <input type="number" placeholder="Min price (₦)" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-            <input type="number" placeholder="Max price (₦)" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+          <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '11px 12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Icon name="mapPin" size={16} color={COLORS.primary} />
+            <input value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="From (e.g. Lagos)" style={{ border: 'none', outline: 'none', fontSize: '14px', fontWeight: 600, color: COLORS.text, width: '100%', padding: 0 }} />
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-            <button onClick={fetchItems} style={{ flex: 1, padding: '12px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '-10px 4px' }}>
+            <div onClick={swapLocations} style={{ width: '28px', height: '28px', borderRadius: '50%', border: `1px solid ${COLORS.border}`, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 2, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
+              <Icon name="refresh" size={13} color={COLORS.primary} />
+            </div>
+          </div>
+
+          <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '11px 12px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+            <Icon name="mapPin" size={16} color={COLORS.secondary} />
+            <input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Destination (e.g. Abuja)" style={{ border: 'none', outline: 'none', fontSize: '14px', fontWeight: 600, color: COLORS.text, width: '100%', padding: 0 }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+            <div style={{ flex: 1, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '11px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icon name="tag" size={15} color={COLORS.primary} />
+              <input type="number" placeholder="Min price (₦)" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: '13px', fontWeight: 600, color: COLORS.text, width: '100%', padding: 0 }} />
+            </div>
+            <div style={{ flex: 1, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '11px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icon name="tag" size={15} color={COLORS.primary} />
+              <input type="number" placeholder="Max price (₦)" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: '13px', fontWeight: 600, color: COLORS.text, width: '100%', padding: 0 }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={fetchItems} style={{ flex: 1, padding: '13px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
               <Icon name="search" size={15} color="white" /> Search Trains
             </button>
-            <button onClick={() => { setDestination(''); setMinPrice(''); setMaxPrice(''); fetchItems() }} style={{ padding: '12px 16px', background: COLORS.bg, color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
+            <button onClick={clearFilters} style={{ padding: '13px 16px', background: COLORS.bg, color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer' }}>
               Clear
             </button>
           </div>
         </div>
 
+        {/* ---------- STATE + QUICK FILTERS ---------- */}
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '14px' }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <span onClick={() => setShowStateFilter(!showStateFilter)} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '20px', cursor: 'pointer', background: stateFilter === 'all' ? COLORS.card : COLORS.primary, color: stateFilter === 'all' ? COLORS.text : 'white', border: `1px solid ${stateFilter === 'all' ? COLORS.border : COLORS.primary}`, whiteSpace: 'nowrap' }}>
+              <Icon name="mapPin" size={13} color={stateFilter === 'all' ? COLORS.text : 'white'} />
+              {stateFilter === 'all' ? 'All States' : stateFilter} ⌄
+            </span>
+            {showStateFilter && (
+              <div style={{ position: 'absolute', left: 0, top: '38px', background: COLORS.card, borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 30, width: '220px', maxHeight: '280px', overflowY: 'auto' }}>
+                <div onClick={() => { setStateFilter('all'); setShowStateFilter(false) }} style={{ padding: '10px 14px', fontSize: '12.5px', fontWeight: stateFilter === 'all' ? 700 : 500, color: stateFilter === 'all' ? COLORS.primary : COLORS.text, cursor: 'pointer', borderBottom: `1px solid ${COLORS.border}` }}>
+                  All States
+                </div>
+                {NIGERIA_STATES.map((s) => (
+                  <div key={s.name} onClick={() => { setStateFilter(s.name); setShowStateFilter(false) }} style={{ padding: '10px 14px', fontSize: '12.5px', fontWeight: stateFilter === s.name ? 700 : 500, color: stateFilter === s.name ? COLORS.primary : COLORS.text, cursor: 'pointer' }}>
+                    {s.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <FilterChip icon="star" label="Top Rated" active={sortBy === 'rating'} onClick={() => setSortBy(sortBy === 'rating' ? 'recommended' : 'rating')} />
           <FilterChip icon="cash" label={sortBy === 'price_low' ? 'Price ↑' : sortBy === 'price_high' ? 'Price ↓' : 'Price'} active={sortBy === 'price_low' || sortBy === 'price_high'} onClick={() => setSortBy(sortBy === 'price_low' ? 'price_high' : sortBy === 'price_high' ? 'recommended' : 'price_low')} />
         </div>
 
+        {/* ---------- RESULT COUNT + SORT ---------- */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>
             {loading ? 'Searching...' : `${visible.length} train route${visible.length !== 1 ? 's' : ''} found${destination.trim() ? ` to ${destination.trim()}` : ''}`}
@@ -206,66 +328,64 @@ function Train() {
         ) : visible.length === 0 ? (
           <div style={{ background: COLORS.card, borderRadius: '16px', padding: '30px', textAlign: 'center', color: COLORS.textMuted, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '13px' }}>No train routes found</p>
-            <p style={{ fontSize: '12px', marginTop: '4px' }}>Try a different destination or clear your filters.</p>
+            <p style={{ fontSize: '12px', marginTop: '4px' }}>Try a different destination, state, or clear your filters.</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {visible.map((h) => (
-              <div key={h.id} onClick={() => navigate(`/train/${h.id}`)} style={{ background: COLORS.card, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer' }}>
-                <div style={{ position: 'relative', height: '130px' }}>
-                  <div style={{ width: '100%', height: '100%', background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>
-                    {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="train" size={32} color="white" />}
+              <div key={h.id} onClick={() => navigate(`/train/${h.id}`)} style={{ background: COLORS.card, borderRadius: '16px', padding: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer', display: 'flex', gap: '12px' }}>
+                <div style={{ position: 'relative', width: '125px', height: '150px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0 }}>
+                  <div style={{ width: '100%', height: '100%', background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="train" size={26} color="white" />}
                   </div>
-                  <div onClick={(e) => toggleFavorite(e, h.id)} style={{ position: 'absolute', top: '10px', right: '10px', width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8' }}>
-                    <Icon name="heart" size={15} color={favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(h.id)} />
+                  <div onClick={(e) => toggleFavorite(e, h.id)} style={{ position: 'absolute', top: '8px', right: '8px', width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8' }}>
+                    <Icon name="heart" size={14} color={favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(h.id)} />
                   </div>
                   {h.id === lowestPriceId && (
-                    <span style={{ position: 'absolute', top: '10px', left: '10px', background: COLORS.secondary, color: 'white', fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '20px' }}>Best Value</span>
+                    <span style={{ position: 'absolute', top: '8px', left: '8px', background: COLORS.secondary, color: 'white', fontSize: '9.5px', fontWeight: 700, padding: '4px 8px', borderRadius: '20px' }}>Best Value</span>
                   )}
                   {h.id === topRatedId && h.id !== lowestPriceId && (
-                    <span style={{ position: 'absolute', top: '10px', left: '10px', background: COLORS.primary, color: 'white', fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', borderRadius: '20px' }}>Top Rated</span>
+                    <span style={{ position: 'absolute', top: '8px', left: '8px', background: COLORS.primary, color: 'white', fontSize: '9.5px', fontWeight: 700, padding: '4px 8px', borderRadius: '20px' }}>Top Rated</span>
                   )}
                 </div>
 
-                <div style={{ padding: '14px' }}>
-                  <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {h.origin ? `${h.origin} → ${h.destination}` : h.destination}
                   </p>
-                  <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>{h.companies?.business_name || 'Traveler.com Partner'}</p>
+                  <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.companies?.business_name || 'Traveler.com Partner'}</p>
 
                   {h.avgRating !== null && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-                      <span style={{ background: '#DCFCE7', color: COLORS.green, fontSize: '11.5px', fontWeight: 800, padding: '2px 7px', borderRadius: '6px' }}>{h.avgRating.toFixed(1)}</span>
-                      <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>({h.reviewCount} review{h.reviewCount !== 1 ? 's' : ''})</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px' }}>
+                      <span style={{ background: '#DCFCE7', color: COLORS.green, fontSize: '11px', fontWeight: 800, padding: '2px 6px', borderRadius: '6px' }}>{h.avgRating.toFixed(1)}</span>
+                      <span style={{ fontSize: '11px', color: COLORS.textMuted }}>({h.reviewCount})</span>
                     </div>
                   )}
 
-                  <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '6px' }}>
-                    {h.departure_time ? new Date(h.departure_time).toLocaleString() : 'Schedule to be announced'}
+                  <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '6px' }}>
+                    {h.departure_time ? new Date(h.departure_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Schedule TBA'}
                     {h.duration_minutes && ` · ${Math.floor(h.duration_minutes / 60)}h ${h.duration_minutes % 60}m`}
                   </p>
 
                   {h.amenities && h.amenities.length > 0 && (
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
-                      {h.amenities.slice(0, 4).map((a) => (
-                        <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
-                          <Icon name={TRAVEL_AMENITY_ICON[a] || 'check'} size={11} color={COLORS.textMuted} /> {a}
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '7px' }}>
+                      {h.amenities.slice(0, 3).map((a) => (
+                        <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9.5px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '3px 7px', borderRadius: '20px' }}>
+                          <Icon name={TRAVEL_AMENITY_ICON[a] || 'check'} size={10} color={COLORS.textMuted} /> {a}
                         </span>
                       ))}
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '10px' }}>
-                    <div>
-                      <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()}</p>
-                      {h.seats_available !== null && (
-                        <p style={{ fontSize: '11px', fontWeight: 700, color: h.seats_available === 0 ? '#DC2626' : COLORS.green }}>
-                          {h.seats_available === 0 ? 'Fully booked' : `${h.seats_available} seats left`}
-                        </p>
-                      )}
-                    </div>
-                    <span style={{ padding: '9px 18px', background: COLORS.secondary, color: 'white', borderRadius: '9px', fontWeight: 700, fontSize: '12.5px' }}>Book</span>
+                  <div style={{ marginTop: '8px' }}>
+                    <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()}</p>
+                    {h.seats_available !== null && (
+                      <p style={{ fontSize: '10.5px', fontWeight: 700, color: h.seats_available === 0 ? '#DC2626' : COLORS.green }}>
+                        {h.seats_available === 0 ? 'Fully booked' : `${h.seats_available} seats left`}
+                      </p>
+                    )}
                   </div>
+                  <span style={{ display: 'inline-block', marginTop: '8px', padding: '8px 16px', background: COLORS.secondary, color: 'white', borderRadius: '9px', fontWeight: 700, fontSize: '12px' }}>View Trains</span>
                 </div>
               </div>
             ))}
@@ -288,10 +408,6 @@ function FilterChip({ icon, label, active, onClick }: { icon: string; label: str
       <Icon name={icon} size={13} color={active ? 'white' : COLORS.text} /> {label}
     </span>
   )
-}
-
-const inputStyle = {
-  width: '100%', padding: '11px', border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '13.5px', boxSizing: 'border-box' as const,
 }
 
 export default Train
