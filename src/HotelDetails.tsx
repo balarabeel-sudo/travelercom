@@ -79,7 +79,7 @@ function HotelDetails() {
 
   // --- Booking wizard ---
   const [step, setStep] = useState<Step>('details')
-  // Guest info is prefilled from the account and shown for confirmation only —
+  // Guest info is prefilled from the account and shown for confirmation/receipt only —
   // it is not written to the database (bookings table has no email/phone columns).
   const [gName, setGName] = useState('')
   const [gEmail, setGEmail] = useState('')
@@ -258,6 +258,44 @@ function HotelDetails() {
     ? !!selectedRoomTypeId && (service?.companies?.allow_unit_selection === false || !!selectedUnitId)
     : true
 
+  // Plain-text receipt, built only from real confirmed booking data — no PDF library
+  // is confirmed installed in the project, so this avoids adding a new dependency.
+  const downloadReceipt = () => {
+    if (!service) return
+    const lines = [
+      'TRAVELER.COM',
+      'HOTEL BOOKING RECEIPT',
+      '----------------------------------------',
+      `Booking Reference: ${ticketCode}`,
+      `Hotel Name: ${service.title}`,
+      `Location: ${service.destination}`,
+      `Room Type: ${selectedRoom?.name || 'Standard'}`,
+      `Guest Name: ${gName}`,
+      `Email: ${gEmail}`,
+      `Phone: ${gPhone}`,
+      `Check-in Date: ${checkInDate}`,
+      `Check-out Date: ${checkOutDate}`,
+      `Number of Nights: ${nights}`,
+      `Amount Paid: ₦${activePrice.toLocaleString()}`,
+      'Payment Status: Paid',
+      `Payment Date: ${new Date().toLocaleString()}`,
+      '----------------------------------------',
+      `TOTAL PAID: ₦${activePrice.toLocaleString()}`,
+      '----------------------------------------',
+      'Traveler.com',
+      'Your Journey, One Platform.',
+    ]
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `TravelerCom-Receipt-${ticketCode}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const handleBookNow = async () => {
     if (!service) return
     setMessage(null)
@@ -416,10 +454,10 @@ function HotelDetails() {
             </div>
             <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: '10px', display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
               <SummaryRow label="Guest" value={gName} />
+              <SummaryRow label="Room type" value={selectedRoom?.name || 'Standard'} />
               <SummaryRow label="Check-in" value={checkInDate} />
               <SummaryRow label="Check-out" value={checkOutDate} />
               <SummaryRow label="Nights" value={String(nights)} />
-              <SummaryRow label="Room" value={selectedRoom?.name || 'Standard'} />
               <SummaryRow label="Total paid" value={`₦${activePrice.toLocaleString()}`} bold />
               <SummaryRow label="Status" value="Confirmed" valueColor={COLORS.green} />
             </div>
@@ -434,12 +472,16 @@ function HotelDetails() {
             style={{ width: '100%', padding: '13px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' }}>
             View Booking
           </button>
-
           <button
-            onClick={() => navigate('/home')}
-            style={{ width: '100%', padding: '13px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
-            Back to Home
+            onClick={downloadReceipt}
+            style={{ width: '100%', padding: '13px', background: COLORS.card, color: COLORS.primary, border: `1px solid ${COLORS.primary}`, borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <Icon name="clipboard" size={15} color={COLORS.primary} /> Download Receipt
           </button>
+          <span
+            onClick={() => navigate('/home')}
+            style={{ display: 'block', textAlign: 'center' as const, fontSize: '12.5px', color: COLORS.textMuted, fontWeight: 700, cursor: 'pointer' }}>
+            Back to Home
+          </span>
         </div>
       </div>
     )
@@ -461,7 +503,7 @@ function HotelDetails() {
           {step === 'details' && 'Hotel Details'}
           {step === 'guest' && 'Guest Information'}
           {step === 'dates' && 'Select Your Stay'}
-          {step === 'summary' && 'Booking Summary'}
+          {step === 'summary' && 'Review Your Booking'}
           {step === 'payment' && 'Payment'}
         </h1>
       </div>
@@ -633,9 +675,9 @@ function HotelDetails() {
             We've filled this in from your account — please confirm it's correct.
           </p>
 
-          <FormField label="Full Name" value={gName} onChange={setGName} error={guestErrors.name} placeholder="Your full name" />
-          <FormField label="Email Address" value={gEmail} onChange={setGEmail} error={guestErrors.email} placeholder="you@example.com" type="email" />
-          <FormField label="Phone Number" value={gPhone} onChange={setGPhone} error={guestErrors.phone} placeholder="080..." type="tel" last />
+          <FormField label="Full Name" value={gName} onChange={setGName} error={guestErrors.name} placeholder="Enter your full name" />
+          <FormField label="Email Address" value={gEmail} onChange={setGEmail} error={guestErrors.email} placeholder="Enter your email address" type="email" />
+          <FormField label="Phone Number" value={gPhone} onChange={setGPhone} error={guestErrors.phone} placeholder="Enter your phone number" type="tel" last />
 
           <button
             onClick={() => { if (validateGuest()) setStep('dates') }}
@@ -712,8 +754,15 @@ function HotelDetails() {
             <SummaryRow label="Location" value={service.destination} />
           </div>
           <div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Room</p>
+            <SummaryRow label="Room type" value={selectedRoom?.name || 'Standard'} />
+            {selectedUnitId && unitOptions.find((u) => u.id === selectedUnitId) && (
+              <SummaryRow label="Room number" value={unitOptions.find((u) => u.id === selectedUnitId)!.unit_number} />
+            )}
+          </div>
+          <div>
             <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Guest</p>
-            <SummaryRow label="Name" value={gName} />
+            <SummaryRow label="Full Name" value={gName} />
             <SummaryRow label="Email" value={gEmail} />
             <SummaryRow label="Phone" value={gPhone} />
           </div>
@@ -722,7 +771,6 @@ function HotelDetails() {
             <SummaryRow label="Check-in" value={checkInDate} />
             <SummaryRow label="Check-out" value={checkOutDate} />
             <SummaryRow label="Nights" value={String(nights)} />
-            <SummaryRow label="Room" value={selectedRoom?.name || 'Standard'} />
           </div>
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Price Breakdown</p>
@@ -731,7 +779,7 @@ function HotelDetails() {
               <SummaryRow label={activePromo.title} value={`− ₦${(calculatedTotal - discountedTotal).toLocaleString()}`} valueColor={COLORS.green} />
             )}
             <div style={{ borderTop: `1px solid ${COLORS.border}`, marginTop: '4px', paddingTop: '8px' }}>
-              <SummaryRow label="Total Amount" value={`₦${discountedTotal.toLocaleString()}`} bold />
+              <SummaryRow label="Total" value={`₦${discountedTotal.toLocaleString()}`} bold />
             </div>
           </div>
         </div>
@@ -739,7 +787,7 @@ function HotelDetails() {
         <button
           onClick={() => setStep('payment')}
           style={{ width: '100%', padding: '15px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' }}>
-          Proceed to Payment
+          Continue to Payment
         </button>
       </>)}
 
@@ -828,13 +876,13 @@ function ProgressBar({ step }: { step: Step }) {
   const COLORS_LOCAL = { primary: '#0EA5E9', border: '#E2E8F0', textMuted: '#64748B', text: '#1A1A1A' }
   const labels: { key: Step; label: string }[] = [
     { key: 'guest', label: 'Guest' },
-    { key: 'dates', label: 'Dates' },
+    { key: 'dates', label: 'Stay' },
     { key: 'summary', label: 'Review' },
     { key: 'payment', label: 'Payment' },
   ]
   const currentIdx = labels.findIndex((l) => l.key === step)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', background: COLORS_LOCAL.border && '#FFFFFF', gap: '4px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', background: '#FFFFFF', gap: '4px' }}>
       {labels.map((l, i) => (
         <div key={l.key} style={{ display: 'flex', alignItems: 'center', flex: i < labels.length - 1 ? 1 : 'none' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
