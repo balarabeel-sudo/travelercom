@@ -12,6 +12,9 @@ import PendingApproval from './PendingApproval'
 import VerifyBooking from './VerifyBooking'
 import Account from './Account'
 import AddListing from './AddListing'
+import AddHotelListing from './AddHotelListing'
+import AddTourListing from './AddTourListing'
+import AddEventCenterListing from './AddEventCenterListing'
 import MyListings from './MyListings'
 import Hotels from './Hotels'
 import Wallet from './Wallet'
@@ -93,6 +96,9 @@ function App() {
         <Route path="/verify-booking" element={<VerifyBooking />} />
         <Route path="/account" element={<Account />} />
         <Route path="/add-listing" element={<AddListing />} />
+        <Route path="/add-hotel-listing" element={<AddHotelListing />} />
+        <Route path="/add-tour-listing" element={<AddTourListing />} />
+        <Route path="/add-event-center-listing" element={<AddEventCenterListing />} />
         <Route path="/my-listings" element={<MyListings />} />
         <Route path="/hotels" element={<Hotels />} />
         <Route path="/wallet" element={<Wallet />} />
