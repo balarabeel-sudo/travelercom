@@ -78,6 +78,7 @@ type Tour = {
   photo_url: string | null
   tour_type: string | null
   amenities: string[] | null
+  duration_minutes: number | null
   companies: { business_name: string } | null
   avgRating: number | null
   reviewCount: number
@@ -108,7 +109,7 @@ function Tours() {
     setNetError(false)
     let query = supabase
       .from('services')
-      .select('id, title, description, destination, price, seats_available, photo_url, tour_type, amenities, companies(business_name)')
+      .select('id, title, description, destination, price, seats_available, photo_url, tour_type, amenities, duration_minutes, companies(business_name)')
       .eq('category', 'tour')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -346,11 +347,23 @@ function Tours() {
                   <p style={{ fontSize: '14.5px', fontWeight: 800, color: COLORS.text }}>{t.title}</p>
                   <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon name="mapPin" size={11} color={COLORS.textMuted} /> {t.destination}</p>
 
-                  {t.avgRating !== null && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px' }}>
-                      <Icon name="star" size={11} color="#D4A017" />
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{t.avgRating.toFixed(1)}</span>
-                      <span style={{ fontSize: '11px', color: COLORS.primary, fontWeight: 600 }}>({t.reviewCount.toLocaleString()})</span>
+                  {(t.avgRating !== null || t.duration_minutes) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', flexWrap: 'wrap' as const }}>
+                      {t.avgRating !== null && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Icon name="star" size={11} color="#D4A017" />
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{t.avgRating.toFixed(1)}</span>
+                          <span style={{ fontSize: '11px', color: COLORS.primary, fontWeight: 600 }}>({t.reviewCount.toLocaleString()})</span>
+                        </div>
+                      )}
+                      {t.duration_minutes && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Icon name="clock" size={11} color={COLORS.textMuted} />
+                          <span style={{ fontSize: '11px', color: COLORS.textMuted, fontWeight: 600 }}>
+                            {t.duration_minutes >= 60 ? `${Math.floor(t.duration_minutes / 60)}h ${t.duration_minutes % 60 ? `${t.duration_minutes % 60}m` : ''}`.trim() : `${t.duration_minutes}m`}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
 
