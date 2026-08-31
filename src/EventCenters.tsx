@@ -77,6 +77,7 @@ type EventCenter = {
   photo_url: string | null
   event_type: string | null
   amenities: string[] | null
+  capacity: number | null
   companies: { business_name: string } | null
   avgRating: number | null
   reviewCount: number
@@ -107,7 +108,7 @@ function EventCenters() {
     setNetError(false)
     let query = supabase
       .from('services')
-      .select('id, title, description, destination, price, seats_available, photo_url, event_type, amenities, companies(business_name)')
+      .select('id, title, description, destination, price, seats_available, photo_url, event_type, amenities, capacity, companies(business_name)')
       .eq('category', 'event_center')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -353,6 +354,11 @@ function EventCenters() {
                   )}
 
                   <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '7px' }}>
+                    {e.capacity != null && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9.5px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '3px 7px', borderRadius: '20px' }}>
+                        <Icon name="user" size={10} color={COLORS.textMuted} /> {e.capacity.toLocaleString()} Capacity
+                      </span>
+                    )}
                     {e.event_type && (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9.5px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '3px 7px', borderRadius: '20px' }}>
                         <Icon name={EVENT_TYPE_ICON[e.event_type] || 'tent'} size={10} color={COLORS.textMuted} /> {e.event_type}
