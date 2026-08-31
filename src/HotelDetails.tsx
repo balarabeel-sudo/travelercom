@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { downloadReceiptImage } from './receiptGenerator'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -258,42 +259,26 @@ function HotelDetails() {
     ? !!selectedRoomTypeId && (service?.companies?.allow_unit_selection === false || !!selectedUnitId)
     : true
 
-  // Plain-text receipt, built only from real confirmed booking data — no PDF library
-  // is confirmed installed in the project, so this avoids adding a new dependency.
+  // Branded, Opay-style receipt image — built only from real confirmed booking data.
   const downloadReceipt = () => {
     if (!service) return
-    const lines = [
-      'TRAVELER.COM',
-      'HOTEL BOOKING RECEIPT',
-      '----------------------------------------',
-      `Booking Reference: ${ticketCode}`,
-      `Hotel Name: ${service.title}`,
-      `Location: ${service.destination}`,
-      `Room Type: ${selectedRoom?.name || 'Standard'}`,
-      `Guest Name: ${gName}`,
-      `Email: ${gEmail}`,
-      `Phone: ${gPhone}`,
-      `Check-in Date: ${checkInDate}`,
-      `Check-out Date: ${checkOutDate}`,
-      `Number of Nights: ${nights}`,
-      `Amount Paid: ₦${activePrice.toLocaleString()}`,
-      'Payment Status: Paid',
-      `Payment Date: ${new Date().toLocaleString()}`,
-      '----------------------------------------',
-      `TOTAL PAID: ₦${activePrice.toLocaleString()}`,
-      '----------------------------------------',
-      'Traveler.com',
-      'Your Journey, One Platform.',
-    ]
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `TravelerCom-Receipt-${ticketCode}.txt`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    downloadReceiptImage({
+      serviceName: service.title,
+      subtitle: service.destination,
+      bookingReference: ticketCode,
+      amountPaid: activePrice,
+      paymentDate: new Date().toLocaleString(),
+      filenamePrefix: 'Hotel',
+      rows: [
+        { label: 'Room Type', value: selectedRoom?.name || 'Standard' },
+        { label: 'Check-in', value: checkInDate },
+        { label: 'Check-out', value: checkOutDate },
+        { label: 'Nights', value: String(nights) },
+        { label: 'Guest', value: gName },
+        { label: 'Email', value: gEmail },
+        { label: 'Phone', value: gPhone },
+      ],
+    })
   }
 
   const handleBookNow = async () => {
