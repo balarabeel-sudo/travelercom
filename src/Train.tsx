@@ -75,10 +75,13 @@ type TripItem = {
   seats_available: number | null
   photo_url: string | null
   amenities: string[] | null
+  train_type: string | null
   companies: { business_name: string } | null
   avgRating: number | null
   reviewCount: number
 }
+
+const TRAIN_TYPES = ['Express', 'Intercity', 'Sleeper', 'AC Coach']
 
 type SortKey = 'recommended' | 'price_low' | 'price_high' | 'rating'
 
@@ -96,6 +99,7 @@ function Train() {
 
   const [stateFilter, setStateFilter] = useState('all')
   const [showStateFilter, setShowStateFilter] = useState(false)
+  const [trainTypeFilter, setTrainTypeFilter] = useState<string | null>(null)
 
   const [sortBy, setSortBy] = useState<SortKey>('recommended')
   const [showSort, setShowSort] = useState(false)
@@ -105,7 +109,7 @@ function Train() {
     setNetError(false)
     let query = supabase
       .from('services')
-      .select('id, title, description, origin, destination, departure_time, duration_minutes, price, seats_available, photo_url, amenities, companies(business_name)')
+      .select('id, title, description, origin, destination, departure_time, duration_minutes, price, seats_available, photo_url, amenities, train_type, companies(business_name)')
       .eq('category', 'train')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -187,12 +191,13 @@ function Train() {
   }
 
   const selectedCity = stateFilter === 'all' ? null : (NIGERIA_STATES.find((s) => s.name === stateFilter)?.city || null)
-  const filteredItems = selectedCity
+  let filteredItems = selectedCity
     ? items.filter((h) => {
         const c = selectedCity.toLowerCase()
         return (h.origin || '').toLowerCase().includes(c) || h.destination.toLowerCase().includes(c)
       })
     : items
+  filteredItems = trainTypeFilter ? filteredItems.filter((h) => h.train_type === trainTypeFilter) : filteredItems
 
   const visible = [...filteredItems].sort((a, b) => {
     if (sortBy === 'price_low') return a.price - b.price
@@ -296,6 +301,9 @@ function Train() {
               </div>
             )}
           </div>
+          {TRAIN_TYPES.map((t) => (
+            <FilterChip key={t} icon="train" label={t} active={trainTypeFilter === t} onClick={() => setTrainTypeFilter(trainTypeFilter === t ? null : t)} />
+          ))}
           <FilterChip icon="star" label="Top Rated" active={sortBy === 'rating'} onClick={() => setSortBy(sortBy === 'rating' ? 'recommended' : 'rating')} />
           <FilterChip icon="cash" label={sortBy === 'price_low' ? 'Price ↑' : sortBy === 'price_high' ? 'Price ↓' : 'Price'} active={sortBy === 'price_low' || sortBy === 'price_high'} onClick={() => setSortBy(sortBy === 'price_low' ? 'price_high' : sortBy === 'price_high' ? 'recommended' : 'price_low')} />
         </div>
@@ -354,6 +362,10 @@ function Train() {
                     {h.origin ? `${h.origin} → ${h.destination}` : h.destination}
                   </p>
                   <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.companies?.business_name || 'Traveler.com Partner'}</p>
+
+                  {h.train_type && (
+                    <span style={{ display: 'inline-block', marginTop: '4px', background: '#EFF6FF', color: COLORS.primary, fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px' }}>{h.train_type}</span>
+                  )}
 
                   {h.avgRating !== null && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px' }}>
