@@ -30,6 +30,7 @@ type TourDetail = {
   vehicle_fee: number | null
   company_id: string
   tour_type: string | null
+  duration_minutes: number | null
   companies: { business_name: string } | null
 }
 
@@ -91,7 +92,7 @@ function TourDetails() {
 
       const { data: svc } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, tour_type, gate_fee, vehicle_fee, companies(business_name)')
+        .select('id, title, description, destination, price, seats_available, company_id, photo_url, tour_type, gate_fee, vehicle_fee, duration_minutes, companies(business_name)')
         .eq('id', id)
         .maybeSingle()
       setService(svc as any)
@@ -399,10 +400,20 @@ function TourDetails() {
           {service.companies?.business_name || 'Traveler.com Partner'} <Icon name="chevronRight" size={12} color={COLORS.primary} />
         </p>
 
-        {service.tour_type && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '16px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
-            <Icon name={TOUR_TYPE_ICON[service.tour_type] || 'map'} size={11} color={COLORS.textMuted} /> {service.tour_type}
-          </span>
+        {(service.tour_type || service.duration_minutes) && (
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '16px' }}>
+            {service.tour_type && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
+                <Icon name={TOUR_TYPE_ICON[service.tour_type] || 'map'} size={11} color={COLORS.textMuted} /> {service.tour_type}
+              </span>
+            )}
+            {service.duration_minutes && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '4px 9px', borderRadius: '20px' }}>
+                <Icon name="clock" size={11} color={COLORS.textMuted} />
+                {service.duration_minutes >= 60 ? `${Math.floor(service.duration_minutes / 60)}h ${service.duration_minutes % 60 ? `${service.duration_minutes % 60}m` : ''}`.trim() : `${service.duration_minutes}m`}
+              </span>
+            )}
+          </div>
         )}
 
         {service.description && (
@@ -565,6 +576,9 @@ function TourDetails() {
             <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Tour Details</p>
             <SummaryRow label="Tour date" value={tourDate} />
             <SummaryRow label="Participants" value={String(travelers)} />
+            {service.duration_minutes && (
+              <SummaryRow label="Duration" value={service.duration_minutes >= 60 ? `${Math.floor(service.duration_minutes / 60)}h ${service.duration_minutes % 60 ? `${service.duration_minutes % 60}m` : ''}`.trim() : `${service.duration_minutes}m`} />
+            )}
           </div>
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Price</p>
