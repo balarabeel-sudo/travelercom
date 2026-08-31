@@ -27,6 +27,7 @@ type ServiceDetail = {
   seats_available: number | null
   company_id: string
   amenities: string[] | null
+  capacity: number | null
   companies: { business_name: string; allow_unit_selection: boolean | null } | null
 }
 
@@ -113,7 +114,7 @@ function EventCenterDetails() {
 
       const { data: svc, error: svcErr } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, companies(business_name, allow_unit_selection)')
+        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, capacity, companies(business_name, allow_unit_selection)')
         .eq('id', id)
         .maybeSingle()
 
@@ -507,6 +508,11 @@ function EventCenterDetails() {
 
         <h2 style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>{service.title}</h2>
         <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '2px' }}>{service.destination}</p>
+        {service.capacity != null && (
+          <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Icon name="user" size={12} color={COLORS.textMuted} /> {service.capacity.toLocaleString()} people capacity
+          </p>
+        )}
         <p
           onClick={() => navigate(`/company/${service.company_id}`)}
           style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, marginBottom: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
