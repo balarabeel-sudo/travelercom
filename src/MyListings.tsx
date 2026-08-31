@@ -36,6 +36,16 @@ const CATEGORY_ICON: Record<string, string> = {
   event_center: 'tent',
 }
 
+// Bus/Train/Flight still share the original transport form; Hotel/Tour/Event Center
+// each got their own dedicated listing form once AddListing.tsx grew to cover 6
+// very different category shapes.
+function addListingRouteFor(category: string | null) {
+  if (category === 'hotel') return '/add-hotel-listing'
+  if (category === 'tour') return '/add-tour-listing'
+  if (category === 'event_center') return '/add-event-center-listing'
+  return '/add-listing'
+}
+
 function formatNaira(n: number) {
   return '₦' + n.toLocaleString(undefined, { maximumFractionDigits: 0 })
 }
@@ -43,6 +53,7 @@ function formatNaira(n: number) {
 export default function MyListings() {
   const navigate = useNavigate()
   const [companyId, setCompanyId] = useState<string | null>(null)
+  const [companyCategory, setCompanyCategory] = useState<string | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -51,9 +62,10 @@ export default function MyListings() {
     setLoading(true)
     const { data: userData } = await supabase.auth.getUser()
     if (!userData?.user) { setLoading(false); return }
-    const { data: company } = await supabase.from('companies').select('id').eq('owner_id', userData.user.id).maybeSingle()
+    const { data: company } = await supabase.from('companies').select('id, business_type').eq('owner_id', userData.user.id).maybeSingle()
     if (!company) { setLoading(false); return }
     setCompanyId(company.id)
+    setCompanyCategory(company.business_type)
 
     const { data } = await supabase
       .from('services')
@@ -102,7 +114,7 @@ export default function MyListings() {
           <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>My Listings</p>
           <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{listings.length} listing{listings.length === 1 ? '' : 's'}</p>
         </div>
-        <div onClick={() => navigate('/add-listing')} style={{
+        <div onClick={() => navigate(addListingRouteFor(companyCategory))} style={{
           width: '38px', height: '38px', borderRadius: '10px', background: COLORS.primary,
           display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
         }}>
@@ -116,7 +128,7 @@ export default function MyListings() {
         ) : listings.length === 0 ? (
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '30px', textAlign: 'center' as const }}>
             <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '12px' }}>You haven't added any listings yet.</p>
-            <div onClick={() => navigate('/add-listing')} style={{
+            <div onClick={() => navigate(addListingRouteFor(companyCategory))} style={{
               display: 'inline-block', padding: '10px 18px', background: COLORS.primary, color: 'white',
               borderRadius: '9px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer',
             }}>
@@ -128,7 +140,7 @@ export default function MyListings() {
             {listings.map((l) => (
               <div key={l.id} style={{ background: COLORS.card, borderRadius: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
                 <div
-                  onClick={() => navigate(`/add-listing?edit=${l.id}`)}
+                  onClick={() => navigate(`${addListingRouteFor(l.category)}?edit=${l.id}`)}
                   style={{
                     height: '90px', cursor: 'pointer',
                     background: l.photo_url ? undefined : 'linear-gradient(135deg, #F97316, #0EA5E9)',
@@ -154,7 +166,7 @@ export default function MyListings() {
                       {l.status === 'active' ? 'Active' : 'Inactive'}
                     </span>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <div onClick={() => navigate(`/add-listing?edit=${l.id}`)} style={{ cursor: 'pointer', padding: '4px' }}>
+                      <div onClick={() => navigate(`${addListingRouteFor(l.category)}?edit=${l.id}`)} style={{ cursor: 'pointer', padding: '4px' }}>
                         <Icon name="edit" size={14} color={COLORS.textMuted} />
                       </div>
                       <div onClick={() => handleDelete(l)} style={{ cursor: deletingId === l.id ? 'default' : 'pointer', padding: '4px', opacity: deletingId === l.id ? 0.4 : 1 }}>
