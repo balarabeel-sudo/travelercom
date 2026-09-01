@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import { DetailsSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
+import { downloadReceiptImage } from './receiptGenerator'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -99,6 +100,7 @@ function FlightDetails() {
 
   const [reservationId, setReservationId] = useState('')
   const [pnr, setPnr] = useState('')
+  const [transactionId, setTransactionId] = useState('')
 
   const load = async () => {
       setLoading(true)
@@ -276,15 +278,40 @@ function FlightDetails() {
     }
 
     const { data: walletRow } = await supabase.from('wallets').select('id').eq('user_id', userId).maybeSingle()
-    await supabase.from('transactions').insert({
+    const { data: txnRow } = await supabase.from('transactions').insert({
       user_id: userId, wallet_id: walletRow?.id, transaction_type: 'payment', amount: total, status: 'successful',
-    })
+    }).select('id').single()
 
     setBooking(false)
     setWalletBalance(newBalance)
     setReservationId(newBooking?.id || '')
     setPnr(code)
+    setTransactionId(txnRow?.id || '')
     setStep(6)
+  }
+
+  // Branded receipt image — built only from real confirmed booking data.
+  const downloadReceipt = () => {
+    if (!service) return
+    downloadReceiptImage({
+      category: 'flight',
+      serviceName: service.title,
+      serviceTypeLabel: selectedSeat?.name || 'Economy',
+      location: `${service.origin || '—'} \u2192 ${service.destination}`,
+      bookingReference: pnr,
+      amountPaid: total,
+      paymentDate: new Date().toLocaleString(),
+      transactionId: transactionId || undefined,
+      filenamePrefix: 'Flight',
+      rows: [
+        { label: 'Passenger Name', value: fullName },
+        { label: 'Email', value: email },
+        { label: 'Phone', value: phone },
+        { label: 'Route', value: `${service.origin || '—'} \u2192 ${service.destination}` },
+        { label: 'Departure', value: service.departure_time ? new Date(service.departure_time).toLocaleString() : 'TBA' },
+        { label: 'Airline', value: service.companies?.business_name || 'Traveler.com Partner' },
+      ],
+    })
   }
 
   if (netError) {
@@ -308,7 +335,7 @@ function FlightDetails() {
 
       {/* Header */}
       <div className="no-print" style={{ background: COLORS.navy, padding: '18px 20px 22px', color: 'white' }}>
-        <span onClick={() => (step === 1 ? navigate(-1) : setStep(step - 1))} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
+        <span onClick={() => (step === 1 ? navigate(-1) : setStep(step - 1))} style={{ cursor: 'pointer', display: 'inline-flex' }}><Icon name="arrowLeft" size={20} color="white" /></span>
         <p style={{ fontSize: '17px', fontWeight: 800, marginTop: '10px' }}>Book Your Flight</p>
         {step <= 5 && (
           <div style={{ display: 'flex', gap: '4px', marginTop: '14px' }}>
@@ -586,7 +613,7 @@ function FlightDetails() {
             </div>
 
             <div className="no-print" style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginTop: '10px' }}>
-              <button onClick={() => window.print()} style={{ padding: '14px', borderRadius: '12px', border: `1.5px solid ${COLORS.primary}`, background: 'white', color: COLORS.primary, fontWeight: 700, fontSize: '14px' }}>Download E-ticket</button>
+              <button onClick={downloadReceipt} style={{ padding: '14px', borderRadius: '12px', border: `1.5px solid ${COLORS.primary}`, background: 'white', color: COLORS.primary, fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}><Icon name="clipboard" size={15} color={COLORS.primary} /> Download Receipt</button>
               <button onClick={() => navigate('/my-bookings')} style={{ padding: '14px', borderRadius: '12px', border: `1.5px solid ${COLORS.border}`, background: 'white', color: COLORS.text, fontWeight: 700, fontSize: '14px' }}>View Booking</button>
               <button onClick={() => navigate('/home')} style={{ padding: '14px', borderRadius: '12px', border: 'none', background: COLORS.secondary, color: 'white', fontWeight: 700, fontSize: '14px' }}>Return Home</button>
             </div>
