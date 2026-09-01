@@ -56,10 +56,16 @@ function AddListing() {
   const [amenities, setAmenities] = useState<string[]>([])
   const [tourType, setTourType] = useState('')
   const [eventType, setEventType] = useState('')
+  // "Repeat" lets a transport company create the same route across several days at
+  // once, instead of re-typing it daily. Only offered when creating a NEW listing —
+  // editing an existing one always edits that single row.
+  const [repeatEnabled, setRepeatEnabled] = useState(false)
+  const [repeatDays, setRepeatDays] = useState('7')
 
   const [submitting, setSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [success, setSuccess] = useState(false)
+  const [createdCount, setCreatedCount] = useState(1)
 
   useEffect(() => {
     const load = async () => {
@@ -150,14 +156,13 @@ function AddListing() {
     // In edit mode, keep the existing photo unless the user picked a new one
     if (!photoFile && editId) photoUrl = existingPhotoUrl || null
 
-    const payload = {
+    const basePayload = {
       company_id: companyId,
       category: category,
       title: title.trim(),
       description: description.trim() || null,
       origin: isTransport ? origin.trim() || null : null,
       destination: destination.trim(),
-      departure_time: departureTime ? new Date(departureTime).toISOString() : null,
       arrival_time: isTransport && arrivalTime ? new Date(arrivalTime).toISOString() : null,
       duration_minutes: isTransport && duration ? parseInt(duration, 10) : null,
       price: parseFloat(price),
@@ -171,28 +176,47 @@ function AddListing() {
       event_type: category === 'event_center' && eventType ? eventType : null,
     }
 
-    const { data: savedListing, error } = editId
-      ? await supabase.from('services').update(payload).eq('id', editId).select('id').single()
-      : await supabase.from('services').insert({ ...payload, status: 'active' }).select('id').single()
+    const useRepeat = !editId && isTransport && repeatEnabled && parseInt(repeatDays, 10) > 1
+    const departureBase = departureTime ? new Date(departureTime) : null
+    const arrivalBase = isTransport && arrivalTime ? new Date(arrivalTime) : null
+    const dayCount = useRepeat ? Math.min(parseInt(repeatDays, 10), 60) : 1
+
+    const rows = Array.from({ length: dayCount }, (_, i) => {
+      const dep = departureBase ? new Date(departureBase.getTime() + i * 86400000) : null
+      const arr = arrivalBase ? new Date(arrivalBase.getTime() + i * 86400000) : null
+      return {
+        ...basePayload,
+        departure_time: dep ? dep.toISOString() : null,
+        arrival_time: arr ? arr.toISOString() : basePayload.arrival_time,
+        status: 'active',
+      }
+    })
+
+    const { data: savedListings, error } = editId
+      ? await supabase.from('services').update(rows[0]).eq('id', editId).select('id')
+      : await supabase.from('services').insert(rows).select('id')
 
     setSubmitting(false)
     if (error) {
       setErrorMsg(error.message)
     } else {
-      if (savedListing) {
+      if (savedListings && savedListings.length > 0) {
         const { data: userData } = await supabase.auth.getUser()
         if (userData?.user) {
-          await supabase.rpc('log_audit', {
-            p_action: editId ? 'updated_listing' : 'created_listing',
-            p_module: 'listings',
-            p_target_type: 'service',
-            p_target_id: savedListing.id,
-            p_previous: null,
-            p_new: { title: title.trim(), category },
-            p_company_id: companyId,
-          })
+          for (const listing of savedListings) {
+            await supabase.rpc('log_audit', {
+              p_action: editId ? 'updated_listing' : 'created_listing',
+              p_module: 'listings',
+              p_target_type: 'service',
+              p_target_id: listing.id,
+              p_previous: null,
+              p_new: { title: title.trim(), category },
+              p_company_id: companyId,
+            })
+          }
         }
       }
+      setCreatedCount(rows.length)
       setSuccess(true)
     }
   }
@@ -222,7 +246,9 @@ function AddListing() {
       <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}><Icon name="checkCircle" size={44} color={COLORS.green} /></div>
-          <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.green, marginBottom: '8px' }}>{editId ? 'Listing Updated!' : 'Listing Added!'}</p>
+          <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.green, marginBottom: '8px' }}>
+            {editId ? 'Listing Updated!' : createdCount > 1 ? `${createdCount} Listings Added!` : 'Listing Added!'}
+          </p>
           <button onClick={() => navigate('/my-listings')} style={{ padding: '12px 24px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
             Back to My Listings
           </button>
@@ -296,6 +322,31 @@ function AddListing() {
             <Field label="Duration (minutes)">
               <input type="number" placeholder="e.g. 80" value={duration} onChange={(e) => setDuration(e.target.value)} style={inputStyle} />
             </Field>
+          )}
+
+          {isTransport && !editId && (
+            <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: '10px', padding: '12px', marginBottom: '14px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={repeatEnabled} onChange={(e) => setRepeatEnabled(e.target.checked)} />
+                <span style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Repeat this trip daily</span>
+              </label>
+              {repeatEnabled && (
+                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', color: COLORS.textMuted }}>For the next</span>
+                  <input
+                    type="number" min={2} max={60} value={repeatDays}
+                    onChange={(e) => setRepeatDays(e.target.value)}
+                    style={{ ...inputStyle, width: '70px', padding: '8px' }}
+                  />
+                  <span style={{ fontSize: '12px', color: COLORS.textMuted }}>days (max 60)</span>
+                </div>
+              )}
+              {repeatEnabled && (
+                <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '8px' }}>
+                  Creates {Math.min(parseInt(repeatDays || '1', 10) || 1, 60)} separate listings, same route and time each day, starting from the departure time above.
+                </p>
+              )}
+            </div>
           )}
 
           <Field label="Price (₦)">
