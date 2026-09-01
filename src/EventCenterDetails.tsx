@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import { DetailsSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
+import { downloadReceiptImage } from './receiptGenerator'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -271,6 +272,28 @@ function EventCenterDetails() {
     ? !!selectedHallTypeId && (service?.companies?.allow_unit_selection === false || !!selectedUnitId)
     : true
 
+  // Branded, Opay-style receipt image — built only from real confirmed booking data.
+  const downloadReceipt = () => {
+    if (!service) return
+    downloadReceiptImage({
+      serviceName: service.title,
+      subtitle: service.destination,
+      bookingReference: ticketCode,
+      amountPaid: activePrice,
+      paymentDate: new Date().toLocaleString(),
+      filenamePrefix: 'EventCenter',
+      rows: [
+        { label: 'Hall', value: selectedHall?.name || 'Standard' },
+        { label: 'Start date', value: startDate },
+        { label: 'End date', value: endDate },
+        { label: 'Duration', value: `${days} day${days > 1 ? 's' : ''}` },
+        { label: 'Customer', value: gName },
+        { label: 'Email', value: gEmail },
+        { label: 'Phone', value: gPhone },
+      ],
+    })
+  }
+
   const handleBookNow = async () => {
     if (!service) return
     setMessage(null)
@@ -446,6 +469,11 @@ function EventCenterDetails() {
             onClick={() => navigate('/bookings')}
             style={{ width: '100%', padding: '13px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' }}>
             View Booking
+          </button>
+          <button
+            onClick={downloadReceipt}
+            style={{ width: '100%', padding: '13px', background: COLORS.card, color: COLORS.primary, border: `1px solid ${COLORS.primary}`, borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <Icon name="clipboard" size={15} color={COLORS.primary} /> Download Receipt
           </button>
 
           <button
