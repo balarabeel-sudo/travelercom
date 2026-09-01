@@ -80,6 +80,7 @@ function EventCenterDetails() {
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [ticketCode, setTicketCode] = useState('')
+  const [transactionId, setTransactionId] = useState('')
   const [assignedUnitNumber, setAssignedUnitNumber] = useState('')
 
   // --- Booking wizard ---
@@ -272,22 +273,25 @@ function EventCenterDetails() {
     ? !!selectedHallTypeId && (service?.companies?.allow_unit_selection === false || !!selectedUnitId)
     : true
 
-  // Branded, Opay-style receipt image — built only from real confirmed booking data.
+  // Branded receipt image — built only from real confirmed booking data.
   const downloadReceipt = () => {
     if (!service) return
     downloadReceiptImage({
+      category: 'event_center',
       serviceName: service.title,
-      subtitle: service.destination,
+      serviceTypeLabel: selectedHall?.name || 'Event Hall',
+      location: service.destination,
       bookingReference: ticketCode,
       amountPaid: activePrice,
       paymentDate: new Date().toLocaleString(),
+      transactionId: transactionId || undefined,
       filenamePrefix: 'EventCenter',
       rows: [
         { label: 'Hall', value: selectedHall?.name || 'Standard' },
         { label: 'Start date', value: startDate },
         { label: 'End date', value: endDate },
         { label: 'Duration', value: `${days} day${days > 1 ? 's' : ''}` },
-        { label: 'Customer', value: gName },
+        { label: 'Customer Name', value: gName },
         { label: 'Email', value: gEmail },
         { label: 'Phone', value: gPhone },
       ],
@@ -397,18 +401,19 @@ function EventCenterDetails() {
       .eq('user_id', userId)
       .maybeSingle()
 
-    await supabase.from('transactions').insert({
+    const { data: txnRow } = await supabase.from('transactions').insert({
       user_id: userId,
       wallet_id: walletRow?.id,
       transaction_type: 'payment',
       amount: activePrice,
       status: 'successful',
-    })
+    }).select('id').single()
 
     setBooking(false)
     setWalletBalance(newBalance)
     setAssignedUnitNumber(assignedNumber)
     setTicketCode(code)
+    setTransactionId(txnRow?.id || '')
     setMessage({ type: 'success', text: 'Booking confirmed!' })
   }
 
