@@ -4,25 +4,29 @@ const COLORS = {
   primary: '#0EA5E9',
   secondary: '#F97316',
   navy: '#0B1E3D',
-  navyDark: '#071428',
   text: '#1A1A1A',
   textMuted: '#64748B',
   border: '#E2E8F0',
   green: '#16A34A',
-  bg: '#FFFFFF',
-  lightGray: '#F8FAFC',
-  cardBg: '#F1F5F9',
+  bg: '#F8FAFC',
 }
 
-export type ReceiptRow = { label: string; value: string }
+// Real, on-file contact info only — never the placeholder domain/email/phone from a template.
+const SUPPORT_EMAIL = 'travelercom12@gmail.com'
+const WEBSITE = 'travelercom.vercel.app'
+
+export type ReceiptRow = { label: string; value: string; icon?: string }
 
 export type ReceiptData = {
+  category: 'hotel' | 'tour' | 'event_center' | 'bus' | 'train' | 'flight'
   serviceName: string
-  subtitle?: string
+  serviceTypeLabel: string
+  location: string
   bookingReference: string
+  paymentDate?: string
   rows: ReceiptRow[]
   amountPaid: number
-  paymentDate?: string
+  transactionId?: string
   filenamePrefix?: string
 }
 
@@ -35,149 +39,211 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   })
 }
 
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number
-) {
-  const radius = Math.min(r, w / 2, h / 2)
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath()
-  ctx.moveTo(x + radius, y)
-  ctx.arcTo(x + w, y, x + w, y + h, radius)
-  ctx.arcTo(x + w, y + h, x, y + h, radius)
-  ctx.arcTo(x, y + h, x, y, radius)
-  ctx.arcTo(x, y, x + w, y, radius)
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
   ctx.closePath()
 }
 
-function drawCheckBadge(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
+function dottedLine(ctx: CanvasRenderingContext2D, x1: number, y: number, x2: number, color = COLORS.border) {
+  ctx.save()
+  ctx.strokeStyle = color
+  ctx.lineWidth = 1.2
+  ctx.setLineDash([2, 3])
   ctx.beginPath()
-  ctx.arc(cx, cy, r, 0, Math.PI * 2)
-  ctx.fillStyle = COLORS.green
-  ctx.fill()
+  ctx.moveTo(x1, y)
+  ctx.lineTo(x2, y)
+  ctx.stroke()
+  ctx.restore()
+}
 
-  ctx.strokeStyle = '#FFFFFF'
-  ctx.lineWidth = 2.8
+// ---------- hand-drawn line icons (Canvas can't render Icons.tsx's SVGs, so these mirror its style) ----------
+
+type IconFn = (ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) => void
+
+function withStroke(ctx: CanvasRenderingContext2D, color: string, width: number, fn: () => void) {
+  ctx.save()
+  ctx.strokeStyle = color
+  ctx.lineWidth = width
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.beginPath()
-  ctx.moveTo(cx - r * 0.42, cy + 1)
-  ctx.lineTo(cx - r * 0.1, cy + r * 0.38)
-  ctx.lineTo(cx + r * 0.45, cy - r * 0.32)
-  ctx.stroke()
+  fn()
+  ctx.restore()
 }
 
-function drawBedIcon(ctx: CanvasRenderingContext2D, x: number, y: number, size = 18) {
-  ctx.strokeStyle = COLORS.navy
-  ctx.fillStyle = COLORS.navy
-  ctx.lineWidth = 1.7
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
+const drawPerson: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.09, () => {
+  ctx.beginPath(); ctx.arc(x + s / 2, y + s * 0.28, s * 0.18, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.arc(x + s / 2, y + s * 0.95, s * 0.38, Math.PI, 0); ctx.stroke()
+})
 
-  // mattress
-  roundRect(ctx, x, y + size * 0.42, size, size * 0.38, 3)
-  ctx.stroke()
+const drawMail: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.08, () => {
+  roundRect(ctx, x, y + s * 0.15, s, s * 0.7, s * 0.08); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x + s * 0.06, y + s * 0.2); ctx.lineTo(x + s / 2, y + s * 0.55); ctx.lineTo(x + s * 0.94, y + s * 0.2); ctx.stroke()
+})
 
-  // headboard
+const drawPhone: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.09, () => {
   ctx.beginPath()
-  ctx.moveTo(x, y + size * 0.42)
-  ctx.lineTo(x, y + size * 0.12)
-  ctx.lineTo(x + size * 0.38, y + size * 0.12)
+  ctx.moveTo(x + s * 0.25, y + s * 0.08)
+  ctx.bezierCurveTo(x + s * 0.05, y + s * 0.25, x + s * 0.15, y + s * 0.55, x + s * 0.35, y + s * 0.75)
+  ctx.bezierCurveTo(x + s * 0.55, y + s * 0.95, x + s * 0.8, y + s, x + s * 0.92, y + s * 0.8)
   ctx.stroke()
+})
 
-  // pillow
-  ctx.beginPath()
-  ctx.ellipse(x + size * 0.22, y + size * 0.3, size * 0.15, size * 0.1, 0, 0, Math.PI * 2)
-  ctx.fill()
+const drawBed: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.09, () => {
+  ctx.beginPath(); ctx.moveTo(x + s * 0.08, y + s); ctx.lineTo(x + s * 0.08, y + s * 0.35); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x + s * 0.92, y + s); ctx.lineTo(x + s * 0.92, y + s * 0.55); ctx.stroke()
+  roundRect(ctx, x + s * 0.08, y + s * 0.35, s * 0.84, s * 0.2, s * 0.05); ctx.stroke()
+  roundRect(ctx, x + s * 0.08, y + s * 0.55, s * 0.84, s * 0.22, s * 0.05); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x + s * 0.08, y + s * 0.77); ctx.lineTo(x + s * 0.92, y + s * 0.77); ctx.stroke()
+})
+
+const drawCalendar: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.08, () => {
+  roundRect(ctx, x + s * 0.05, y + s * 0.15, s * 0.9, s * 0.8, s * 0.08); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x + s * 0.05, y + s * 0.4); ctx.lineTo(x + s * 0.95, y + s * 0.4); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x + s * 0.28, y); ctx.lineTo(x + s * 0.28, y + s * 0.25); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x + s * 0.72, y); ctx.lineTo(x + s * 0.72, y + s * 0.25); ctx.stroke()
+})
+
+const drawMoon: IconFn = (ctx, x, y, s, c) => {
+  ctx.save()
+  ctx.fillStyle = c
+  ctx.beginPath(); ctx.arc(x + s * 0.5, y + s * 0.5, s * 0.42, 0, Math.PI * 2); ctx.fill()
+  ctx.globalCompositeOperation = 'destination-out'
+  ctx.beginPath(); ctx.arc(x + s * 0.68, y + s * 0.4, s * 0.36, 0, Math.PI * 2); ctx.fill()
+  ctx.restore()
 }
 
-function drawCalendarIcon(ctx: CanvasRenderingContext2D, x: number, y: number, size = 16) {
-  ctx.strokeStyle = COLORS.navy
-  ctx.lineWidth = 1.6
-  ctx.lineCap = 'round'
-
-  roundRect(ctx, x, y + 3, size, size - 3, 2.5)
-  ctx.stroke()
-
-  // top bar
+const drawShieldCheck: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.08, () => {
   ctx.beginPath()
-  ctx.moveTo(x, y + 8)
-  ctx.lineTo(x + size, y + 8)
+  ctx.moveTo(x + s * 0.5, y)
+  ctx.lineTo(x + s * 0.95, y + s * 0.18)
+  ctx.lineTo(x + s * 0.95, y + s * 0.5)
+  ctx.bezierCurveTo(x + s * 0.95, y + s * 0.85, x + s * 0.72, y + s * 1.02, x + s * 0.5, y + s)
+  ctx.bezierCurveTo(x + s * 0.28, y + s * 1.02, x + s * 0.05, y + s * 0.85, x + s * 0.05, y + s * 0.5)
+  ctx.lineTo(x + s * 0.05, y + s * 0.18)
+  ctx.closePath()
   ctx.stroke()
-
-  // pins
   ctx.beginPath()
-  ctx.moveTo(x + 4, y + 1)
-  ctx.lineTo(x + 4, y + 6)
-  ctx.moveTo(x + size - 4, y + 1)
-  ctx.lineTo(x + size - 4, y + 6)
+  ctx.moveTo(x + s * 0.32, y + s * 0.5)
+  ctx.lineTo(x + s * 0.45, y + s * 0.63)
+  ctx.lineTo(x + s * 0.7, y + s * 0.35)
   ctx.stroke()
+})
+
+const drawDocument: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.08, () => {
+  roundRect(ctx, x + s * 0.1, y, s * 0.8, s, s * 0.08); ctx.stroke()
+  for (const f of [0.28, 0.48, 0.68]) {
+    ctx.beginPath(); ctx.moveTo(x + s * 0.25, y + s * f); ctx.lineTo(x + s * 0.75, y + s * f); ctx.stroke()
+  }
+})
+
+const drawMapPin: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.09, () => {
+  ctx.beginPath()
+  ctx.arc(x + s * 0.5, y + s * 0.38, s * 0.38, Math.PI * 0.15, Math.PI * 0.85, true)
+  ctx.lineTo(x + s * 0.5, y + s)
+  ctx.closePath()
+  ctx.stroke()
+  ctx.beginPath(); ctx.arc(x + s * 0.5, y + s * 0.38, s * 0.14, 0, Math.PI * 2); ctx.stroke()
+})
+
+const drawGlobe: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.07, () => {
+  ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2, s * 0.46, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.ellipse(x + s / 2, y + s / 2, s * 0.2, s * 0.46, 0, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x + s * 0.06, y + s / 2); ctx.lineTo(x + s * 0.94, y + s / 2); ctx.stroke()
+})
+
+const drawHeadset: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.09, () => {
+  ctx.beginPath(); ctx.arc(x + s / 2, y + s * 0.55, s * 0.4, Math.PI, 0); ctx.stroke()
+  roundRect(ctx, x + s * 0.06, y + s * 0.5, s * 0.16, s * 0.32, s * 0.05); ctx.stroke()
+  roundRect(ctx, x + s * 0.78, y + s * 0.5, s * 0.16, s * 0.32, s * 0.05); ctx.stroke()
+})
+
+const drawTent: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.08, () => {
+  ctx.beginPath(); ctx.moveTo(x + s * 0.5, y); ctx.lineTo(x + s * 0.95, y + s); ctx.lineTo(x + s * 0.05, y + s); ctx.closePath(); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x + s * 0.5, y + s * 0.4); ctx.lineTo(x + s * 0.38, y + s); ctx.moveTo(x + s * 0.5, y + s * 0.4); ctx.lineTo(x + s * 0.62, y + s); ctx.stroke()
+})
+
+const drawCompass: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.08, () => {
+  ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2, s * 0.46, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(x + s * 0.65, y + s * 0.32); ctx.lineTo(x + s * 0.42, y + s * 0.45); ctx.lineTo(x + s * 0.35, y + s * 0.68); ctx.lineTo(x + s * 0.58, y + s * 0.55); ctx.closePath()
+  ctx.stroke()
+})
+
+const drawBus: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.08, () => {
+  roundRect(ctx, x + s * 0.06, y + s * 0.1, s * 0.88, s * 0.6, s * 0.12); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x + s * 0.06, y + s * 0.4); ctx.lineTo(x + s * 0.94, y + s * 0.4); ctx.stroke()
+  ctx.beginPath(); ctx.arc(x + s * 0.26, y + s * 0.82, s * 0.1, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.arc(x + s * 0.74, y + s * 0.82, s * 0.1, 0, Math.PI * 2); ctx.stroke()
+})
+
+const drawPlane: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.08, () => {
+  ctx.beginPath()
+  ctx.moveTo(x + s * 0.05, y + s * 0.75)
+  ctx.lineTo(x + s * 0.95, y + s * 0.3)
+  ctx.lineTo(x + s * 0.6, y + s * 0.55)
+  ctx.lineTo(x + s * 0.62, y + s)
+  ctx.lineTo(x + s * 0.45, y + s * 0.68)
+  ctx.closePath()
+  ctx.stroke()
+})
+
+const drawTrain: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.08, () => {
+  roundRect(ctx, x + s * 0.16, y, s * 0.68, s * 0.7, s * 0.14); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x + s * 0.16, y + s * 0.32); ctx.lineTo(x + s * 0.84, y + s * 0.32); ctx.stroke()
+  ctx.beginPath(); ctx.arc(x + s * 0.34, y + s * 0.85, s * 0.09, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.arc(x + s * 0.66, y + s * 0.85, s * 0.09, 0, Math.PI * 2); ctx.stroke()
+})
+
+const ICON_MAP: Record<string, IconFn> = {
+  person: drawPerson, mail: drawMail, phone: drawPhone, bed: drawBed, calendar: drawCalendar,
+  moon: drawMoon, shield: drawShieldCheck, document: drawDocument, mapPin: drawMapPin,
+  globe: drawGlobe, headset: drawHeadset, tent: drawTent, compass: drawCompass,
+  bus: drawBus, plane: drawPlane, train: drawTrain,
 }
 
-function drawMoonIcon(ctx: CanvasRenderingContext2D, x: number, y: number, size = 16) {
-  ctx.fillStyle = COLORS.navy
-  ctx.beginPath()
-  ctx.arc(x + size * 0.55, y + size * 0.5, size * 0.4, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.fillStyle = '#FFFFFF'
-  ctx.beginPath()
-  ctx.arc(x + size * 0.72, y + size * 0.38, size * 0.32, 0, Math.PI * 2)
-  ctx.fill()
+const CATEGORY_ICON: Record<ReceiptData['category'], string> = {
+  hotel: 'bed', tour: 'compass', event_center: 'tent', bus: 'bus', train: 'train', flight: 'plane',
 }
 
-function drawPersonIcon(ctx: CanvasRenderingContext2D, x: number, y: number, size = 16) {
-  ctx.fillStyle = COLORS.navy
-  // head
-  ctx.beginPath()
-  ctx.arc(x + size / 2, y + size * 0.28, size * 0.22, 0, Math.PI * 2)
-  ctx.fill()
-  // body
-  ctx.beginPath()
-  ctx.ellipse(x + size / 2, y + size * 0.72, size * 0.3, size * 0.26, 0, 0, Math.PI * 2)
-  ctx.fill()
+// Best-effort icon per row label — purely cosmetic, falls back to a generic document icon if unmatched.
+function iconForLabel(label: string): string {
+  const l = label.toLowerCase()
+  if (l.includes('room') || l.includes('hall')) return 'bed'
+  if (l.includes('check-in') || l.includes('check-out') || l.includes('date') || l.includes('start') || l.includes('end')) return 'calendar'
+  if (l.includes('night')) return 'moon'
+  if (l.includes('name') || l.includes('guest') || l.includes('customer')) return 'person'
+  if (l.includes('email')) return 'mail'
+  if (l.includes('phone')) return 'phone'
+  if (l.includes('duration') || l.includes('participant')) return 'compass'
+  return 'document'
 }
 
-function drawEnvelopeIcon(ctx: CanvasRenderingContext2D, x: number, y: number, size = 16) {
-  ctx.strokeStyle = COLORS.navy
-  ctx.lineWidth = 1.6
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-
-  roundRect(ctx, x, y + 2, size, size - 3, 2)
-  ctx.stroke()
-
-  ctx.beginPath()
-  ctx.moveTo(x + 1, y + 4)
-  ctx.lineTo(x + size / 2, y + size * 0.55)
-  ctx.lineTo(x + size - 1, y + 4)
-  ctx.stroke()
+function drawIcon(ctx: CanvasRenderingContext2D, name: string, x: number, y: number, s: number, color: string) {
+  const fn = ICON_MAP[name] || drawDocument
+  fn(ctx, x, y, s, color)
 }
 
-function drawPhoneIcon(ctx: CanvasRenderingContext2D, x: number, y: number, size = 15) {
-  ctx.strokeStyle = COLORS.navy
-  ctx.lineWidth = 1.7
-  ctx.lineCap = 'round'
-
-  roundRect(ctx, x + 2.5, y, size - 5, size, 3.5)
-  ctx.stroke()
-
-  // speaker line
-  ctx.beginPath()
-  ctx.moveTo(x + size * 0.38, y + size - 3.5)
-  ctx.lineTo(x + size * 0.62, y + size - 3.5)
-  ctx.stroke()
-}
-
+// Renders a branded, template-matched booking receipt to a PNG and triggers a download.
+// Every value comes from the real, already-confirmed booking — nothing here is invented.
 export async function downloadReceiptImage(data: ReceiptData) {
   const scale = 2
-  const width = 720
-  const rowH = 40
-  const detailsH = data.rows.length * rowH
-  const height = 980 + detailsH
+  const width = 1000
+  const rowH = 46
+  const headerH = 220
+  const successRowH = 150
+  const boxesRowH = 140
+  const detailsHeaderH = 60
+  const rowsH = data.rows.length * rowH
+  const summaryH = 150
+  const disclaimerH = 90
+  const footerH = 110
+  const gaps = 120
+  const height = headerH + successRowH + boxesRowH + detailsHeaderH + rowsH + summaryH + disclaimerH + footerH + gaps
 
   const canvas = document.createElement('canvas')
   canvas.width = width * scale
@@ -186,328 +252,289 @@ export async function downloadReceiptImage(data: ReceiptData) {
   if (!ctx) return
   ctx.scale(scale, scale)
 
-  // ===================== BACKGROUND =====================
+  // page bg
   ctx.fillStyle = '#FFFFFF'
   ctx.fillRect(0, 0, width, height)
-
-  // ===================== TOP HEADER =====================
-  // dark navy base
-  ctx.fillStyle = COLORS.navy
-  ctx.beginPath()
-  ctx.moveTo(0, 0)
-  ctx.lineTo(width, 0)
-  ctx.lineTo(width, 118)
-  ctx.quadraticCurveTo(width * 0.72, 148, width * 0.5, 132)
-  ctx.quadraticCurveTo(width * 0.22, 118, 0, 138)
-  ctx.closePath()
-  ctx.fill()
-
-  // orange accent curves (top right style)
-  ctx.strokeStyle = COLORS.secondary
-  ctx.lineWidth = 7
-  ctx.lineCap = 'round'
-  ctx.beginPath()
-  ctx.moveTo(width * 0.55, 0)
-  ctx.quadraticCurveTo(width * 0.78, 55, width, 38)
-  ctx.stroke()
-
-  ctx.lineWidth = 5
-  ctx.beginPath()
-  ctx.moveTo(width * 0.62, 0)
-  ctx.quadraticCurveTo(width * 0.85, 70, width, 55)
-  ctx.stroke()
-
-  // Logo
-  const logoImg = await loadImage(logo)
-  const logoSize = 52
-  if (logoImg) {
-    ctx.drawImage(logoImg, 36, 32, logoSize, logoSize)
-  }
-
-  // Brand name
-  ctx.textAlign = 'left'
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 24px Arial, sans-serif'
-  const brandX = 100
-  ctx.fillText('TRAVELER', brandX, 52)
-  const travelerW = ctx.measureText('TRAVELER').width
-  ctx.fillStyle = COLORS.secondary
-  ctx.fillText('.COM', brandX + travelerW, 52)
-
-  // Tagline
-  ctx.fillStyle = 'rgba(255,255,255,0.78)'
-  ctx.font = '12.5px Arial, sans-serif'
-  ctx.fillText('Your Journey, One Platform.', brandX, 74)
-
-  // RECEIPT badge (top right)
-  ctx.fillStyle = 'rgba(255,255,255,0.12)'
-  roundRect(ctx, width - 188, 26, 158, 62, 12)
-  ctx.fill()
-
-  ctx.textAlign = 'right'
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 13px Arial, sans-serif'
-  ctx.fillText('RECEIPT', width - 48, 48)
-
-  ctx.font = '11px Arial, sans-serif'
-  ctx.fillStyle = 'rgba(255,255,255,0.82)'
-  ctx.fillText('Thank you for choosing', width - 48, 66)
-  ctx.fillStyle = COLORS.secondary
-  ctx.font = 'bold 11.5px Arial, sans-serif'
-  ctx.fillText('Traveler.com', width - 48, 82)
-
-  // ===================== SUCCESS + BOOKING REF =====================
-  let y = 168
-
-  // Success
-  drawCheckBadge(ctx, 52, y + 12, 17)
-  ctx.textAlign = 'left'
-  ctx.fillStyle = COLORS.green
-  ctx.font = 'bold 16px Arial, sans-serif'
-  ctx.fillText('PAYMENT SUCCESSFUL', 80, y + 8)
-  ctx.fillStyle = COLORS.textMuted
-  ctx.font = '12.5px Arial, sans-serif'
-  ctx.fillText('Your payment has been processed successfully.', 80, y + 28)
-
-  // Booking Reference card
-  ctx.strokeStyle = COLORS.border
-  ctx.lineWidth = 1.5
-  roundRect(ctx, width - 248, y - 8, 218, 74, 14)
-  ctx.stroke()
-
-  ctx.fillStyle = COLORS.textMuted
-  ctx.font = '10px Arial, sans-serif'
-  ctx.textAlign = 'left'
-  ctx.fillText('BOOKING REFERENCE', width - 230, y + 10)
-
-  ctx.fillStyle = COLORS.navy
-  ctx.font = 'bold 15px Arial, sans-serif'
-  ctx.fillText(data.bookingReference, width - 230, y + 32)
-
-  ctx.fillStyle = COLORS.textMuted
-  ctx.font = '12px Arial, sans-serif'
-  ctx.fillText('📅  ' + (data.paymentDate || '—'), width - 230, y + 52)
-
-  // ===================== AMOUNT + ROOM CARD =====================
-  y = 270
-
-  // Amount Paid
-  ctx.fillStyle = COLORS.navy
-  roundRect(ctx, 32, y, 300, 96, 18)
-  ctx.fill()
-
-  ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.font = '11px Arial, sans-serif'
-  ctx.textAlign = 'left'
-  ctx.fillText('AMOUNT PAID', 54, y + 28)
-
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 34px Arial, sans-serif'
-  const amountStr = `₦${data.amountPaid.toLocaleString()}`
-  ctx.fillText(amountStr, 54, y + 68)
-
-  const amountW = ctx.measureText(amountStr).width
-  ctx.font = '14px Arial, sans-serif'
-  ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  ctx.fillText('NGN', 54 + amountW + 10, y + 66)
-
-  // Room card
-  ctx.strokeStyle = COLORS.border
-  ctx.lineWidth = 1.5
-  roundRect(ctx, width - 350, y, 318, 96, 18)
-  ctx.stroke()
-
-  // circular icon bg
-  ctx.fillStyle = COLORS.lightGray
-  ctx.beginPath()
-  ctx.arc(width - 300, y + 48, 26, 0, Math.PI * 2)
-  ctx.fill()
-  drawBedIcon(ctx, width - 309, y + 39, 18)
-
-  ctx.fillStyle = COLORS.navy
-  ctx.font = 'bold 16px Arial, sans-serif'
-  ctx.textAlign = 'left'
-  ctx.fillText(data.serviceName || 'Executive Room', width - 260, y + 40)
-
-  ctx.fillStyle = COLORS.textMuted
-  ctx.font = '13px Arial, sans-serif'
-  ctx.fillText('📍  ' + (data.subtitle || 'Abuja'), width - 260, y + 62)
-
-  // ===================== BOOKING DETAILS =====================
-  y = 400
-
-  // center label
-  ctx.fillStyle = COLORS.navy
-  roundRect(ctx, width / 2 - 90, y - 14, 180, 30, 15)
-  ctx.fill()
-
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 12.5px Arial, sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillText('BOOKING DETAILS', width / 2, y + 5)
-
-  // lines on sides of label
   ctx.strokeStyle = COLORS.border
   ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(32, y + 1)
-  ctx.lineTo(width / 2 - 100, y + 1)
-  ctx.moveTo(width / 2 + 100, y + 1)
-  ctx.lineTo(width - 32, y + 1)
-  ctx.stroke()
+  ctx.strokeRect(0.5, 0.5, width - 1, height - 1)
 
-  y += 48
+  const pad = 44
 
-  const iconFns = [
-    drawBedIcon,
-    drawCalendarIcon,
-    drawCalendarIcon,
-    drawMoonIcon,
-    drawPersonIcon,
-    drawEnvelopeIcon,
-    drawPhoneIcon,
-  ]
+  // ---------- header ----------
+  const logoImg = await loadImage(logo)
+  const logoSize = 74
+  if (logoImg) ctx.drawImage(logoImg, pad, 28, logoSize, logoSize)
 
-  data.rows.forEach((row, i) => {
-    const drawIcon = iconFns[i % iconFns.length]
-    drawIcon(ctx, 42, y - 9, 17)
-
-    ctx.textAlign = 'left'
-    ctx.fillStyle = COLORS.textMuted
-    ctx.font = '13.5px Arial, sans-serif'
-    ctx.fillText(row.label, 74, y + 4)
-
-    ctx.textAlign = 'right'
-    ctx.fillStyle = COLORS.text
-    ctx.font = 'bold 13.5px Arial, sans-serif'
-    ctx.fillText(row.value, width - 42, y + 4)
-
-    if (i < data.rows.length - 1) {
-      ctx.strokeStyle = '#F1F5F9'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.moveTo(74, y + 20)
-      ctx.lineTo(width - 42, y + 20)
-      ctx.stroke()
-    }
-
-    y += rowH
-  })
-
-  // ===================== PAYMENT SUMMARY =====================
-  y += 18
-
-  // outer container
-  ctx.strokeStyle = COLORS.border
-  ctx.lineWidth = 1.5
-  roundRect(ctx, 32, y, width - 64, 108, 16)
-  ctx.stroke()
-
-  // left content
-  ctx.fillStyle = COLORS.navy
-  ctx.font = 'bold 12.5px Arial, sans-serif'
   ctx.textAlign = 'left'
-  ctx.fillText('PAYMENT SUMMARY', 52, y + 28)
-
-  ctx.fillStyle = COLORS.textMuted
-  ctx.font = '13px Arial, sans-serif'
-  ctx.fillText('Payment Method', 52, y + 56)
-  ctx.fillText('Transaction ID', 52, y + 80)
-
-  ctx.fillStyle = COLORS.text
-  ctx.font = '13.5px Arial, sans-serif'
-  ctx.fillText('Traveler.com Wallet', 200, y + 56)
-  ctx.fillText(
-    'TRX-' + (data.paymentDate ? data.paymentDate.replace(/\D/g, '').slice(0, 10) : '202605241045'),
-    200,
-    y + 80
-  )
-
-  // right dark total box
+  ctx.font = 'bold 30px Arial, sans-serif'
   ctx.fillStyle = COLORS.navy
-  roundRect(ctx, width - 248, y + 8, 200, 92, 14)
-  ctx.fill()
-
-  // orange right accent
+  const wordX = pad + logoSize + 16
+  ctx.fillText('TRAVELER', wordX, 62)
+  const w1 = ctx.measureText('TRAVELER').width
   ctx.fillStyle = COLORS.secondary
-  ctx.fillRect(width - 52, y + 18, 6, 72)
+  ctx.fillText('.COM', wordX + w1, 62)
+  ctx.font = '14px Arial, sans-serif'
+  ctx.fillStyle = COLORS.textMuted
+  ctx.fillText('Your Journey, One Platform.', wordX, 86)
 
-  ctx.textAlign = 'center'
-  ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.font = '11px Arial, sans-serif'
-  ctx.fillText('TOTAL PAID', width - 148, y + 32)
-
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 26px Arial, sans-serif'
-  ctx.fillText(`₦${data.amountPaid.toLocaleString()}`, width - 148, y + 62)
-
-  ctx.fillStyle = COLORS.green
-  ctx.font = 'bold 11.5px Arial, sans-serif'
-  ctx.fillText('PAID IN FULL', width - 148, y + 84)
-
-  // ===================== BOTTOM NOTE =====================
-  y += 128
-
-  ctx.fillStyle = '#F1F5F9'
-  roundRect(ctx, 32, y, width - 64, 54, 12)
+  // navy diagonal panel top-right
+  ctx.save()
+  ctx.beginPath()
+  ctx.moveTo(width * 0.62, 0)
+  ctx.lineTo(width, 0)
+  ctx.lineTo(width, headerH - 20)
+  ctx.quadraticCurveTo(width * 0.7, headerH - 20, width * 0.55, headerH - 40)
+  ctx.closePath()
+  ctx.fillStyle = COLORS.navy
   ctx.fill()
+  ctx.restore()
 
-  ctx.textAlign = 'left'
-  ctx.fillStyle = COLORS.textMuted
-  ctx.font = '11.5px Arial, sans-serif'
-  ctx.fillText('🛡️  This is a system generated receipt and does not require a signature.', 48, y + 22)
-  ctx.fillText('For any support, contact us via help@traveler.com', 48, y + 40)
-
-  ctx.textAlign = 'right'
-  ctx.fillStyle = COLORS.navy
-  ctx.font = 'italic 14px Georgia, serif'
-  ctx.fillText('Thank you!', width - 48, y + 24)
-  ctx.font = '11.5px Arial, sans-serif'
-  ctx.fillStyle = COLORS.textMuted
-  ctx.fillText('We wish you a pleasant stay.', width - 48, y + 42)
-
-  // ===================== FOOTER =====================
-  const footerY = height - 78
-  ctx.fillStyle = COLORS.navy
-  ctx.fillRect(0, footerY, width, 78)
-
-  // orange top curves
+  ctx.save()
   ctx.strokeStyle = COLORS.secondary
   ctx.lineWidth = 5
   ctx.beginPath()
-  ctx.moveTo(0, footerY)
-  ctx.quadraticCurveTo(width * 0.28, footerY - 18, width * 0.5, footerY)
+  ctx.moveTo(width * 0.58, 0)
+  ctx.quadraticCurveTo(width * 0.68, headerH * 0.45, width * 0.5, headerH - 34)
+  ctx.stroke()
+  ctx.restore()
+
+  drawIcon(ctx, 'document', width * 0.72, 34, 26, '#FFFFFF')
+  ctx.textAlign = 'left'
+  ctx.font = 'bold 22px Arial, sans-serif'
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillText('RECEIPT', width * 0.72 + 34, 55)
+  ctx.font = '13px Arial, sans-serif'
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'
+  ctx.fillText('Thank you for choosing', width * 0.72, 82)
+  ctx.font = 'bold 13px Arial, sans-serif'
+  ctx.fillStyle = COLORS.secondary
+  ctx.fillText('Traveler.com', width * 0.72, 100)
+
+  let y = headerH
+
+  // ---------- payment success + booking reference ----------
+  const checkR = 32
+  ctx.beginPath()
+  ctx.arc(pad + checkR, y + checkR, checkR, 0, Math.PI * 2)
+  ctx.fillStyle = COLORS.green
+  ctx.fill()
+  ctx.save()
+  ctx.strokeStyle = 'white'
+  ctx.lineWidth = 4
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  ctx.moveTo(pad + checkR - 13, y + checkR)
+  ctx.lineTo(pad + checkR - 3, y + checkR + 10)
+  ctx.lineTo(pad + checkR + 14, y + checkR - 12)
+  ctx.stroke()
+  ctx.restore()
+
+  ctx.textAlign = 'left'
+  ctx.font = 'bold 19px Arial, sans-serif'
+  ctx.fillStyle = COLORS.green
+  ctx.fillText('PAYMENT SUCCESSFUL', pad + checkR * 2 + 16, y + 24)
+  ctx.font = '13px Arial, sans-serif'
+  ctx.fillStyle = COLORS.textMuted
+  ctx.fillText('Your payment has been processed successfully.', pad + checkR * 2 + 16, y + 44)
+
+  const refBoxW = 300, refBoxX = width - pad - refBoxW, refBoxY = y
+  roundRect(ctx, refBoxX, refBoxY, refBoxW, 108, 10)
+  ctx.strokeStyle = COLORS.border
+  ctx.lineWidth = 1
+  ctx.stroke()
+  ctx.font = '11px Arial, sans-serif'
+  ctx.fillStyle = COLORS.textMuted
+  ctx.fillText('BOOKING REFERENCE', refBoxX + 18, refBoxY + 24)
+  ctx.font = 'bold 19px Arial, sans-serif'
+  ctx.fillStyle = COLORS.navy
+  ctx.fillText(data.bookingReference, refBoxX + 18, refBoxY + 50)
+  if (data.paymentDate) {
+    drawIcon(ctx, 'calendar', refBoxX + 18, refBoxY + 62, 15, COLORS.textMuted)
+    ctx.font = '11px Arial, sans-serif'
+    ctx.fillStyle = COLORS.textMuted
+    ctx.fillText('Payment Date', refBoxX + 40, refBoxY + 74)
+    ctx.font = 'bold 13px Arial, sans-serif'
+    ctx.fillStyle = COLORS.navy
+    ctx.fillText(data.paymentDate, refBoxX + 40, refBoxY + 92)
+  }
+
+  y += successRowH
+
+  // ---------- amount box + service info box ----------
+  const amtBoxW = width - pad * 2 - 260 - 16
+  roundRect(ctx, pad, y, amtBoxW, 100, 12)
+  ctx.fillStyle = COLORS.navy
+  ctx.fill()
+  ctx.font = '12px Arial, sans-serif'
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.fillText('AMOUNT PAID', pad + 24, y + 28)
+  ctx.font = 'bold 40px Arial, sans-serif'
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillText(`\u20A6${data.amountPaid.toLocaleString()}`, pad + 24, y + 72)
+  const amtW = ctx.measureText(`\u20A6${data.amountPaid.toLocaleString()}`).width
+  ctx.font = '13px Arial, sans-serif'
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.fillText('NGN', pad + 24 + amtW + 10, y + 72)
+
+  const infoBoxX = pad + amtBoxW + 16, infoBoxW = 260
+  roundRect(ctx, infoBoxX, y, infoBoxW, 100, 12)
+  ctx.strokeStyle = COLORS.border
   ctx.stroke()
   ctx.beginPath()
-  ctx.moveTo(width * 0.55, footerY)
-  ctx.quadraticCurveTo(width * 0.82, footerY + 22, width, footerY)
-  ctx.stroke()
+  ctx.arc(infoBoxX + 40, y + 50, 24, 0, Math.PI * 2)
+  ctx.fillStyle = COLORS.bg
+  ctx.fill()
+  drawIcon(ctx, CATEGORY_ICON[data.category], infoBoxX + 28, y + 38, 24, COLORS.navy)
+  ctx.font = 'bold 15px Arial, sans-serif'
+  ctx.fillStyle = COLORS.navy
+  ctx.fillText(data.serviceTypeLabel, infoBoxX + 76, y + 44)
+  drawIcon(ctx, 'mapPin', infoBoxX + 76, y + 54, 13, COLORS.secondary)
+  ctx.font = '12px Arial, sans-serif'
+  ctx.fillStyle = COLORS.textMuted
+  ctx.fillText(data.location, infoBoxX + 94, y + 66)
 
-  ctx.fillStyle = 'rgba(255,255,255,0.88)'
-  ctx.font = '11.5px Arial, sans-serif'
+  y += boxesRowH
+
+  // ---------- BOOKING DETAILS divider ----------
+  ctx.beginPath()
+  ctx.moveTo(pad, y + 18)
+  ctx.lineTo(width - pad, y + 18)
+  ctx.strokeStyle = COLORS.navy
+  ctx.lineWidth = 1
+  ctx.stroke()
+  const pillText = 'BOOKING DETAILS'
+  ctx.font = 'bold 12px Arial, sans-serif'
+  const pillW = ctx.measureText(pillText).width + 36
+  roundRect(ctx, width / 2 - pillW / 2, y, pillW, 28, 14)
+  ctx.fillStyle = COLORS.navy
+  ctx.fill()
+  ctx.fillStyle = '#FFFFFF'
+  ctx.textAlign = 'center'
+  ctx.fillText(pillText, width / 2, y + 18)
   ctx.textAlign = 'left'
 
-  ctx.fillText('🌐  Website', 36, footerY + 30)
-  ctx.fillText('www.traveler.com', 36, footerY + 48)
+  y += detailsHeaderH
 
-  ctx.fillText('🎧  Support', 210, footerY + 30)
-  ctx.fillText('help@traveler.com', 210, footerY + 48)
+  // ---------- detail rows ----------
+  for (const row of data.rows) {
+    drawIcon(ctx, row.icon || iconForLabel(row.label), pad, y - 15, 18, COLORS.navy)
+    ctx.font = '14px Arial, sans-serif'
+    ctx.fillStyle = COLORS.text
+    ctx.fillText(row.label, pad + 30, y)
+    ctx.textAlign = 'right'
+    ctx.font = 'bold 14px Arial, sans-serif'
+    ctx.fillText(row.value, width - pad, y)
+    ctx.textAlign = 'left'
+    dottedLine(ctx, pad, y + 14, width - pad)
+    y += rowH
+  }
 
-  ctx.fillText('📞  Phone', 400, footerY + 30)
-  ctx.fillText('+234 806 123 4567', 400, footerY + 48)
+  y += 10
 
+  // ---------- payment summary split box ----------
+  const sumH = summaryH - 20
+  const sumSplit = width * 0.68
+  roundRect(ctx, pad, y, width - pad * 2, sumH, 12)
+  ctx.strokeStyle = COLORS.border
+  ctx.stroke()
+
+  ctx.save()
+  roundRect(ctx, pad, y, sumSplit - pad, sumH, 12)
+  ctx.clip()
+  ctx.fillStyle = COLORS.bg
+  ctx.fillRect(pad, y, sumSplit - pad, sumH)
+  ctx.restore()
+
+  ctx.font = 'bold 12px Arial, sans-serif'
+  ctx.fillStyle = COLORS.navy
+  ctx.fillText('PAYMENT SUMMARY', pad + 20, y + 26)
+  ctx.font = '12px Arial, sans-serif'
+  ctx.fillStyle = COLORS.textMuted
+  ctx.fillText('Payment Method', pad + 20, y + 58)
+  ctx.font = 'bold 13px Arial, sans-serif'
+  ctx.fillStyle = COLORS.text
+  ctx.fillText('Traveler.com Wallet', pad + 20, y + 76)
+  if (data.transactionId) {
+    ctx.font = '12px Arial, sans-serif'
+    ctx.fillStyle = COLORS.textMuted
+    ctx.fillText('Transaction ID', pad + 20, y + 104)
+    ctx.font = 'bold 13px Arial, sans-serif'
+    ctx.fillStyle = COLORS.text
+    ctx.fillText(data.transactionId, pad + 20, y + 122)
+  }
+
+  const totalX = sumSplit
+  ctx.save()
+  roundRect(ctx, totalX, y, width - pad - totalX, sumH, 12)
+  ctx.clip()
+  ctx.fillStyle = COLORS.navy
+  ctx.fillRect(totalX, y, width - pad - totalX, sumH)
+  ctx.fillStyle = COLORS.secondary
+  ctx.fillRect(totalX, y, 5, sumH)
+  ctx.restore()
+  ctx.font = '11px Arial, sans-serif'
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.fillText('TOTAL PAID', totalX + 24, y + 30)
+  ctx.font = 'bold 26px Arial, sans-serif'
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillText(`\u20A6${data.amountPaid.toLocaleString()}`, totalX + 24, y + 66)
+  ctx.font = 'bold 12px Arial, sans-serif'
+  ctx.fillStyle = '#4ADE80'
+  ctx.fillText('PAID IN FULL', totalX + 24, y + 90)
+
+  y += summaryH
+
+  // ---------- disclaimer bar ----------
+  roundRect(ctx, pad, y, width - pad * 2, disclaimerH - 20, 10)
+  ctx.fillStyle = COLORS.bg
+  ctx.fill()
+  drawIcon(ctx, 'shield', pad + 20, y + 16, 22, COLORS.navy)
+  ctx.font = '11.5px Arial, sans-serif'
+  ctx.fillStyle = COLORS.textMuted
+  ctx.fillText('This is a system generated receipt and does not require a signature.', pad + 56, y + 26)
+  ctx.fillText(`For any support, contact us via ${SUPPORT_EMAIL}`, pad + 56, y + 44)
   ctx.textAlign = 'right'
-  ctx.fillText('Follow us', width - 36, footerY + 30)
-  ctx.font = '15px Arial, sans-serif'
-  ctx.fillText('f   𝕏   📷   ▶', width - 36, footerY + 50)
+  ctx.font = 'italic bold 15px Georgia, serif'
+  ctx.fillStyle = COLORS.navy
+  ctx.fillText('Thank you!', width - pad - 20, y + 26)
+  ctx.font = '11.5px Arial, sans-serif'
+  ctx.fillStyle = COLORS.textMuted
+  ctx.fillText('We wish you a pleasant journey.', width - pad - 20, y + 44)
+  ctx.textAlign = 'left'
 
-  // ===================== DOWNLOAD =====================
+  y += disclaimerH
+
+  // ---------- footer ----------
+  roundRect(ctx, 0, y, width, footerH, 0)
+  ctx.fillStyle = COLORS.navy
+  ctx.fill()
+  const footerCenterY = y + footerH / 2
+
+  drawIcon(ctx, 'globe', pad, footerCenterY - 11, 20, '#FFFFFF')
+  ctx.font = '10.5px Arial, sans-serif'
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.fillText('Website', pad + 28, footerCenterY - 3)
+  ctx.font = 'bold 11.5px Arial, sans-serif'
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillText(WEBSITE, pad + 28, footerCenterY + 13)
+
+  const supportX = pad + 230
+  drawIcon(ctx, 'headset', supportX, footerCenterY - 11, 20, '#FFFFFF')
+  ctx.font = '10.5px Arial, sans-serif'
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.fillText('Support', supportX + 28, footerCenterY - 3)
+  ctx.font = 'bold 11.5px Arial, sans-serif'
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillText(SUPPORT_EMAIL, supportX + 28, footerCenterY + 13)
+
   canvas.toBlob((blob) => {
     if (!blob) return
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `TravelerCom-\( {data.filenamePrefix || 'Receipt'}- \){data.bookingReference}.png`
+    a.download = `TravelerCom-${data.filenamePrefix || 'Receipt'}-${data.bookingReference}.png`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
