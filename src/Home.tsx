@@ -17,6 +17,47 @@ const COLORS = {
 
 const PERIOD_DAYS: Record<'week' | 'month' | 'year', number> = { week: 7, month: 30, year: 365 }
 
+// Category listing pages vs individual detail pages use different route bases
+// in this app (e.g. flights list is /flights but a single flight is /flight/:id).
+const CATEGORY_LIST_ROUTES: Record<string, string> = {
+  hotel: '/hotels', bus: '/bus', train: '/train', flight: '/flights', tour: '/tours', event_center: '/event-centers',
+}
+const CATEGORY_DETAIL_BASE: Record<string, string> = {
+  hotel: '/hotels', bus: '/bus', train: '/train', flight: '/flight', tour: '/tour', event_center: '/event-center',
+}
+
+type HomeBanner = {
+  id: string; title: string; message: string; image_url: string | null; link_url: string | null;
+  banner_type: 'promo' | 'discount' | 'featured' | 'announcement';
+  link_type: 'listing' | 'category' | 'external';
+  target_listing_id: string | null;
+  target_category: string | null;
+  cta_text: string | null;
+}
+
+function getBannerHref(b: HomeBanner, listingMeta: Record<string, { category: string; discountPercent: number | null }>): string | null {
+  if (b.link_type === 'category' && b.target_category) {
+    return CATEGORY_LIST_ROUTES[b.target_category] || null
+  }
+  if (b.link_type === 'listing' && b.target_listing_id) {
+    const meta = listingMeta[b.target_listing_id]
+    if (!meta) return null
+    const base = CATEGORY_DETAIL_BASE[meta.category]
+    return base ? `${base}/${b.target_listing_id}` : null
+  }
+  // external, or legacy banners saved before link_type existed
+  return b.link_url || null
+}
+
+function bannerGradient(bannerType?: string) {
+  switch (bannerType) {
+    case 'discount': return 'linear-gradient(135deg, #F97316, #c2410c)'
+    case 'promo': return 'linear-gradient(135deg, #1e293b, #0f172a)'
+    case 'featured': return 'linear-gradient(135deg, #0d9488, #115e59)'
+    default: return 'linear-gradient(135deg, #0EA5E9, #0369a1)'
+  }
+}
+
 function computePeriodStats(bookings: any[], filter: 'week' | 'month' | 'year') {
   const days = PERIOD_DAYS[filter]
   const now = Date.now()
@@ -88,7 +129,15 @@ function Home() {
     price: number; photo_url: string | null; companyName: string
   }[]>([])
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
-  const [banners, setBanners] = useState<{ id: string; title: string; message: string; image_url: string | null; link_url: string | null }[]>([])
+  const [banners, setBanners] = useState<{
+    id: string; title: string; message: string; image_url: string | null; link_url: string | null;
+    banner_type: 'promo' | 'discount' | 'featured' | 'announcement';
+    link_type: 'listing' | 'category' | 'external';
+    target_listing_id: string | null;
+    target_category: string | null;
+    cta_text: string | null;
+  }[]>([])
+  const [listingMeta, setListingMeta] = useState<Record<string, { category: string; discountPercent: number | null }>>({})
   const [heroSlide, setHeroSlide] = useState(0)
   useEffect(() => {
     const loadUser = async () => {
@@ -119,11 +168,23 @@ function Home() {
       setAccountType(isCompany ? 'company' : 'personal')
       const { data: bannerRows } = await supabase
         .from('platform_banners')
-        .select('id, title, message, image_url, link_url')
+        .select('id, title, message, image_url, link_url, banner_type, link_type, target_listing_id, target_category, cta_text')
         .eq('active', true)
         .in('target_audience', isCompany ? ['all', 'company'] : ['all', 'personal'])
         .order('created_at', { ascending: false })
       setBanners(bannerRows || [])
+
+      // Fetch category + live discount info for any banner linked to a specific listing,
+      // so the hero card can route correctly and show a real "X% OFF" badge.
+      const linkedListingIds = Array.from(new Set(
+        (bannerRows || []).filter((b: any) => b.link_type === 'listing' && b.target_listing_id).map((b: any) => b.target_listing_id)
+      ))
+      if (linkedListingIds.length > 0) {
+        const { data: svcRows } = await supabase.from('services').select('id, category, discount_percent, discount_active').in('id', linkedListingIds)
+        const map: Record<string, { category: string; discountPercent: number | null }> = {}
+        ;(svcRows || []).forEach((s: any) => { map[s.id] = { category: s.category, discountPercent: s.discount_active ? s.discount_percent : null } })
+        setListingMeta(map)
+      }
       setDisplayName(meta.full_name || '')
 
       // Ensure a profiles row exists for this user (required for companies/wallets/bookings FK)
@@ -391,39 +452,65 @@ if (accountType === 'company') {
         {banners.length > 0 && (
           <div style={{ padding: '0 16px', marginBottom: '20px' }}>
             <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
-              {banners.map((b) => (
-                <div
-                  key={b.id}
-                  onClick={() => {
-                    if (!b.link_url) return
-                    if (b.link_url.startsWith('http')) window.location.href = b.link_url
-                    else navigate(b.link_url)
-                  }}
-                  style={{
-                    minWidth: '280px',
-                    flexShrink: 0,
-                    background: b.image_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, #ea580c)`,
-                    borderRadius: '18px',
-                    padding: '20px',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    boxShadow: '0 8px 20px rgba(249,115,22,0.25)',
-                    cursor: b.link_url ? 'pointer' : 'default',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    minHeight: '90px',
-                  }}>
-                  {b.image_url && (
-                    <img src={b.image_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} />
-                  )}
-                  <div style={{ flex: 1, position: 'relative' }}>
-                    <p style={{ fontSize: '15px', fontWeight: 800, marginBottom: '4px' }}>{b.title}</p>
-                    <p style={{ fontSize: '12px', opacity: 0.95 }}>{b.message}</p>
+              {banners.map((b) => {
+                const href = getBannerHref(b, listingMeta)
+                const discountPct = b.banner_type === 'discount' && b.target_listing_id ? listingMeta[b.target_listing_id]?.discountPercent : null
+                return (
+                  <div
+                    key={b.id}
+                    onClick={() => {
+                      if (!href) return
+                      if (href.startsWith('http')) window.location.href = href
+                      else navigate(href)
+                    }}
+                    style={{
+                      minWidth: '280px',
+                      flexShrink: 0,
+                      background: bannerGradient(b.banner_type),
+                      borderRadius: '18px',
+                      padding: '20px',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 8px 20px rgba(249,115,22,0.25)',
+                      cursor: href ? 'pointer' : 'default',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      minHeight: '90px',
+                    }}>
+                    {b.image_url && (
+                      <>
+                        <img src={b.image_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.55))' }} />
+                      </>
+                    )}
+                    {discountPct != null && (
+                      <div style={{
+                        position: 'absolute', top: '10px', right: '10px', width: '44px', height: '44px', borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.96)', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                        justifyContent: 'center', textAlign: 'center',
+                      }}>
+                        <span style={{ fontSize: '10px', fontWeight: 900, color: '#c2410c', lineHeight: 1 }}>{discountPct}%</span>
+                        <span style={{ fontSize: '6.5px', fontWeight: 700, color: '#c2410c', lineHeight: 1 }}>OFF</span>
+                      </div>
+                    )}
+                    <div style={{ flex: 1, position: 'relative' }}>
+                      <p style={{ fontSize: '15px', fontWeight: 800, marginBottom: '4px' }}>{b.title}</p>
+                      <p style={{ fontSize: '12px', opacity: 0.95 }}>{b.message}</p>
+                      {b.cta_text && (
+                        <div style={{
+                          marginTop: '10px', display: 'inline-flex', alignItems: 'center', gap: '5px',
+                          background: 'rgba(255,255,255,0.95)', color: '#1A1A1A', padding: '6px 11px',
+                          borderRadius: '8px', fontSize: '11.5px', fontWeight: 800,
+                        }}>
+                          {b.cta_text} <span>→</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -583,11 +670,15 @@ const services = [
   // No real listings yet for tours/events — will be populated once companies start adding services
 
   // First slide is always the default welcome message; any active banners follow
-  const heroSlides: ({ type: 'default' } | { type: 'banner'; banner: typeof banners[number] })[] = [
+  const heroSlides: ({ type: 'default' } | { type: 'banner'; banner: HomeBanner })[] = [
     { type: 'default' },
     ...banners.map((b) => ({ type: 'banner' as const, banner: b })),
   ]
   const currentSlide = heroSlides[heroSlide] || heroSlides[0]
+  const heroHref = currentSlide.type === 'banner' ? getBannerHref(currentSlide.banner, listingMeta) : null
+  const heroDiscountPct = currentSlide.type === 'banner' && currentSlide.banner.banner_type === 'discount' && currentSlide.banner.target_listing_id
+    ? listingMeta[currentSlide.banner.target_listing_id]?.discountPercent
+    : null
 
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
@@ -634,9 +725,9 @@ const services = [
       <div style={{ margin: '16px' }}>
         <div
           onClick={() => {
-            if (currentSlide.type !== 'banner' || !currentSlide.banner.link_url) return
-            if (currentSlide.banner.link_url.startsWith('http')) window.location.href = currentSlide.banner.link_url
-            else navigate(currentSlide.banner.link_url)
+            if (!heroHref) return
+            if (heroHref.startsWith('http')) window.location.href = heroHref
+            else navigate(heroHref)
           }}
           style={{
             borderRadius: '20px',
@@ -644,13 +735,27 @@ const services = [
             minHeight: '108px',
             position: 'relative',
             overflow: 'hidden',
-            background: `linear-gradient(135deg, ${COLORS.primary}, #0369a1)`,
+            background: currentSlide.type === 'default' ? bannerGradient() : bannerGradient(currentSlide.banner.banner_type),
             color: 'white',
             boxShadow: '0 8px 24px rgba(14,165,233,0.25)',
-            cursor: currentSlide.type === 'banner' && currentSlide.banner.link_url ? 'pointer' : 'default',
+            cursor: heroHref ? 'pointer' : 'default',
           }}>
           {currentSlide.type === 'banner' && currentSlide.banner.image_url && (
-            <img src={currentSlide.banner.image_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} />
+            <>
+              <img src={currentSlide.banner.image_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.55))' }} />
+            </>
+          )}
+          {heroDiscountPct != null && (
+            <div style={{
+              position: 'absolute', top: '14px', right: '14px', width: '58px', height: '58px', borderRadius: '50%',
+              background: 'rgba(255,255,255,0.96)', display: 'flex', flexDirection: 'column', alignItems: 'center',
+              justifyContent: 'center', textAlign: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+            }}>
+              <span style={{ fontSize: '8.5px', fontWeight: 700, color: '#c2410c', lineHeight: 1 }}>Up to</span>
+              <span style={{ fontSize: '15px', fontWeight: 900, color: '#c2410c', lineHeight: 1.15 }}>{heroDiscountPct}%</span>
+              <span style={{ fontSize: '8.5px', fontWeight: 700, color: '#c2410c', lineHeight: 1 }}>OFF</span>
+            </div>
           )}
           <div style={{ position: 'relative' }}>
             {currentSlide.type === 'default' ? (
@@ -664,12 +769,21 @@ const services = [
               </>
             ) : (
               <>
-                <h2 style={{ fontSize: '17px', fontWeight: 800, lineHeight: 1.3, marginBottom: '6px' }}>
+                <h2 style={{ fontSize: '17px', fontWeight: 800, lineHeight: 1.3, marginBottom: '6px', maxWidth: heroDiscountPct != null ? '75%' : '100%' }}>
                   {currentSlide.banner.title}
                 </h2>
-                <p style={{ fontSize: '13px', opacity: 0.95 }}>
+                <p style={{ fontSize: '13px', opacity: 0.95, maxWidth: heroDiscountPct != null ? '75%' : '100%' }}>
                   {currentSlide.banner.message}
                 </p>
+                {currentSlide.banner.cta_text && (
+                  <div style={{
+                    marginTop: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    background: 'rgba(255,255,255,0.95)', color: '#1A1A1A', padding: '8px 14px',
+                    borderRadius: '9px', fontSize: '12.5px', fontWeight: 800,
+                  }}>
+                    {currentSlide.banner.cta_text} <span>→</span>
+                  </div>
+                )}
               </>
             )}
           </div>
