@@ -37,6 +37,7 @@ type Banner = {
   target_listing_id: string | null
   target_category: string | null
   cta_text: string | null
+  promotion_id: string | null
 }
 type Notice = { id: string; title: string; message: string; target_audience: 'all' | 'personal' | 'company'; active: boolean; created_at: string }
 type ServiceOption = { id: string; title: string; category: string; price: number | null }
@@ -108,6 +109,12 @@ function BannersTab() {
   const [listingQuery, setListingQuery] = useState('')
   const [listingResults, setListingResults] = useState<ServiceOption[]>([])
   const [listingSearching, setListingSearching] = useState(false)
+  const [linkedPromotionId, setLinkedPromotionId] = useState<string | null>(null)
+  const [promotionPercents, setPromotionPercents] = useState<Record<string, number>>({})
+
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState('')
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   useEffect(() => { fetchBanners() }, [])
 
@@ -134,6 +141,16 @@ function BannersTab() {
     } else {
       setListingTitles({})
     }
+
+    const promoIds = Array.from(new Set(list.filter((b) => b.banner_type === 'discount' && b.promotion_id).map((b) => b.promotion_id as string)))
+    if (promoIds.length > 0) {
+      const { data: promos } = await supabase.from('promotions').select('id, discount_value').in('id', promoIds)
+      const pmap: Record<string, number> = {}
+      ;(promos || []).forEach((p: any) => { pmap[p.id] = p.discount_value })
+      setPromotionPercents(pmap)
+    } else {
+      setPromotionPercents({})
+    }
     setLoading(false)
   }
 
@@ -159,7 +176,11 @@ function BannersTab() {
     setForm({ ...form, banner_type: bt, link_type: bt === 'discount' ? 'listing' : form.link_type })
   }
 
-  function openNew() { setForm(EMPTY_BANNER_FORM); setEditingId(null); setListingQuery(''); setListingResults([]); setShowForm(true) }
+  function openNew() {
+    setForm(EMPTY_BANNER_FORM); setEditingId(null); setListingQuery(''); setListingResults([])
+    setLinkedPromotionId(null); setPhotoFile(null); setPhotoPreview('')
+    setShowForm(true)
+  }
 
   async function openEdit(b: Banner) {
     setForm({
@@ -179,20 +200,31 @@ function BannersTab() {
     })
     setEditingId(b.id)
     setListingQuery(''); setListingResults([])
+    setLinkedPromotionId(b.promotion_id || null)
+    setPhotoFile(null); setPhotoPreview('')
     setShowForm(true)
 
     if (b.target_listing_id) {
-      const { data } = await supabase.from('services').select('title, discount_percent, discount_expires_at, discount_label').eq('id', b.target_listing_id).single()
+      const { data } = await supabase.from('services').select('title').eq('id', b.target_listing_id).single()
+      if (data) setForm((f) => ({ ...f, target_listing_title: (data as any).title || '' }))
+    }
+
+    if (b.promotion_id) {
+      const { data } = await supabase.from('promotions').select('title, discount_value, end_date').eq('id', b.promotion_id).single()
       if (data) {
         setForm((f) => ({
           ...f,
-          target_listing_title: (data as any).title || '',
-          discount_percent: (data as any).discount_percent != null ? String((data as any).discount_percent) : '',
-          discount_expires_at: (data as any).discount_expires_at ? String((data as any).discount_expires_at).slice(0, 10) : '',
-          discount_label: (data as any).discount_label || '',
+          discount_percent: (data as any).discount_value != null ? String((data as any).discount_value) : '',
+          discount_expires_at: (data as any).end_date ? String((data as any).end_date).slice(0, 10) : '',
+          discount_label: (data as any).title || '',
         }))
       }
     }
+  }
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) { setPhotoFile(file); setPhotoPreview(URL.createObjectURL(file)) }
   }
 
   async function save() {
@@ -206,35 +238,69 @@ function BannersTab() {
     }
 
     setSaving(true); setError('')
-    const { data: userData } = await supabase.auth.getUser()
+
+    // 1. Upload a new photo if one was picked; otherwise keep whatever image_url already has.
+    let finalImageUrl = form.image_url.trim() || null
+    if (photoFile) {
+      setUploadingPhoto(true)
+      const fileExt = photoFile.name.split('.').pop()
+      const fileName = `banner-${Date.now()}.${fileExt}`
+      const { error: uploadErr } = await supabase.storage.from('listing-photos').upload(fileName, photoFile)
+      setUploadingPhoto(false)
+      if (uploadErr) { setSaving(false); setError('Photo upload ya kasa: ' + uploadErr.message); return }
+      const { data: urlData } = supabase.storage.from('listing-photos').getPublicUrl(fileName)
+      finalImageUrl = urlData.publicUrl
+    }
+
+    // 2. Create/update the promotion row (or deactivate one that's no longer wanted) BEFORE
+    //    saving the banner, so we know which promotion_id to attach to it.
+    let promotionId: string | null = form.banner_type === 'discount' ? linkedPromotionId : null
+
+    if (form.banner_type === 'discount') {
+      const promoPayload = {
+        service_id: form.target_listing_id,
+        title: form.discount_label.trim() || form.title.trim(),
+        discount_type: 'percentage',
+        discount_value: Number(form.discount_percent),
+        start_date: new Date().toISOString().slice(0, 10),
+        end_date: form.discount_expires_at || null,
+        active: true,
+      }
+      if (linkedPromotionId) {
+        const { error: promoErr } = await supabase.from('promotions').update(promoPayload).eq('id', linkedPromotionId)
+        if (promoErr) { setSaving(false); setError(promoErr.message); return }
+      } else {
+        const { data: newPromo, error: promoErr } = await supabase.from('promotions').insert(promoPayload).select('id').single()
+        if (promoErr) { setSaving(false); setError(promoErr.message); return }
+        promotionId = newPromo?.id || null
+      }
+    } else if (linkedPromotionId) {
+      // Banner type was changed away from "discount" — switch off the old promotion
+      // rather than deleting it, so any past bookings that used it stay intact.
+      await supabase.from('promotions').update({ active: false }).eq('id', linkedPromotionId)
+      promotionId = null
+    }
+
+    // 3. Save the banner itself.
     const payload = {
       title: form.title.trim(),
       message: form.message.trim(),
-      image_url: form.image_url.trim() || null,
+      image_url: finalImageUrl,
       link_url: form.link_type === 'external' ? (form.link_url.trim() || null) : null,
       banner_type: form.banner_type,
       link_type: form.link_type,
       target_listing_id: form.link_type === 'listing' ? form.target_listing_id : null,
       target_category: form.link_type === 'category' ? form.target_category : null,
-      cta_text: form.cta_text.trim() || null,
+      cta_text: form.cta_text.trim() || (form.banner_type === 'discount' || form.banner_type === 'promo' ? 'Book Now' : 'Explore Now'),
+      promotion_id: promotionId,
     }
+    const { data: userData } = await supabase.auth.getUser()
     const { error } = editingId
       ? await supabase.from('platform_banners').update(payload).eq('id', editingId)
       : await supabase.from('platform_banners').insert({ ...payload, active: true, created_by: userData?.user?.id })
 
-    if (error) { setSaving(false); setError(error.message); return }
-
-    if (form.banner_type === 'discount' && form.target_listing_id) {
-      const { error: discErr } = await supabase.from('services').update({
-        discount_percent: Number(form.discount_percent),
-        discount_active: true,
-        discount_expires_at: form.discount_expires_at ? new Date(form.discount_expires_at).toISOString() : null,
-        discount_label: form.discount_label.trim() || form.title.trim(),
-      }).eq('id', form.target_listing_id)
-      if (discErr) { setSaving(false); setError(discErr.message); return }
-    }
-
     setSaving(false)
+    if (error) { setError(error.message); return }
     setShowForm(false); fetchBanners()
   }
 
@@ -242,8 +308,8 @@ function BannersTab() {
     const nextActive = !b.active
     const { error } = await supabase.from('platform_banners').update({ active: nextActive }).eq('id', b.id)
     if (error) { setError(error.message); return }
-    if (b.banner_type === 'discount' && b.target_listing_id) {
-      await supabase.from('services').update({ discount_active: nextActive }).eq('id', b.target_listing_id)
+    if (b.banner_type === 'discount' && b.promotion_id) {
+      await supabase.from('promotions').update({ active: nextActive }).eq('id', b.promotion_id)
     }
     fetchBanners()
   }
@@ -252,8 +318,8 @@ function BannersTab() {
     if (!confirm(`Delete "${b.title}"?`)) return
     const { error } = await supabase.from('platform_banners').delete().eq('id', b.id)
     if (error) { setError(error.message); return }
-    if (b.banner_type === 'discount' && b.target_listing_id) {
-      await supabase.from('services').update({ discount_active: false }).eq('id', b.target_listing_id)
+    if (b.banner_type === 'discount' && b.promotion_id) {
+      await supabase.from('promotions').update({ active: false }).eq('id', b.promotion_id)
     }
     fetchBanners()
   }
@@ -317,6 +383,11 @@ function BannersTab() {
                       CTA: {b.cta_text}
                     </span>
                   )}
+                  {b.banner_type === 'discount' && b.promotion_id && promotionPercents[b.promotion_id] != null && (
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.orange, background: COLORS.orangeBg, padding: '3px 8px', borderRadius: '6px' }}>
+                      {promotionPercents[b.promotion_id]}% OFF
+                    </span>
+                  )}
                 </div>
                 <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '6px', lineHeight: 1.4 }}>{b.message}</p>
                 <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '5px' }}>
@@ -367,7 +438,23 @@ function BannersTab() {
 
             <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Title" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', color: COLORS.text }} />
             <textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Message" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '60px', marginBottom: '10px', color: COLORS.text }} />
-            <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="Image URL" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', color: COLORS.text }} />
+            <label style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '6px', display: 'block', fontWeight: 700 }}>Banner Photo</label>
+            <label style={{ display: 'block', marginBottom: '14px', cursor: 'pointer' }}>
+              {(photoPreview || form.image_url) ? (
+                <div style={{ position: 'relative' as const, width: '100%', height: '130px', borderRadius: '10px', overflow: 'hidden' }}>
+                  <img src={photoPreview || form.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute' as const, inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ color: '#fff', fontSize: '12px', fontWeight: 700 }}>{uploadingPhoto ? 'Uploading...' : 'Tap to change photo'}</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ width: '100%', height: '90px', borderRadius: '10px', border: `1.5px dashed ${COLORS.border}`, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                  <Icon name="image" size={18} color={COLORS.textMuted} />
+                  <span style={{ fontSize: '12px', color: COLORS.textMuted, fontWeight: 600 }}>Tap to upload a photo</span>
+                </div>
+              )}
+              <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
+            </label>
             <input value={form.cta_text} onChange={(e) => setForm({ ...form, cta_text: e.target.value })} placeholder="Button text (e.g. Book Now) — optional" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '14px', color: COLORS.text }} />
 
             {/* Banner Type */}
