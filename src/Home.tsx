@@ -33,9 +33,10 @@ type HomeBanner = {
   target_listing_id: string | null;
   target_category: string | null;
   cta_text: string | null;
+  promotion_id: string | null;
 }
 
-function getBannerHref(b: HomeBanner, listingMeta: Record<string, { category: string; discountPercent: number | null }>): string | null {
+function getBannerHref(b: HomeBanner, listingMeta: Record<string, { category: string }>): string | null {
   if (b.link_type === 'category' && b.target_category) {
     return CATEGORY_LIST_ROUTES[b.target_category] || null
   }
@@ -129,15 +130,9 @@ function Home() {
     price: number; photo_url: string | null; companyName: string
   }[]>([])
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
-  const [banners, setBanners] = useState<{
-    id: string; title: string; message: string; image_url: string | null; link_url: string | null;
-    banner_type: 'promo' | 'discount' | 'featured' | 'announcement';
-    link_type: 'listing' | 'category' | 'external';
-    target_listing_id: string | null;
-    target_category: string | null;
-    cta_text: string | null;
-  }[]>([])
-  const [listingMeta, setListingMeta] = useState<Record<string, { category: string; discountPercent: number | null }>>({})
+  const [banners, setBanners] = useState<HomeBanner[]>([])
+  const [listingMeta, setListingMeta] = useState<Record<string, { category: string }>>({})
+  const [promoPercents, setPromoPercents] = useState<Record<string, number>>({})
   const [heroSlide, setHeroSlide] = useState(0)
   useEffect(() => {
     const loadUser = async () => {
@@ -168,22 +163,36 @@ function Home() {
       setAccountType(isCompany ? 'company' : 'personal')
       const { data: bannerRows } = await supabase
         .from('platform_banners')
-        .select('id, title, message, image_url, link_url, banner_type, link_type, target_listing_id, target_category, cta_text')
+        .select('id, title, message, image_url, link_url, banner_type, link_type, target_listing_id, target_category, cta_text, promotion_id')
         .eq('active', true)
         .in('target_audience', isCompany ? ['all', 'company'] : ['all', 'personal'])
         .order('created_at', { ascending: false })
       setBanners(bannerRows || [])
 
-      // Fetch category + live discount info for any banner linked to a specific listing,
-      // so the hero card can route correctly and show a real "X% OFF" badge.
+      // Category (for routing to the right details page) for any banner linked to a specific listing.
       const linkedListingIds = Array.from(new Set(
         (bannerRows || []).filter((b: any) => b.link_type === 'listing' && b.target_listing_id).map((b: any) => b.target_listing_id)
       ))
       if (linkedListingIds.length > 0) {
-        const { data: svcRows } = await supabase.from('services').select('id, category, discount_percent, discount_active').in('id', linkedListingIds)
-        const map: Record<string, { category: string; discountPercent: number | null }> = {}
-        ;(svcRows || []).forEach((s: any) => { map[s.id] = { category: s.category, discountPercent: s.discount_active ? s.discount_percent : null } })
+        const { data: svcRows } = await supabase.from('services').select('id, category').in('id', linkedListingIds)
+        const map: Record<string, { category: string }> = {}
+        ;(svcRows || []).forEach((s: any) => { map[s.id] = { category: s.category } })
         setListingMeta(map)
+      }
+
+      // Real discount % for the "X% OFF" badge, sourced from the app's actual promotions
+      // table (the same one every Details page reads from at checkout).
+      const today = new Date().toISOString().slice(0, 10)
+      const promoIds = Array.from(new Set(
+        (bannerRows || []).filter((b: any) => b.banner_type === 'discount' && b.promotion_id).map((b: any) => b.promotion_id)
+      ))
+      if (promoIds.length > 0) {
+        const { data: promoRows } = await supabase.from('promotions').select('id, discount_value, active, end_date').in('id', promoIds)
+        const pmap: Record<string, number> = {}
+        ;(promoRows || []).forEach((p: any) => {
+          if (p.active && (!p.end_date || p.end_date >= today)) pmap[p.id] = p.discount_value
+        })
+        setPromoPercents(pmap)
       }
       setDisplayName(meta.full_name || '')
 
@@ -454,7 +463,7 @@ if (accountType === 'company') {
             <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
               {banners.map((b) => {
                 const href = getBannerHref(b, listingMeta)
-                const discountPct = b.banner_type === 'discount' && b.target_listing_id ? listingMeta[b.target_listing_id]?.discountPercent : null
+                const discountPct = b.banner_type === 'discount' && b.promotion_id ? promoPercents[b.promotion_id] ?? null : null
                 return (
                   <div
                     key={b.id}
@@ -676,8 +685,8 @@ const services = [
   ]
   const currentSlide = heroSlides[heroSlide] || heroSlides[0]
   const heroHref = currentSlide.type === 'banner' ? getBannerHref(currentSlide.banner, listingMeta) : null
-  const heroDiscountPct = currentSlide.type === 'banner' && currentSlide.banner.banner_type === 'discount' && currentSlide.banner.target_listing_id
-    ? listingMeta[currentSlide.banner.target_listing_id]?.discountPercent
+  const heroDiscountPct = currentSlide.type === 'banner' && currentSlide.banner.banner_type === 'discount' && currentSlide.banner.promotion_id
+    ? promoPercents[currentSlide.banner.promotion_id] ?? null
     : null
 
   return (
