@@ -63,6 +63,7 @@ export default function AddGuest() {
   const [saving, setSaving] = useState(false)
   const [successCode, setSuccessCode] = useState<string | null>(null)
   const [assignedUnitNumber, setAssignedUnitNumber] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -210,6 +211,7 @@ export default function AddGuest() {
   const handleSave = async () => {
     if (!canSave || !companyId) return
     setSaving(true)
+    setErrorMsg('')
 
     const category = selectedService?.category || 'hotel'
     const prefix = PREFIX_MAP[category] || 'TRV'
@@ -223,7 +225,7 @@ export default function AddGuest() {
     let assignedUnitId: string | null = null
     let assignedNumber = ''
     if (selectedType) {
-      const { data: freeUnit } = await supabase
+      const { data: freeUnit, error: freeUnitErr } = await supabase
         .from('inventory_units')
         .select('id, unit_number')
         .eq('inventory_item_id', selectedType.id)
@@ -232,8 +234,14 @@ export default function AddGuest() {
         .limit(1)
         .maybeSingle()
 
+      if (freeUnitErr) {
+        setSaving(false)
+        setErrorMsg('Could not check availability: ' + freeUnitErr.message)
+        return
+      }
       if (!freeUnit) {
         setSaving(false)
+        setErrorMsg(`No available ${unitLabel.toLowerCase()} of this type right now. Please pick a different type.`)
         return
       }
       assignedUnitId = freeUnit.id
@@ -264,11 +272,17 @@ export default function AddGuest() {
 
     if (error) {
       setSaving(false)
+      setErrorMsg(error.message)
       return
     }
 
     if (assignedUnitId) {
-      await supabase.from('inventory_units').update({ status: 'occupied', booking_id: newBooking?.id || null }).eq('id', assignedUnitId)
+      const { error: unitErr } = await supabase.from('inventory_units').update({ status: 'occupied', booking_id: newBooking?.id || null }).eq('id', assignedUnitId)
+      if (unitErr) {
+        // Booking already saved successfully -- don't block success on this,
+        // but surface it so the mismatch (unit still shows "available") can be fixed manually.
+        setErrorMsg(`Booking saved, but the ${unitLabel.toLowerCase()} status could not be updated: ${unitErr.message}`)
+      }
     }
 
     setSaving(false)
@@ -492,6 +506,12 @@ export default function AddGuest() {
               }}>
               {saving ? 'Saving...' : 'Save Guest Booking'}
             </div>
+
+            {errorMsg && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '12px 14px', marginBottom: '14px' }}>
+                <p style={{ fontSize: '12px', color: COLORS.red, lineHeight: 1.5 }}>{errorMsg}</p>
+              </div>
+            )}
 
             <div style={{ background: '#F5F3FF', borderRadius: '12px', padding: '14px', display: 'flex', gap: '10px' }}>
               <span style={{ fontSize: '16px' }}>🛡️</span>
