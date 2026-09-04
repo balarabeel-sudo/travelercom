@@ -46,6 +46,40 @@ type Summary = {
 type ChipFilter = 'all' | 'personal' | 'company' | 'active' | 'suspended'
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
 
+// supabase.functions.invoke() resolves to a *.functions.supabase.co subdomain
+// that isn't reliably reachable on some networks, even though the main
+// *.supabase.co domain (used for every other call in this app) works fine.
+// This calls the Edge Function directly at the same domain/path shown in
+// its Supabase settings page instead, so it rides the same connection that
+// already works everywhere else.
+async function callAdminManageUsers(body: Record<string, unknown>): Promise<{ data: any; error: { message: string } | null }> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+    if (!token) return { data: null, error: { message: 'Missing auth token' } }
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+    const res = await fetch(`${supabaseUrl}/functions/v1/admin-manage-users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'apikey': anonKey,
+      },
+      body: JSON.stringify(body),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      return { data: null, error: { message: json?.error || `Request failed (${res.status})` } }
+    }
+    return { data: json, error: null }
+  } catch (e: any) {
+    return { data: null, error: { message: e?.message || 'Network error' } }
+  }
+}
+
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : false)
   useEffect(() => {
@@ -177,9 +211,7 @@ export default function AdminUsers() {
     if (!selected) return
     setActionLoading(true)
     setActionError('')
-    const { data, error } = await supabase.functions.invoke('admin-manage-users', {
-      body: { action, target_user_id: selected.id, reason: reason || undefined },
-    })
+    const { data, error } = await callAdminManageUsers({ action, target_user_id: selected.id, reason: reason || undefined })
     setActionLoading(false)
     if (error || (data && data.error)) {
       setActionError((data && data.error) || error?.message || 'Action failed')
@@ -196,9 +228,7 @@ export default function AdminUsers() {
     if (!newEmail.trim()) { setAddError('Email is required'); return }
     setAddLoading(true)
     setAddError('')
-    const { data, error } = await supabase.functions.invoke('admin-manage-users', {
-      body: { action: 'invite', email: newEmail.trim(), full_name: newName.trim() || undefined, account_type: newType },
-    })
+    const { data, error } = await callAdminManageUsers({ action: 'invite', email: newEmail.trim(), full_name: newName.trim() || undefined, account_type: newType })
     setAddLoading(false)
     if (error || (data && data.error)) {
       setAddError((data && data.error) || error?.message || 'Failed to invite user')
