@@ -81,6 +81,7 @@ type EventCenter = {
   companies: { business_name: string } | null
   avgRating: number | null
   reviewCount: number
+  realAvailable: number | null
 }
 
 type SortKey = 'recommended' | 'price_low' | 'price_high' | 'rating'
@@ -136,10 +137,21 @@ function EventCenters() {
       })
     }
 
+    // Real hall/slot availability lives in inventory_items, same system Hotel/Tour use.
+    let realAvailMap: Record<string, number> = {}
+    if (rows.length > 0) {
+      const ids = rows.map((r) => r.id)
+      const { data: invRows } = await supabase.from('inventory_items').select('service_id, available_quantity').in('service_id', ids)
+      ;(invRows || []).forEach((inv: any) => {
+        realAvailMap[inv.service_id] = (realAvailMap[inv.service_id] || 0) + (Number(inv.available_quantity) || 0)
+      })
+    }
+
     setEvents(rows.map((t) => {
       const ratings = ratingMap[t.id] || []
       const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null
-      return { ...t, avgRating, reviewCount: ratings.length }
+      const realAvailable = t.id in realAvailMap ? realAvailMap[t.id] : t.seats_available
+      return { ...t, avgRating, reviewCount: ratings.length, realAvailable }
     }))
     setLoading(false)
   }
@@ -258,15 +270,16 @@ function EventCenters() {
         </div>
 
         {/* ---------- TYPE CARDS + STATE FILTER ---------- */}
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '20px' }}>
-          <TypeCard icon="grid" label="All" active={typeFilter === null} onClick={() => setTypeFilter(null)} />
-          {EVENT_TYPES.map((t) => (
-            <TypeCard key={t} icon={EVENT_TYPE_ICON[t]} label={t} active={typeFilter === t} onClick={() => setTypeFilter(typeFilter === t ? null : t)} />
-          ))}
-          <div style={{ position: 'relative', flexShrink: 0 }}>
+        <div style={{ position: 'relative', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+            <TypeCard icon="grid" label="All" active={typeFilter === null} onClick={() => setTypeFilter(null)} />
+            {EVENT_TYPES.map((t) => (
+              <TypeCard key={t} icon={EVENT_TYPE_ICON[t]} label={t} active={typeFilter === t} onClick={() => setTypeFilter(typeFilter === t ? null : t)} />
+            ))}
             <TypeCard icon="barChart" label="Filters" active={stateFilter !== 'all'} onClick={() => setShowStateFilter(!showStateFilter)} />
-            {showStateFilter && (
-              <div style={{ position: 'absolute', right: 0, top: '68px', background: COLORS.card, borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 30, width: '220px', maxHeight: '280px', overflowY: 'auto' }}>
+          </div>
+          {showStateFilter && (
+            <div style={{ position: 'absolute', right: 0, top: '72px', background: COLORS.card, borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 30, width: '220px', maxHeight: '280px', overflowY: 'auto' }}>
                 <p style={{ padding: '10px 14px', fontSize: '10.5px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' }}>Filter by State</p>
                 <div onClick={() => { setStateFilter('all'); setShowStateFilter(false) }} style={{ padding: '10px 14px', fontSize: '12.5px', fontWeight: stateFilter === 'all' ? 700 : 500, color: stateFilter === 'all' ? COLORS.primary : COLORS.text, cursor: 'pointer', borderBottom: `1px solid ${COLORS.border}` }}>
                   All States
@@ -278,7 +291,6 @@ function EventCenters() {
                 ))}
               </div>
             )}
-          </div>
         </div>
 
         {stateFilter !== 'all' && (
@@ -376,9 +388,9 @@ function EventCenters() {
 
                   <div style={{ marginTop: '8px' }}>
                     <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(e.price).toLocaleString()} <span style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 400 }}>/day</span></p>
-                    {e.seats_available !== null && (
-                      <p style={{ fontSize: '10.5px', fontWeight: 700, color: e.seats_available === 0 ? '#DC2626' : COLORS.green }}>
-                        {e.seats_available === 0 ? 'Fully booked' : `${e.seats_available} slots available`}
+                    {e.realAvailable !== null && (
+                      <p style={{ fontSize: '10.5px', fontWeight: 700, color: e.realAvailable === 0 ? '#DC2626' : COLORS.green }}>
+                        {e.realAvailable === 0 ? 'Not available' : `${e.realAvailable} slot${e.realAvailable === 1 ? '' : 's'} available`}
                       </p>
                     )}
                   </div>
