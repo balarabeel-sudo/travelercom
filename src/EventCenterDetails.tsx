@@ -9,6 +9,7 @@ import { downloadReceiptImage } from './receiptGenerator'
 const COLORS = {
   primary: '#0EA5E9',
   secondary: '#F97316',
+  navy: '#0B1E3D',
   bg: '#F8FAFC',
   card: '#FFFFFF',
   text: '#1A1A1A',
@@ -42,6 +43,13 @@ const AMENITY_ICON: Record<string, string> = {
 
 type Step = 'details' | 'guest' | 'dates' | 'payment' | 'summary'
 const STEP_ORDER: Step[] = ['details', 'guest', 'dates', 'payment', 'summary']
+const STEP_LABELS: { key: Step; label: string }[] = [
+  { key: 'details', label: 'Event Center' },
+  { key: 'guest', label: 'Information' },
+  { key: 'dates', label: 'Date & Time' },
+  { key: 'payment', label: 'Payment' },
+  { key: 'summary', label: 'Review' },
+]
 
 type HallType = {
   id: string
@@ -495,25 +503,24 @@ function EventCenterDetails() {
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
 
-      <div style={{
-        padding: '18px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        background: COLORS.card,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
-      }}>
-        <span onClick={goBack} style={{ display: 'flex', cursor: 'pointer' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
-        <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>
+      <div style={{ background: COLORS.navy, padding: '18px 20px 22px', color: 'white' }}>
+        <span onClick={goBack} style={{ cursor: 'pointer', display: 'inline-flex' }}><Icon name="arrowLeft" size={20} color="white" /></span>
+        <p style={{ fontSize: '17px', fontWeight: 800, marginTop: '10px' }}>
           {step === 'details' && 'Event Center Details'}
           {step === 'guest' && 'Your Information'}
           {step === 'dates' && 'Select Event Date'}
           {step === 'payment' && 'Payment'}
           {step === 'summary' && 'Review & Confirm'}
-        </h1>
+        </p>
+        <div style={{ display: 'flex', gap: '4px', marginTop: '14px' }}>
+          {STEP_LABELS.map((l, i) => (
+            <div key={l.key} style={{ flex: 1 }}>
+              <div style={{ height: '4px', borderRadius: '2px', background: i <= STEP_ORDER.indexOf(step) ? COLORS.secondary : 'rgba(255,255,255,0.25)', marginBottom: '4px' }} />
+              <p style={{ fontSize: '9.5px', color: i <= STEP_ORDER.indexOf(step) ? 'white' : 'rgba(255,255,255,0.5)', fontWeight: i === STEP_ORDER.indexOf(step) ? 800 : 500 }}>{l.label}</p>
+            </div>
+          ))}
+        </div>
       </div>
-
-      {step !== 'details' && <ProgressBar step={step} />}
 
       <div style={{ padding: '16px' }}>
       {step === 'details' && (<>
@@ -891,37 +898,6 @@ function EventCenterDetails() {
         </button>
       </>)}
       </div>
-    </div>
-  )
-}
-
-function ProgressBar({ step }: { step: Step }) {
-  const COLORS_LOCAL = { primary: '#0EA5E9', border: '#E2E8F0', textMuted: '#64748B', text: '#1A1A1A' }
-  const labels: { key: Step; label: string }[] = [
-    { key: 'guest', label: 'Information' },
-    { key: 'dates', label: 'Date & Time' },
-    { key: 'payment', label: 'Payment' },
-    { key: 'summary', label: 'Review' },
-  ]
-  const currentIdx = labels.findIndex((l) => l.key === step)
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', background: '#FFFFFF', gap: '4px' }}>
-      {labels.map((l, i) => (
-        <div key={l.key} style={{ display: 'flex', alignItems: 'center', flex: i < labels.length - 1 ? 1 : 'none' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{
-              width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: i <= currentIdx ? COLORS_LOCAL.primary : COLORS_LOCAL.border,
-              color: i <= currentIdx ? 'white' : COLORS_LOCAL.textMuted,
-              fontSize: '10px', fontWeight: 700, flexShrink: 0,
-            }}>
-              {i + 1}
-            </div>
-            <span style={{ fontSize: '10.5px', fontWeight: 700, color: i <= currentIdx ? COLORS_LOCAL.text : COLORS_LOCAL.textMuted, whiteSpace: 'nowrap' as const }}>{l.label}</span>
-          </div>
-          {i < labels.length - 1 && <div style={{ flex: 1, height: '1px', background: i < currentIdx ? COLORS_LOCAL.primary : COLORS_LOCAL.border, margin: '0 6px' }} />}
-        </div>
-      ))}
     </div>
   )
 }
