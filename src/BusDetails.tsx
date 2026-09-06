@@ -85,6 +85,7 @@ function BusDetails() {
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
 
   const [fullName, setFullName] = useState('')
+  const [passengers, setPassengers] = useState(1)
   const [dob, setDob] = useState('')
   const [gender, setGender] = useState('Male')
   const [phone, setPhone] = useState('')
@@ -194,12 +195,14 @@ function BusDetails() {
   const usingSeatTypes = seatTypes.length > 0
   const selectedSeat = seatTypes.find((s) => s.id === selectedSeatTypeId)
   const baseFare = usingSeatTypes ? (selectedSeat?.price ?? 0) : Number(service?.price ?? 0)
+  const effectivePassengers = usingSeatTypes ? 1 : passengers
+  const baseFareTotal = baseFare * effectivePassengers
   const fareAfterDiscount = (() => {
-    if (!activePromo || baseFare <= 0) return baseFare
-    if (activePromo.discount_type === 'percentage') return Math.max(0, baseFare * (1 - activePromo.discount_value / 100))
-    return Math.max(0, baseFare - activePromo.discount_value)
+    if (!activePromo || baseFareTotal <= 0) return baseFareTotal
+    if (activePromo.discount_type === 'percentage') return Math.max(0, baseFareTotal * (1 - activePromo.discount_value / 100))
+    return Math.max(0, baseFareTotal - activePromo.discount_value)
   })()
-  const discountAmount = baseFare - fareAfterDiscount
+  const discountAmount = baseFareTotal - fareAfterDiscount
   const addonsTotal = (extraLuggage ? ADDON_PRICES.luggage : 0) + (travelInsurance ? ADDON_PRICES.insurance : 0)
   const total = fareAfterDiscount + addonsTotal + SERVICE_FEE
 
@@ -242,7 +245,7 @@ function BusDetails() {
       service_id: service.id,
       company_id: service.company_id,
       inventory_item_id: selectedSeat?.id || null,
-      quantity: 1,
+      quantity: effectivePassengers,
       amount_paid: total,
       commission_amount: 0,
       booking_status: 'confirmed',
@@ -264,7 +267,7 @@ function BusDetails() {
     if (assignedUnitId) {
       await supabase.from('inventory_units').update({ booking_id: newBooking?.id || null }).eq('id', assignedUnitId)
     } else if (!usingSeatTypes && service.seats_available !== null && service.seats_available > 0) {
-      const { data: newCount, error: decErr } = await supabase.rpc('decrement_seats', { p_service_id: service.id })
+      const { data: newCount, error: decErr } = await supabase.rpc('decrement_seats', { p_service_id: service.id, p_quantity: effectivePassengers })
       if (!decErr && newCount !== null) {
         setService({ ...service, seats_available: newCount })
       }
@@ -306,6 +309,7 @@ function BusDetails() {
       filenamePrefix: 'Bus',
       rows: [
         { label: 'Passenger Name', value: fullName },
+        { label: 'Passengers', value: String(effectivePassengers) },
         { label: 'Email', value: email },
         { label: 'Phone', value: phone },
         { label: 'Route', value: `${service.origin || '—'} \u2192 ${service.destination}` },
@@ -403,6 +407,27 @@ function BusDetails() {
         {step === 2 && (
           <div style={cardStyle}>
             <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '14px' }}>Passenger Information</p>
+            {!usingSeatTypes && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={labelStyle}>Number of Passengers</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px' }}>
+                  <span
+                    onClick={() => setPassengers((p) => Math.max(1, p - 1))}
+                    style={{ width: '32px', height: '32px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <Icon name="minus" size={14} color={COLORS.text} />
+                  </span>
+                  <span style={{ fontSize: '15px', fontWeight: 700, color: COLORS.text, minWidth: '20px', textAlign: 'center' as const }}>{passengers}</span>
+                  <span
+                    onClick={() => setPassengers((p) => service.seats_available != null ? Math.min(service.seats_available, p + 1) : p + 1)}
+                    style={{ width: '32px', height: '32px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <Icon name="plus" size={14} color={COLORS.text} />
+                  </span>
+                  {service.seats_available != null && (
+                    <span style={{ fontSize: '11px', color: COLORS.textMuted }}>{service.seats_available} seat{service.seats_available !== 1 ? 's' : ''} left</span>
+                  )}
+                </div>
+              </div>
+            )}
             <label style={labelStyle}>Full Name</label>
             <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="As it appears on your ID" />
             <label style={labelStyle}>Date of Birth</label>
@@ -502,8 +527,12 @@ function BusDetails() {
         {step === 4 && (
           <div style={cardStyle}>
             <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '14px' }}>Payment Summary</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0' }}>
+              <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Passengers</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.text }}>{effectivePassengers}</span>
+            </div>
             {[
-              ['Bus Fare', baseFare],
+              ['Bus Fare', baseFareTotal],
               ['Taxes', 0],
               ['Service Fee', SERVICE_FEE],
               ['Discount', -discountAmount],
@@ -548,6 +577,7 @@ function BusDetails() {
             <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '14px' }}>Review & Confirm</p>
             {[
               ['Passenger', fullName],
+              ['Passengers', String(effectivePassengers)],
               ['Trip', service.title],
               ['Route', `${service.origin || '—'} → ${service.destination}`],
               ['Date', service.departure_time ? new Date(service.departure_time).toLocaleString() : 'TBA'],
@@ -590,6 +620,10 @@ function BusDetails() {
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
                 <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>Passenger</span>
                 <span style={{ fontSize: '12.5px', fontWeight: 700 }}>{fullName}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>Passengers</span>
+                <span style={{ fontSize: '12.5px', fontWeight: 700 }}>{effectivePassengers}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
                 <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>Route</span>
