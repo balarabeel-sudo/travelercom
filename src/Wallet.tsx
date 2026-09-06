@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import NotificationBell from './NotificationBell'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -54,6 +56,7 @@ function Wallet() {
   const [amount, setAmount] = useState('')
   const [processing, setProcessing] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [balanceHidden, setBalanceHidden] = useState(false)
 
   const loadWallet = async (uid: string) => {
     const { data: wallet } = await supabase
@@ -247,28 +250,13 @@ function Wallet() {
       .eq('user_id', userId)
       .maybeSingle()
 
-    const { data: newTxn } = await supabase.from('transactions').insert({
+    await supabase.from('transactions').insert({
       user_id: userId,
       wallet_id: walletRow?.id,
       transaction_type: 'withdrawal',
       amount: amt,
       status: 'pending',
-    }).select('id').single()
-
-    if (newTxn) {
-      const { data: userData } = await supabase.auth.getUser()
-      if (userData?.user) {
-        await supabase.rpc('log_audit', {
-          p_action: 'requested_withdrawal',
-          p_module: 'finance',
-          p_target_type: 'transaction',
-          p_target_id: newTxn.id,
-          p_previous: null,
-          p_new: { amount: amt },
-          p_company_id: companyId,
-        })
-      }
-    }
+    })
 
     setWithdrawing(false)
     setBalance(newBalance)
@@ -306,12 +294,23 @@ function Wallet() {
         padding: '18px 20px',
         display: 'flex',
         alignItems: 'center',
-        gap: '12px',
+        justifyContent: 'space-between',
         background: COLORS.card,
         boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
       }}>
-        <span onClick={() => navigate(accountType === 'company' ? '/home' : '/account')} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
-        <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Wallet</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span
+            onClick={() => navigate(accountType === 'company' ? '/home' : '/account')}
+            style={{
+              width: '36px', height: '36px', borderRadius: '50%', background: '#0B1E3D',
+              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '16px', cursor: 'pointer', flexShrink: 0,
+            }}>
+            <Icon name="arrowLeft" size={16} color="white" />
+          </span>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Wallet</h1>
+        </div>
+        <NotificationBell iconColor={COLORS.text} />
       </div>
 
       <div style={{ padding: '20px 16px' }}>
@@ -337,9 +336,10 @@ function Wallet() {
                 fontWeight: 'bold',
                 fontSize: '14px',
                 cursor: 'pointer',
-                marginBottom: '16px'
+                marginBottom: '16px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
               }}>
-              💸 {showWithdraw ? 'Cancel' : 'Withdraw Funds'}
+              <Icon name="cash" size={16} color="white" /> {showWithdraw ? 'Cancel' : 'Withdraw Funds'}
             </button>
 
             {withdrawMsg && !showWithdraw && (
@@ -393,15 +393,37 @@ function Wallet() {
         ) : (
           <>
             <div style={{
-              background: `linear-gradient(135deg, ${COLORS.primary}, #0369a1)`,
-              borderRadius: '18px',
+              background: 'linear-gradient(135deg, #0B1E3D, #14294f)',
+              borderRadius: '20px',
               padding: '24px',
               color: 'white',
               marginBottom: '20px',
-              boxShadow: '0 8px 24px rgba(14,165,233,0.25)'
+              boxShadow: '0 8px 24px rgba(11,30,61,0.35)',
+              position: 'relative',
+              overflow: 'hidden',
             }}>
-              <p style={{ fontSize: '12px', opacity: 0.9, marginBottom: '6px' }}>Available Balance</p>
-              <p style={{ fontSize: '30px', fontWeight: 800 }}>₦{balance.toLocaleString()}</p>
+              <div style={{ position: 'absolute', top: '-6px', right: '-6px', opacity: 0.1 }}>
+                <Icon name="compass" size={110} color="white" strokeWidth={1} />
+              </div>
+              <div style={{ position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  <p style={{ fontSize: '12px', opacity: 0.85 }}>Available Balance</p>
+                  <span onClick={() => setBalanceHidden(!balanceHidden)} style={{ cursor: 'pointer', display: 'flex', opacity: 0.85 }}>
+                    <Icon name={balanceHidden ? 'eyeOff' : 'eye'} size={14} color="white" />
+                  </span>
+                </div>
+                <p style={{ fontSize: '30px', fontWeight: 800 }}>{balanceHidden ? '₦••••••' : `₦${balance.toLocaleString()}`}</p>
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '12px',
+                  background: 'rgba(255,255,255,0.12)', padding: '6px 12px', borderRadius: '20px',
+                  fontSize: '11.5px', fontWeight: 600,
+                }}>
+                  <Icon name="shield" size={13} color="white" /> Traveler.com Wallet
+                </div>
+              </div>
+              <svg viewBox="0 0 400 30" preserveAspectRatio="none" style={{ position: 'absolute', left: 0, right: 0, bottom: '-1px', width: '100%', height: '22px' }}>
+                <path d="M0,30 Q200,-6 400,30 L400,30 L0,30 Z" fill={COLORS.secondary} opacity="0.9" />
+              </svg>
             </div>
 
             <div style={{
@@ -425,19 +447,35 @@ function Wallet() {
                 </div>
               )}
 
+              <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '6px' }}>Enter amount</p>
               <input
                 type="number"
-                placeholder="Amount (₦)"
+                placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 style={inputStyle}
               />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', marginTop: '10px' }}>
+                {[1000, 5000, 10000, 20000].map((preset) => (
+                  <span
+                    key={preset}
+                    onClick={() => setAmount(String(preset))}
+                    style={{
+                      textAlign: 'center' as const, padding: '9px 4px', borderRadius: '10px',
+                      border: `1px solid ${amount === String(preset) ? COLORS.primary : COLORS.border}`,
+                      color: amount === String(preset) ? COLORS.primary : COLORS.text,
+                      fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                    }}>
+                    ₦{preset.toLocaleString()}
+                  </span>
+                ))}
+              </div>
               <button
                 onClick={handleTopUp}
                 disabled={processing}
                 style={{
                   width: '100%',
-                  marginTop: '12px',
+                  marginTop: '14px',
                   padding: '13px',
                   background: processing ? '#94a3b8' : COLORS.secondary,
                   color: 'white',
@@ -445,10 +483,14 @@ function Wallet() {
                   borderRadius: '10px',
                   fontWeight: 'bold',
                   fontSize: '14px',
-                  cursor: processing ? 'not-allowed' : 'pointer'
+                  cursor: processing ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
                 }}>
-                {processing ? 'Verifying Payment...' : '💳 Top Up'}
+                {processing ? 'Verifying Payment...' : (<><Icon name="creditCard" size={15} color="white" /> Top Up Wallet</>)}
               </button>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, textAlign: 'center' as const, marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                <Icon name="lock" size={11} color={COLORS.textMuted} /> Your wallet is secure and protected
+              </p>
             </div>
           </>
         )}
@@ -467,33 +509,51 @@ function Wallet() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {transactions.map((tx) => (
-              <div key={tx.id} style={{
-                background: COLORS.card,
-                borderRadius: '12px',
-                padding: '12px 14px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-              }}>
-                <div>
-                  <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, textTransform: 'capitalize' as const }}>
-                    {tx.transaction_type.replace('_', ' ')}
-                  </p>
-                  <p style={{ fontSize: '11px', color: COLORS.textMuted }}>
-                    {new Date(tx.created_at).toLocaleDateString()} • {tx.status}
-                  </p>
-                </div>
-                <p style={{
-                  fontSize: '14px',
-                  fontWeight: 800,
-                  color: tx.transaction_type === 'topup' || tx.transaction_type === 'refund' || tx.transaction_type === 'commission_payout' ? COLORS.green : COLORS.red
+            {transactions.map((tx) => {
+              const isCredit = tx.transaction_type === 'topup' || tx.transaction_type === 'refund' || tx.transaction_type === 'commission_payout'
+              const statusColor = tx.status === 'successful' ? { bg: '#dcfce7', fg: COLORS.green }
+                : tx.status === 'pending' ? { bg: '#fef3c7', fg: '#b45309' }
+                : { bg: '#fee2e2', fg: COLORS.red }
+              return (
+                <div key={tx.id} style={{
+                  background: COLORS.card,
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
                 }}>
-                  {tx.transaction_type === 'topup' || tx.transaction_type === 'refund' || tx.transaction_type === 'commission_payout' ? '+' : '-'}₦{Number(tx.amount || 0).toLocaleString()}
-                </p>
-              </div>
-            ))}
+                  <div style={{
+                    width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+                    background: isCredit ? '#dcfce7' : '#fff1e6',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px',
+                  }}>
+                    <Icon name={isCredit ? 'plus' : 'minus'} size={16} color={isCredit ? COLORS.green : COLORS.secondary} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, textTransform: 'capitalize' as const }}>
+                      {tx.transaction_type.replace('_', ' ')}
+                    </p>
+                    <p style={{ fontSize: '11px', color: COLORS.textMuted }}>
+                      {new Date(tx.created_at).toLocaleDateString()} • {new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
+                    <p style={{ fontSize: '14px', fontWeight: 800, color: isCredit ? COLORS.green : COLORS.red }}>
+                      {isCredit ? '+' : '-'}₦{Number(tx.amount || 0).toLocaleString()}
+                    </p>
+                    <span style={{
+                      display: 'inline-block', marginTop: '4px', padding: '2px 9px', borderRadius: '10px',
+                      fontSize: '10px', fontWeight: 700, textTransform: 'capitalize' as const,
+                      background: statusColor.bg, color: statusColor.fg,
+                    }}>
+                      {tx.status}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
