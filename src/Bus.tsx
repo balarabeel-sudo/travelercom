@@ -351,16 +351,17 @@ function Bus() {
         {/* ---------- STATE + QUICK FILTERS ---------- */}
         <div style={{ position: 'relative', marginBottom: '14px' }}>
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-            <span onClick={() => setShowStateFilter(!showStateFilter)} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '20px', cursor: 'pointer', background: stateFilter === 'all' ? COLORS.card : COLORS.primary, color: stateFilter === 'all' ? COLORS.text : 'white', border: `1px solid ${stateFilter === 'all' ? COLORS.border : COLORS.primary}`, whiteSpace: 'nowrap', flexShrink: 0 }}>
-              <Icon name="mapPin" size={13} color={stateFilter === 'all' ? COLORS.text : 'white'} />
-              {stateFilter === 'all' ? 'All States' : stateFilter} ⌄
-            </span>
+            <div style={{ flexShrink: 0 }}>
+              <span onClick={() => setShowStateFilter(!showStateFilter)} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 700, padding: '9px 14px', borderRadius: '20px', cursor: 'pointer', background: stateFilter === 'all' ? COLORS.card : COLORS.primary, color: stateFilter === 'all' ? COLORS.text : 'white', border: `1px solid ${stateFilter === 'all' ? COLORS.border : COLORS.primary}`, whiteSpace: 'nowrap' }}>
+                <Icon name="mapPin" size={13} color={stateFilter === 'all' ? COLORS.text : 'white'} />
+                {stateFilter === 'all' ? 'All States' : stateFilter} ⌄
+              </span>
+            </div>
             <FilterChip icon="star" label="Top Rated" active={sortBy === 'rating'} onClick={() => setSortBy(sortBy === 'rating' ? 'recommended' : 'rating')} />
             <FilterChip icon="cash" label={sortBy === 'price_low' ? 'Price ↑' : sortBy === 'price_high' ? 'Price ↓' : 'Price'} active={sortBy === 'price_low' || sortBy === 'price_high'} onClick={() => setSortBy(sortBy === 'price_low' ? 'price_high' : sortBy === 'price_high' ? 'recommended' : 'price_low')} />
           </div>
-
           {showStateFilter && (
-            <div style={{ position: 'absolute', left: 0, top: '44px', background: COLORS.card, borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 30, width: '220px', maxHeight: '280px', overflowY: 'auto' }}>
+            <div style={{ position: 'absolute', left: 0, top: '42px', background: COLORS.card, borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 30, width: '220px', maxHeight: '280px', overflowY: 'auto' }}>
               <div onClick={() => { setStateFilter('all'); setShowStateFilter(false) }} style={{ padding: '10px 14px', fontSize: '12.5px', fontWeight: stateFilter === 'all' ? 700 : 500, color: stateFilter === 'all' ? COLORS.primary : COLORS.text, cursor: 'pointer', borderBottom: `1px solid ${COLORS.border}` }}>
                 All States
               </div>
@@ -498,11 +499,9 @@ function Bus() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '10px' }}>
                       <div>
                         <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()}</p>
-                        {h.seats_available !== null && (
-                          <p style={{ fontSize: '10.5px', fontWeight: 700, color: h.seats_available === 0 ? '#DC2626' : COLORS.green }}>
-                            {h.seats_available === 0 ? 'Fully booked' : `${h.seats_available} seats left`}
-                          </p>
-                        )}
+                        <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!h.seats_available || h.seats_available === 0) ? '#DC2626' : COLORS.green }}>
+                          {(!h.seats_available || h.seats_available === 0) ? 'Not available' : `${h.seats_available} seats left`}
+                        </p>
                       </div>
                       <span style={{ padding: '9px 16px', background: COLORS.secondary, color: 'white', borderRadius: '9px', fontWeight: 700, fontSize: '12px' }}>View Seats</span>
                     </div>
