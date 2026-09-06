@@ -79,6 +79,7 @@ type Hotel = {
   destination: string
   price: number
   seats_available: number | null
+  realAvailable: number | null
   photo_url: string | null
   amenities: string[] | null
   companies: { business_name: string } | null
@@ -123,6 +124,7 @@ function Hotels() {
     const rows = (data as any[]) || []
 
     let ratingMap: Record<string, number[]> = {}
+    let realAvailMap: Record<string, number> = {}
     if (rows.length > 0) {
       const ids = rows.map((r) => r.id)
       const { data: reviewRows } = await supabase.from('reviews').select('service_id, rating').in('service_id', ids)
@@ -131,12 +133,29 @@ function Hotels() {
         if (!ratingMap[r.service_id]) ratingMap[r.service_id] = []
         ratingMap[r.service_id].push(Number(r.rating))
       })
+
+      // Listings on Business Suite plans manage availability per room type via inventory_units,
+      // not the flat seats_available column — compute the real total so the list card matches
+      // what View Details actually shows.
+      const { data: itemRows } = await supabase.from('inventory_items').select('id, service_id').in('service_id', ids)
+      if (itemRows && itemRows.length > 0) {
+        const itemToService: Record<string, string> = {}
+        itemRows.forEach((i: any) => { itemToService[i.id] = i.service_id; realAvailMap[i.service_id] = realAvailMap[i.service_id] || 0 })
+        const itemIds = itemRows.map((i: any) => i.id)
+        const { data: unitRows } = await supabase.from('inventory_units').select('inventory_item_id, status').in('inventory_item_id', itemIds)
+        ;(unitRows || []).forEach((u: any) => {
+          if (u.status !== 'available') return
+          const svcId = itemToService[u.inventory_item_id]
+          if (svcId) realAvailMap[svcId] = (realAvailMap[svcId] || 0) + 1
+        })
+      }
     }
 
     setHotels(rows.map((h) => {
       const ratings = ratingMap[h.id] || []
       const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null
-      return { ...h, avgRating, reviewCount: ratings.length }
+      const realAvailable = h.id in realAvailMap ? realAvailMap[h.id] : null
+      return { ...h, avgRating, reviewCount: ratings.length, realAvailable }
     }))
     setLoading(false)
   }
@@ -384,8 +403,8 @@ function Hotels() {
 
                   <div style={{ marginTop: '8px' }}>
                     <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()} <span style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 400 }}>/night</span></p>
-                    <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!h.seats_available || h.seats_available === 0) ? '#DC2626' : COLORS.green }}>
-                      {(!h.seats_available || h.seats_available === 0) ? 'Not available' : `${h.seats_available} rooms available`}
+                    <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!(h.realAvailable !== null ? h.realAvailable : h.seats_available)) ? '#DC2626' : COLORS.green }}>
+                      {!(h.realAvailable !== null ? h.realAvailable : h.seats_available) ? 'Not available' : `${h.realAvailable !== null ? h.realAvailable : h.seats_available} rooms available`}
                     </p>
                   </div>
                 </div>
