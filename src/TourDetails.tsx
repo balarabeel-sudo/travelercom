@@ -16,8 +16,8 @@ const COLORS = {
   red: '#dc2626',
 }
 
-type Step = 'details' | 'guest' | 'dates' | 'participants' | 'summary' | 'payment'
-const STEP_ORDER: Step[] = ['details', 'guest', 'dates', 'participants', 'summary', 'payment']
+type Step = 'details' | 'guest' | 'dates' | 'participants' | 'payment' | 'summary'
+const STEP_ORDER: Step[] = ['details', 'guest', 'dates', 'participants', 'payment', 'summary']
 
 type TourDetail = {
   id: string
@@ -71,6 +71,7 @@ function TourDetails() {
   const [gPhone, setGPhone] = useState('')
   const [guestErrors, setGuestErrors] = useState<{ name?: string; email?: string; phone?: string }>({})
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'paystack'>('wallet')
+  const [agreedTerms, setAgreedTerms] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -350,8 +351,8 @@ function TourDetails() {
           {step === 'guest' && 'Your Information'}
           {step === 'dates' && 'Select Tour Date'}
           {step === 'participants' && 'Participants'}
-          {step === 'summary' && 'Review Booking'}
           {step === 'payment' && 'Payment'}
+          {step === 'summary' && 'Review & Confirm'}
         </h1>
       </div>
 
@@ -543,51 +544,9 @@ function TourDetails() {
         </div>
 
         <button
-          onClick={() => setStep('summary')}
-          style={{ width: '100%', padding: '15px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' }}>
-          Continue
-        </button>
-      </>)}
-
-      {step === 'summary' && (<>
-        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
-          <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Tour</p>
-            <SummaryRow label="Name" value={service.title} />
-            <SummaryRow label="Destination" value={service.destination} />
-          </div>
-          <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Customer</p>
-            <SummaryRow label="Full Name" value={gName} />
-            <SummaryRow label="Email" value={gEmail} />
-            <SummaryRow label="Phone" value={gPhone} />
-          </div>
-          <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Tour Details</p>
-            <SummaryRow label="Tour date" value={tourDate} />
-            <SummaryRow label="Participants" value={String(travelers)} />
-            {service.duration_minutes && (
-              <SummaryRow label="Duration" value={service.duration_minutes >= 60 ? `${Math.floor(service.duration_minutes / 60)}h ${service.duration_minutes % 60 ? `${service.duration_minutes % 60}m` : ''}`.trim() : `${service.duration_minutes}m`} />
-            )}
-          </div>
-          <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Price</p>
-            <SummaryRow label={`Adult × ${travelers}`} value={`₦${calculatedTotal.toLocaleString()}`} />
-            {addGateFee && service.gate_fee != null && <SummaryRow label="Gate Fee" value={`₦${Number(service.gate_fee).toLocaleString()}`} />}
-            {addVehicleFee && service.vehicle_fee != null && <SummaryRow label="Vehicle Fee" value={`₦${Number(service.vehicle_fee).toLocaleString()}`} />}
-            {activePromo && (
-              <SummaryRow label={activePromo.title} value={`− ₦${(calculatedTotal - discountedTotal).toLocaleString()}`} valueColor={COLORS.green} />
-            )}
-            <div style={{ borderTop: `1px solid ${COLORS.border}`, marginTop: '4px', paddingTop: '8px' }}>
-              <SummaryRow label="Total Amount" value={`₦${activePrice.toLocaleString()}`} bold />
-            </div>
-          </div>
-        </div>
-
-        <button
           onClick={() => setStep('payment')}
           style={{ width: '100%', padding: '15px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' }}>
-          Confirm & Continue
+          Continue
         </button>
       </>)}
 
@@ -633,6 +592,68 @@ function TourDetails() {
           </div>
         </div>
 
+        <button
+          onClick={() => setStep('summary')}
+          disabled={paymentMethod !== 'wallet'}
+          style={{
+            width: '100%',
+            padding: '15px',
+            background: paymentMethod !== 'wallet' ? '#94a3b8' : COLORS.secondary,
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            fontWeight: 'bold',
+            fontSize: '15px',
+            cursor: paymentMethod !== 'wallet' ? 'not-allowed' : 'pointer'
+          }}>
+          Continue
+        </button>
+      </>)}
+
+      {step === 'summary' && (<>
+        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
+          <div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Tour</p>
+            <SummaryRow label="Name" value={service.title} />
+            <SummaryRow label="Destination" value={service.destination} />
+          </div>
+          <div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Customer</p>
+            <SummaryRow label="Full Name" value={gName} />
+            <SummaryRow label="Email" value={gEmail} />
+            <SummaryRow label="Phone" value={gPhone} />
+          </div>
+          <div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Tour Details</p>
+            <SummaryRow label="Tour date" value={tourDate} />
+            <SummaryRow label="Participants" value={String(travelers)} />
+            {service.duration_minutes && (
+              <SummaryRow label="Duration" value={service.duration_minutes >= 60 ? `${Math.floor(service.duration_minutes / 60)}h ${service.duration_minutes % 60 ? `${service.duration_minutes % 60}m` : ''}`.trim() : `${service.duration_minutes}m`} />
+            )}
+          </div>
+          <div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Price</p>
+            <SummaryRow label={`Adult × ${travelers}`} value={`₦${calculatedTotal.toLocaleString()}`} />
+            {addGateFee && service.gate_fee != null && <SummaryRow label="Gate Fee" value={`₦${Number(service.gate_fee).toLocaleString()}`} />}
+            {addVehicleFee && service.vehicle_fee != null && <SummaryRow label="Vehicle Fee" value={`₦${Number(service.vehicle_fee).toLocaleString()}`} />}
+            {activePromo && (
+              <SummaryRow label={activePromo.title} value={`− ₦${(calculatedTotal - discountedTotal).toLocaleString()}`} valueColor={COLORS.green} />
+            )}
+            <div style={{ borderTop: `1px solid ${COLORS.border}`, marginTop: '4px', paddingTop: '8px' }}>
+              <SummaryRow label="Total Amount" value={`₦${activePrice.toLocaleString()}`} bold />
+            </div>
+          </div>
+          <div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Payment Method</p>
+            <SummaryRow label="Method" value="Traveler Wallet" />
+          </div>
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '14px', cursor: 'pointer' }}>
+          <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} style={{ marginTop: '3px' }} />
+          <span style={{ fontSize: '12px', color: COLORS.textMuted }}>I agree to the Terms &amp; Conditions.</span>
+        </label>
+
         {message && (
           <div style={{
             background: message.type === 'success' ? '#f0fdf4' : '#fef2f2',
@@ -652,11 +673,11 @@ function TourDetails() {
 
         <button
           onClick={handleBookNow}
-          disabled={booking || paymentMethod !== 'wallet'}
+          disabled={booking || !agreedTerms}
           style={{
             width: '100%',
             padding: '15px',
-            background: booking || paymentMethod !== 'wallet' ? '#94a3b8' : COLORS.secondary,
+            background: booking || !agreedTerms ? '#94a3b8' : COLORS.secondary,
             color: 'white',
             border: 'none',
             borderRadius: '12px',
@@ -664,7 +685,7 @@ function TourDetails() {
             fontSize: '15px',
             cursor: booking ? 'not-allowed' : 'pointer'
           }}>
-          {booking ? 'Processing...' : `Pay Now — ₦${activePrice.toLocaleString()}`}
+          {booking ? 'Processing...' : `Confirm & Pay — ₦${activePrice.toLocaleString()}`}
         </button>
       </>)}
       </div>
@@ -678,8 +699,8 @@ function ProgressBar({ step }: { step: Step }) {
     { key: 'guest', label: 'Information' },
     { key: 'dates', label: 'Date' },
     { key: 'participants', label: 'Participants' },
-    { key: 'summary', label: 'Review' },
     { key: 'payment', label: 'Payment' },
+    { key: 'summary', label: 'Review' },
   ]
   const currentIdx = labels.findIndex((l) => l.key === step)
   return (
