@@ -585,20 +585,23 @@ if (accountType === 'company') {
               Overview
             </h3>
             {companyPlan === 'business_suite' && (
-              <select
-                value={timeFilter}
-                onChange={(e) => setTimeFilter(e.target.value as 'week' | 'month' | 'year')}
-                style={{
-                  fontSize: '12px', fontWeight: 600, color: COLORS.primary, background: '#eff6ff',
-                  border: 'none', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer'
-                }}>
-                <option value="week">Last 7 Days</option>
-                <option value="month">Last 30 Days</option>
-                <option value="year">Last 12 Months</option>
-              </select>
+              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', borderRadius: '8px', padding: '7px 10px 7px 12px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.primary, whiteSpace: 'nowrap' as const }}>
+                  {timeFilter === 'week' ? 'Last 7 Days' : timeFilter === 'month' ? 'Last 30 Days' : 'Last 12 Months'}
+                </span>
+                <span style={{ fontSize: '10px', color: COLORS.primary, lineHeight: 1 }}>▾</span>
+                <select
+                  value={timeFilter}
+                  onChange={(e) => setTimeFilter(e.target.value as 'week' | 'month' | 'year')}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', border: 'none' }}>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">Last 30 Days</option>
+                  <option value="year">Last 12 Months</option>
+                </select>
+              </div>
             )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '24px' }}>
             {analytics.map((a) => {
               const change = a.statKey && periodStats ? periodStats.changes[a.statKey as keyof typeof periodStats.changes] : null
               const clickable = a.label === 'Active Listings'
@@ -612,10 +615,10 @@ if (accountType === 'company') {
                   boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
                   cursor: clickable ? 'pointer' : 'default',
                 }}>
-                  <div style={{ marginBottom: '8px' }}>
-                    <Icon name={a.icon} size={22} color={COLORS.primary} />
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
+                    <Icon name={a.icon} size={20} color={COLORS.primary} />
                   </div>
-                  <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>{a.value}</p>
+                  <p style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text }}>{a.value}</p>
                   <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{a.label}</p>
                   {companyPlan === 'business_suite' && change !== null && (
                     <p style={{ fontSize: '10.5px', fontWeight: 700, marginTop: '6px', color: change >= 0 ? '#16A34A' : '#DC2626' }}>
@@ -634,10 +637,10 @@ if (accountType === 'company') {
                 boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
                 cursor: 'pointer'
               }}>
-              <div style={{ marginBottom: '8px' }}>
-                <Icon name="camera" size={22} color={COLORS.primary} />
+              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
+                <Icon name="camera" size={20} color={COLORS.primary} />
               </div>
-              <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>Verify</p>
+              <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text }}>Verify</p>
               <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Booking</p>
             </div>
           </div> 
