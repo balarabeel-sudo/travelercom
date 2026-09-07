@@ -38,6 +38,7 @@ type Banner = {
   target_category: string | null
   cta_text: string | null
   promotion_id: string | null
+  target_audience: 'all' | 'personal' | 'company'
 }
 type Notice = { id: string; title: string; message: string; target_audience: 'all' | 'personal' | 'company'; active: boolean; created_at: string }
 type ServiceOption = { id: string; title: string; category: string; price: number | null }
@@ -56,6 +57,7 @@ const EMPTY_BANNER_FORM = {
   discount_percent: '',
   discount_expires_at: '',
   discount_label: '',
+  target_audience: 'all' as 'all' | 'personal' | 'company',
 }
 const EMPTY_NOTICE_FORM = { title: '', message: '', target_audience: 'all' as 'all' | 'personal' | 'company' }
 const PAGE_SIZE = 5
@@ -197,6 +199,7 @@ function BannersTab() {
       discount_percent: '',
       discount_expires_at: '',
       discount_label: '',
+      target_audience: b.target_audience || 'all',
     })
     setEditingId(b.id)
     setListingQuery(''); setListingResults([])
@@ -293,6 +296,7 @@ function BannersTab() {
       target_category: form.link_type === 'category' ? form.target_category : null,
       cta_text: form.cta_text.trim() || (form.banner_type === 'discount' || form.banner_type === 'promo' ? 'Book Now' : 'Explore Now'),
       promotion_id: promotionId,
+      target_audience: form.target_audience,
     }
     const { data: userData } = await supabase.auth.getUser()
     const { error } = editingId
@@ -388,6 +392,11 @@ function BannersTab() {
                       {promotionPercents[b.promotion_id]}% OFF
                     </span>
                   )}
+                  {b.target_audience && b.target_audience !== 'all' && (
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.purple, background: COLORS.purpleBg, padding: '3px 8px', borderRadius: '6px' }}>
+                      {b.target_audience === 'personal' ? 'Personal only' : 'Company only'}
+                    </span>
+                  )}
                 </div>
                 <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '6px', lineHeight: 1.4 }}>{b.message}</p>
                 <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '5px' }}>
@@ -456,6 +465,22 @@ function BannersTab() {
               <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
             </label>
             <input value={form.cta_text} onChange={(e) => setForm({ ...form, cta_text: e.target.value })} placeholder="Button text (e.g. Book Now) — optional" style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '14px', color: COLORS.text }} />
+
+            <label style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '6px', display: 'block', fontWeight: 700 }}>Audience</label>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+              {(['all', 'personal', 'company'] as const).map((aud) => (
+                <div key={aud} onClick={() => setForm({ ...form, target_audience: aud })}
+                  style={{
+                    flex: 1, textAlign: 'center' as const, padding: '8px', borderRadius: '8px', cursor: 'pointer',
+                    border: `1px solid ${form.target_audience === aud ? COLORS.primary : COLORS.border}`,
+                    background: form.target_audience === aud ? COLORS.blueBg : 'transparent',
+                    fontSize: '12px', fontWeight: 700,
+                    color: form.target_audience === aud ? COLORS.primary : COLORS.textMuted,
+                  }}>
+                  {aud === 'all' ? 'All' : aud === 'personal' ? 'Personal' : 'Company'}
+                </div>
+              ))}
+            </div>
 
             {/* Banner Type */}
             <label style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '6px', display: 'block', fontWeight: 700 }}>Banner Type</label>
