@@ -124,7 +124,7 @@ function VerificationDocs({ ownerId }: { ownerId: string | null }) {
     return () => { cancelled = true }
   }, [ownerId])
 
-  const labelFor = (t: string) => t === 'cac_certificate' ? 'CAC Certificate' : t === 'government_id' ? 'Government ID' : t.replace(/_/g, ' ')
+  const labelFor = (t: string) => t === 'cac_certificate' ? 'CAC Certificate' : t === 'valid_id' ? 'Government ID' : t.replace(/_/g, ' ')
 
   if (loading) return <p style={{ fontSize: '12px', color: COLORS.textMuted, padding: '8px 0' }}>Loading documents…</p>
   if (docs.length === 0) return <p style={{ fontSize: '12px', color: COLORS.textMuted, padding: '8px 0' }}>No documents uploaded yet.</p>
@@ -168,6 +168,13 @@ export default function AdminCompanies() {
   const [viewingCompany, setViewingCompany] = useState<Company | null>(null)
   const [reasonInput, setReasonInput] = useState('')
   const [showReasonBox, setShowReasonBox] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addForm, setAddForm] = useState({
+    business_name: '', email: '', phone: '', city: '', address: '',
+    business_type: '', cac_number: '', license_number: '', business_address: '',
+  })
+  const [addLoading, setAddLoading] = useState(false)
+  const [addError, setAddError] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState('')
 
@@ -239,6 +246,27 @@ export default function AdminCompanies() {
     fetchSummary()
   }
 
+  const runCreateCompany = async () => {
+    if (!addForm.business_name.trim() || !addForm.email.trim()) {
+      setAddError('Business name and email are required')
+      return
+    }
+    setAddLoading(true)
+    setAddError('')
+    const { data, error } = await supabase.functions.invoke('admin-manage-companies', {
+      body: { action: 'create', ...addForm },
+    })
+    setAddLoading(false)
+    if (error || (data && data.error)) {
+      setAddError((data && data.error) || error?.message || 'Could not create company')
+      return
+    }
+    setShowAddModal(false)
+    setAddForm({ business_name: '', email: '', phone: '', city: '', address: '', business_type: '', cac_number: '', license_number: '', business_address: '' })
+    fetchCompanies()
+    fetchSummary()
+  }
+
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
   const chips: { key: ChipFilter; label: string; count: number | undefined; dotColor?: string }[] = [
     { key: 'all', label: 'All', count: summary?.total_companies },
@@ -247,6 +275,25 @@ export default function AdminCompanies() {
     { key: 'rejected', label: 'Rejected', count: summary?.rejected, dotColor: COLORS.red },
     { key: 'suspended', label: 'Suspended', count: summary?.suspended, dotColor: COLORS.purple },
   ]
+
+  const exportCompaniesCsv = () => {
+    const headers = ['Business Name', 'Type', 'City', 'Email', 'Phone', 'Plan', 'Verification Status', 'CAC Number', 'License Number', 'Joined']
+    const rows = companies.map((c) => [
+      c.business_name, c.business_type || '', c.city || '', c.email || '', c.phone || '',
+      c.plan || '', c.verification_status || '', c.cac_number || '', c.license_number || '',
+      new Date(c.created_at).toLocaleDateString(),
+    ])
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `companies-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div style={{ padding: isDesktop ? '24px 28px' : '16px', maxWidth: '1400px', margin: '0 auto', overflowY: 'auto' as const, height: '100%' }}>
@@ -265,11 +312,11 @@ export default function AdminCompanies() {
           <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>Manage and verify all registered companies and partners on the platform.</p>
         </div>
         <div style={{ display: 'flex', gap: '9px' }}>
-          <button onClick={() => alert('Export is coming soon.')}
+          <button onClick={exportCompaniesCsv}
             style={{ padding: '9px 14px', background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '12.5px', fontWeight: 700, color: COLORS.text, cursor: 'pointer' }}>
             Export
           </button>
-          <button onClick={() => alert('Add Company is coming soon.')}
+          <button onClick={() => setShowAddModal(true)}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 14px', background: COLORS.primary, border: 'none', borderRadius: '9px', fontSize: '12.5px', fontWeight: 700, color: 'white', cursor: 'pointer' }}>
             <Icon name="plus" size={14} color="white" />
             Add Company
@@ -569,6 +616,59 @@ export default function AdminCompanies() {
                 Close
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Add Company modal */}
+      {showAddModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent: 'center', zIndex: 100, padding: isDesktop ? '20px' : 0 }}>
+          <div style={{ background: COLORS.card, borderRadius: isDesktop ? '16px' : '20px 20px 0 0', padding: '22px 20px', width: '100%', maxWidth: '460px', maxHeight: '88vh', overflowY: 'auto' as const }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>Add Company</p>
+              <span onClick={() => { setShowAddModal(false); setAddError('') }} style={{ cursor: 'pointer' }}>
+                <Icon name="x" size={18} color={COLORS.textMuted} />
+              </span>
+            </div>
+            <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '16px' }}>
+              This creates the company as already verified and sends the owner an invite email to set up their login — no signup or document review needed.
+            </p>
+
+            {addError && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '10px', marginBottom: '14px' }}>
+                <p style={{ fontSize: '12px', color: COLORS.red }}>{addError}</p>
+              </div>
+            )}
+
+            {[
+              { key: 'business_name', label: 'Business Name *', placeholder: 'e.g. Zaranda Hotel' },
+              { key: 'email', label: 'Owner Email *', placeholder: 'owner@example.com' },
+              { key: 'phone', label: 'Phone', placeholder: '0800 000 0000' },
+              { key: 'business_type', label: 'Business Type', placeholder: 'hotel, bus, tour, event_center...' },
+              { key: 'city', label: 'City', placeholder: 'Kaduna' },
+              { key: 'address', label: 'Address', placeholder: 'Street address' },
+              { key: 'cac_number', label: 'CAC Number', placeholder: 'RC1234567' },
+              { key: 'license_number', label: 'License Number', placeholder: '' },
+              { key: 'business_address', label: 'Registered Business Address', placeholder: '' },
+            ].map((f) => (
+              <div key={f.key} style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '5px', display: 'block' }}>{f.label}</label>
+                <input
+                  type="text"
+                  value={(addForm as any)[f.key]}
+                  onChange={(e) => setAddForm({ ...addForm, [f.key]: e.target.value })}
+                  placeholder={f.placeholder}
+                  style={{ width: '100%', padding: '11px 12px', border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '13.5px', color: COLORS.text, boxSizing: 'border-box' as const, outline: 'none' }}
+                />
+              </div>
+            ))}
+
+            <button
+              onClick={runCreateCompany}
+              disabled={addLoading}
+              style={{ width: '100%', padding: '13px', background: addLoading ? '#94a3b8' : COLORS.primary, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: addLoading ? 'not-allowed' : 'pointer', marginTop: '4px' }}>
+              {addLoading ? 'Creating...' : 'Create Company'}
+            </button>
           </div>
         </div>
       )}
