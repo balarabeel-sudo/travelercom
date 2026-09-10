@@ -34,6 +34,9 @@ type Company = {
   created_at: string
   bookings_count?: number
   total_revenue?: number
+  cac_number: string | null
+  license_number: string | null
+  business_address: string | null
 }
 
 type Summary = {
@@ -96,6 +99,54 @@ function StatusBadge({ status }: { status: string | null }) {
     <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 9px', borderRadius: '6px', background: s.bg, color: s.color, display: 'inline-block' }}>
       {s.label.toUpperCase()}
     </span>
+  )
+}
+
+function VerificationDocs({ ownerId }: { ownerId: string | null }) {
+  const [docs, setDocs] = useState<{ id: string; document_type: string; url: string | null; verification_status: string | null }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      if (!ownerId) { setDocs([]); setLoading(false); return }
+      const { data: rows } = await supabase
+        .from('documents')
+        .select('id, document_type, file_url, verification_status')
+        .eq('user_id', ownerId)
+      const withUrls = await Promise.all((rows || []).map(async (d) => {
+        const { data: signed } = await supabase.storage.from('verification-docs').createSignedUrl(d.file_url, 3600)
+        return { id: d.id, document_type: d.document_type, verification_status: d.verification_status, url: signed?.signedUrl || null }
+      }))
+      if (!cancelled) { setDocs(withUrls); setLoading(false) }
+    })()
+    return () => { cancelled = true }
+  }, [ownerId])
+
+  const labelFor = (t: string) => t === 'cac_certificate' ? 'CAC Certificate' : t === 'government_id' ? 'Government ID' : t.replace(/_/g, ' ')
+
+  if (loading) return <p style={{ fontSize: '12px', color: COLORS.textMuted, padding: '8px 0' }}>Loading documents…</p>
+  if (docs.length === 0) return <p style={{ fontSize: '12px', color: COLORS.textMuted, padding: '8px 0' }}>No documents uploaded yet.</p>
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+      {docs.map((d) => (
+        <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: COLORS.bg, borderRadius: '9px', border: `1px solid ${COLORS.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+            <Icon name="clipboard" size={15} color={COLORS.primary} />
+            <span style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>{labelFor(d.document_type)}</span>
+          </div>
+          {d.url ? (
+            <a href={d.url} target="_blank" rel="noreferrer" style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.primary, textDecoration: 'none' }}>
+              View →
+            </a>
+          ) : (
+            <span style={{ fontSize: '11px', color: COLORS.textMuted }}>Unavailable</span>
+          )}
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -420,11 +471,34 @@ export default function AdminCompanies() {
                 <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text }}>{new Date(selected.created_at).toLocaleDateString()}</span>
               </div>
               {selected.description && (
-                <div style={{ padding: '9px 0' }}>
+                <div style={{ padding: '9px 0', borderBottom: (selected.cac_number || selected.license_number || selected.business_address) ? `1px solid ${COLORS.border}` : 'none' }}>
                   <span style={{ fontSize: '12px', color: COLORS.textMuted }}>Description</span>
                   <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text, marginTop: '3px', lineHeight: 1.5 }}>{selected.description}</p>
                 </div>
               )}
+              {selected.cac_number && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: `1px solid ${COLORS.border}` }}>
+                  <span style={{ fontSize: '12px', color: COLORS.textMuted }}>CAC Number</span>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text }}>{selected.cac_number}</span>
+                </div>
+              )}
+              {selected.license_number && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: `1px solid ${COLORS.border}` }}>
+                  <span style={{ fontSize: '12px', color: COLORS.textMuted }}>License Number</span>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text }}>{selected.license_number}</span>
+                </div>
+              )}
+              {selected.business_address && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0' }}>
+                  <span style={{ fontSize: '12px', color: COLORS.textMuted }}>Registered Address</span>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text, textAlign: 'right' as const, maxWidth: '65%' }}>{selected.business_address}</span>
+                </div>
+              )}
+            </div>
+
+            <p style={{ fontSize: '12px', fontWeight: 800, color: COLORS.text, marginBottom: '8px' }}>Verification Documents</p>
+            <div style={{ marginBottom: '16px' }}>
+              <VerificationDocs ownerId={selected.owner_id} />
             </div>
 
             {actionError && (
@@ -665,12 +739,21 @@ function CompanyDetailsView({
           ['Phone Number', company.phone || 'Not set'],
           ['City', company.city || 'Not set'],
           ['Address', company.address || 'Not set'],
-        ].map(([label, value], i) => (
-          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i === 4 ? 'none' : `1px solid ${COLORS.border}` }}>
+          ['CAC Number', company.cac_number || 'Not set'],
+          ['License Number', company.license_number || 'Not set'],
+          ['Registered Address', company.business_address || 'Not set'],
+        ].map(([label, value], i, arr) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
             <span style={{ fontSize: '12px', color: COLORS.textMuted }}>{label}</span>
             <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text, textAlign: 'right' as const, maxWidth: '60%' }}>{value}</span>
           </div>
         ))}
+      </div>
+
+      {/* Verification Documents */}
+      <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text, marginBottom: '8px' }}>Verification Documents</p>
+      <div style={{ marginBottom: '16px' }}>
+        <VerificationDocs ownerId={company.owner_id} />
       </div>
 
       {/* Recent Activity */}
