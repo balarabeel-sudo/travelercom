@@ -32,6 +32,15 @@ type Company = {
 
 type ServiceRow = { id: string; title: string; price: number; photo_url: string | null; category: string }
 
+const CATEGORY_ICON: Record<string, string> = {
+  hotel: 'hotel',
+  bus: 'bus',
+  train: 'train',
+  flight: 'plane',
+  tour: 'tent',
+  event_center: 'party',
+}
+
 export default function CompanyProfile() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -217,6 +226,28 @@ export default function CompanyProfile() {
           </div>
         </div>
 
+        {company.plan !== 'business_suite' && (
+          <div
+            onClick={() => navigate('/upgrade-business-suite')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
+              background: `linear-gradient(135deg, ${COLORS.purple}, #4C1D95)`, borderRadius: '14px',
+              padding: '14px 16px', marginBottom: '16px', boxShadow: '0 4px 14px rgba(107,33,168,0.3)'
+            }}>
+            <div style={{
+              width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(255,255,255,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }}>
+              <Icon name="crown" size={18} color="#FBBF24" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: '13.5px', fontWeight: 800, color: 'white' }}>Upgrade to Business Suite</p>
+              <p style={{ fontSize: '11.5px', color: 'rgba(255,255,255,0.85)' }}>Manage staff, inventory, finance & more</p>
+            </div>
+            <Icon name="chevronRight" size={18} color="white" />
+          </div>
+        )}
+
         {editing ? (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>About / Description</p>
@@ -288,7 +319,7 @@ export default function CompanyProfile() {
               {services.map((s) => (
                 <div key={s.id} style={{ background: COLORS.card, borderRadius: '14px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
                   <div style={{ height: '80px', background: s.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {s.photo_url ? <img src={s.photo_url} alt={s.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '24px' }}>🏨</span>}
+                    {s.photo_url ? <img src={s.photo_url} alt={s.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name={CATEGORY_ICON[s.category] || 'box'} size={24} color="white" />}
                   </div>
                   <div style={{ padding: '10px' }}>
                     <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{s.title}</p>
