@@ -23,7 +23,7 @@ import BookingsManagement from './BookingsManagement'
 import ListingsManagement from './ListingsManagement'
 import Services from './Services'
 import ServiceDetails from './ServiceDetails'
-import BusinessSuite from './BusinessSuite'
+import UpgradeBusinessSuite from './UpgradeBusinessSuite'
 import GuestList from './GuestList'
 import CompanyMenu from './CompanyMenu'
 import InventoryManagement from './InventoryManagement'
@@ -107,7 +107,7 @@ function App() {
         <Route path="/listings-management" element={<ListingsManagement />} />
         <Route path="/services/:category" element={<Services />} />
         <Route path="/services/:category/:id" element={<ServiceDetails />} />
-        <Route path="/business-suite" element={<BusinessSuite />} />
+        <Route path="/upgrade-business-suite" element={<UpgradeBusinessSuite />} />
         <Route path="/guests" element={<GuestList />} />
         <Route path="/company-menu" element={<CompanyMenu />} />
         <Route path="/inventory" element={<InventoryManagement />} />
