@@ -50,7 +50,29 @@ async function resolveSignedUrls(msgs: { id: string; attachment_url?: string | n
   return map
 }
 
-type Admin = { id: string; full_name: string | null; email: string | null }
+type Admin = { user_id: string; full_name: string | null; email: string | null; role_id: string | null; is_super_admin: boolean; suspended: boolean | null }
+
+// Maps keywords found in a ticket's category to the permission an admin needs
+// to actually be able to act on that kind of issue.
+const CATEGORY_PERMISSION_RULES: { keywords: string[]; permission: string }[] = [
+  { keywords: ['refund'], permission: 'refunds.view' },
+  { keywords: ['withdraw'], permission: 'withdrawals.view' },
+  { keywords: ['financ', 'payment', 'wallet'], permission: 'finance.view' },
+  { keywords: ['verif', 'complian'], permission: 'verification.view' },
+  { keywords: ['staff', 'permission'], permission: 'companies.view' },
+  { keywords: ['market'], permission: 'marketing.view' },
+  { keywords: ['booking', 'hotel', 'transport', 'bus', 'train', 'flight', 'tour', 'event', 'visa'], permission: 'bookings.view' },
+  { keywords: ['compan'], permission: 'companies.view' },
+]
+
+function permissionForCategory(category: string | null): string | null {
+  if (!category) return null
+  const c = category.toLowerCase()
+  for (const rule of CATEGORY_PERMISSION_RULES) {
+    if (rule.keywords.some((k) => c.includes(k))) return rule.permission
+  }
+  return null
+}
 
 type CompanyContext = {
   business_name: string
@@ -94,6 +116,8 @@ export default function AdminSupport() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [admins, setAdmins] = useState<Admin[]>([])
+  const [rolePerms, setRolePerms] = useState<Record<string, Set<string>>>({})
+  const [showAllAdmins, setShowAllAdmins] = useState(false)
   const [requesterNames, setRequesterNames] = useState<Record<string, string>>({})
 
   const [selected, setSelected] = useState<Ticket | null>(null)
@@ -110,7 +134,30 @@ export default function AdminSupport() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentAdminId(data.user?.id || null))
-    supabase.from('admins').select('id, full_name, email').then(({ data }) => setAdmins(data || []))
+
+    supabase
+      .from('admins')
+      .select('user_id, role_id, is_super_admin, suspended, profiles(full_name, email)')
+      .then(({ data }) => {
+        const list: Admin[] = (data || []).map((a: any) => ({
+          user_id: a.user_id,
+          role_id: a.role_id,
+          is_super_admin: a.is_super_admin,
+          suspended: a.suspended,
+          full_name: a.profiles?.full_name || null,
+          email: a.profiles?.email || null,
+        }))
+        setAdmins(list)
+      })
+
+    supabase.from('role_permissions').select('role_id, permission_id').then(({ data }) => {
+      const map: Record<string, Set<string>> = {}
+      for (const row of data || []) {
+        if (!map[row.role_id]) map[row.role_id] = new Set()
+        map[row.role_id].add(row.permission_id)
+      }
+      setRolePerms(map)
+    })
   }, [])
 
   useEffect(() => { fetchTickets() }, [filter])
@@ -153,8 +200,15 @@ export default function AdminSupport() {
 
   const adminName = (id: string | null) => {
     if (!id) return null
-    const a = admins.find((x) => x.id === id)
+    const a = admins.find((x) => x.user_id === id)
     return a?.full_name || a?.email || 'Staff'
+  }
+
+  const adminCanHandle = (a: Admin, category: string | null) => {
+    if (a.is_super_admin) return true
+    const needed = permissionForCategory(category)
+    if (!needed) return true
+    return rolePerms[a.role_id || '']?.has(needed) || false
   }
 
   const openTicket = async (t: Ticket) => {
@@ -289,10 +343,44 @@ export default function AdminSupport() {
             <select value={selected.assigned_staff_id || ''} onChange={(e) => updateTicket({ assigned_staff_id: e.target.value || null })}
               style={{ padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '12px' }}>
               <option value="">Unassigned</option>
-              {admins.map((a) => <option key={a.id} value={a.id}>{a.full_name || a.email}</option>)}
+              {(() => {
+                const active = admins.filter((a) => !a.suspended)
+                const suggested = active.filter((a) => adminCanHandle(a, selected.category))
+                const others = active.filter((a) => !adminCanHandle(a, selected.category))
+                return (
+                  <>
+                    <optgroup label={suggested.length ? 'Suggested (has access)' : 'No admin matches — showing all'}>
+                      {(suggested.length ? suggested : active).map((a) => (
+                        <option key={a.user_id} value={a.user_id}>{a.full_name || a.email}</option>
+                      ))}
+                    </optgroup>
+                    {suggested.length > 0 && (showAllAdmins || others.length) ? (
+                      <optgroup label="Other admins (may lack access)">
+                        {others.map((a) => (
+                          <option key={a.user_id} value={a.user_id}>{a.full_name || a.email}</option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                  </>
+                )
+              })()}
             </select>
           </div>
 
+          {selected.assigned_staff_id && (() => {
+            const a = admins.find((x) => x.user_id === selected.assigned_staff_id)
+            if (a && !adminCanHandle(a, selected.category)) {
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', padding: '8px 10px', borderRadius: '8px', background: '#FEF2F2', border: '1px solid #FECACA' }}>
+                  <Icon name="alertCircle" size={13} color={COLORS.red} />
+                  <span style={{ fontSize: '11px', color: '#B91C1C' }}>
+                    {a.full_name || a.email} may not have the access needed to resolve a "{selected.category}" issue.
+                  </span>
+                </div>
+              )
+            }
+            return null
+          })()}
           {(companyCtx || bookingCtx) && (
             <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' as const }}>
               {companyCtx && (
