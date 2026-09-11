@@ -23,6 +23,7 @@ import AdminStaff from './AdminStaff'
 import AdminAuditLogs from './AdminAuditLogs'
 import AdminSettings from './AdminSettings'
 import AdminApprovals from './AdminApprovals'
+import AdminReviews from './AdminReviews'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -64,7 +65,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 type SectionKey =
-  | 'overview' | 'users' | 'companies' | 'hotels' | 'transport' | 'flights' | 'tours' | 'events' | 'bookings'
+  | 'overview' | 'users' | 'companies' | 'hotels' | 'transport' | 'flights' | 'tours' | 'events' | 'bookings' | 'reviews'
   | 'finance' | 'wallet' | 'refunds' | 'withdrawals' | 'approvals'
   | 'support' | 'analytics' | 'marketing'
   | 'platform' | 'staff' | 'audit' | 'notifications' | 'settings'
@@ -84,6 +85,7 @@ const NAV: NavGroup[] = [
       { key: 'tours', label: 'Tours', icon: 'map' },
       { key: 'events', label: 'Event Centers', icon: 'tent' },
       { key: 'bookings', label: 'Bookings', icon: 'ticket' },
+      { key: 'reviews', label: 'Reviews & Ratings', icon: 'star' },
     ]
   },
   {
@@ -124,6 +126,7 @@ const SECTION_PERMISSION: Partial<Record<SectionKey, string | string[]>> = {
   tours: ['companies.view', 'verification.view'],
   events: ['companies.view', 'verification.view'],
   bookings: 'bookings.view',
+  reviews: 'reviews.manage',
   finance: 'finance.view',
   wallet: 'wallet.view',
   refunds: 'refunds.view',
@@ -498,6 +501,7 @@ function AdminDashboard() {
       {section === 'tours' && <AdminTours />}
       {section === 'events' && <AdminEventCenters />}
       {section === 'bookings' && <AdminBookings />}
+      {section === 'reviews' && <AdminReviews />}
       {section === 'finance' && <AdminFinance />}
       {section === 'wallet' && <AdminWallet />}
       {section === 'refunds' && <AdminRefunds />}
@@ -510,7 +514,7 @@ function AdminDashboard() {
       {section === 'audit' && <AdminAuditLogs />}
       {section === 'settings' && <AdminSettings />}
       {section === 'approvals' && <AdminApprovals />}
-      {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'finance' && section !== 'wallet' && section !== 'refunds' && section !== 'withdrawals' && section !== 'support' && section !== 'analytics' && section !== 'marketing' && section !== 'platform' && section !== 'staff' && section !== 'audit' && section !== 'settings' && section !== 'approvals' && <ComingSoonPanel label={currentLabel} />}
+      {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'reviews' && section !== 'finance' && section !== 'wallet' && section !== 'refunds' && section !== 'withdrawals' && section !== 'support' && section !== 'analytics' && section !== 'marketing' && section !== 'platform' && section !== 'staff' && section !== 'audit' && section !== 'settings' && section !== 'approvals' && <ComingSoonPanel label={currentLabel} />}
     </>
   )
 
