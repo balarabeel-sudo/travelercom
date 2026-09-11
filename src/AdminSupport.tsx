@@ -137,20 +137,28 @@ export default function AdminSupport() {
 
     supabase
       .from('admins')
-      .select('user_id, role_id, is_super_admin, suspended, profiles(full_name, email)')
-      .then(({ data }) => {
-        const list: Admin[] = (data || []).map((a: any) => ({
+      .select('user_id, role_id, is_super_admin, suspended')
+      .then(async ({ data: adminRows, error: adminErr }) => {
+        if (adminErr) { console.error('Failed to load admins:', adminErr.message); setAdmins([]); return }
+        const rows = adminRows || []
+        const userIds = rows.map((a) => a.user_id)
+        let profileMap: Record<string, { full_name: string | null; email: string | null }> = {}
+        if (userIds.length) {
+          const { data: profs } = await supabase.from('profiles').select('id, full_name, email').in('id', userIds)
+          for (const p of profs || []) profileMap[p.id] = { full_name: p.full_name, email: p.email }
+        }
+        setAdmins(rows.map((a) => ({
           user_id: a.user_id,
           role_id: a.role_id,
           is_super_admin: a.is_super_admin,
           suspended: a.suspended,
-          full_name: a.profiles?.full_name || null,
-          email: a.profiles?.email || null,
-        }))
-        setAdmins(list)
+          full_name: profileMap[a.user_id]?.full_name || null,
+          email: profileMap[a.user_id]?.email || null,
+        })))
       })
 
-    supabase.from('role_permissions').select('role_id, permission_id').then(({ data }) => {
+    supabase.from('role_permissions').select('role_id, permission_id').then(({ data, error }) => {
+      if (error) { console.error('Failed to load role_permissions:', error.message); return }
       const map: Record<string, Set<string>> = {}
       for (const row of data || []) {
         if (!map[row.role_id]) map[row.role_id] = new Set()
