@@ -64,6 +64,7 @@ import CompanyStaffAccess from './CompanyStaffAccess'
 import StaffDashboard from './StaffDashboard'
 import AcceptInvite from './AcceptInvite'
 import Flights from './Flights'
+import Profile from './Profile'
 
 // Listens for the auth session created when an invited staff member clicks
 // their invite email link, and routes them to the Accept Invite page.
@@ -97,6 +98,7 @@ function App() {
         <Route path="/pending-approval" element={<PendingApproval />} />
         <Route path="/verify-booking" element={<VerifyBooking />} />
         <Route path="/account" element={<Account />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="/add-listing" element={<AddListing />} />
         <Route path="/add-hotel-listing" element={<AddHotelListing />} />
         <Route path="/add-tour-listing" element={<AddTourListing />} />
@@ -110,7 +112,7 @@ function App() {
         <Route path="/services/:category" element={<Services />} />
         <Route path="/services/:category/:id" element={<ServiceDetails />} />
         <Route path="/upgrade-business-suite" element={<UpgradeBusinessSuite />} />
-        <Route path="/terms" element={<TermsAndConditions />} />
+        <Route path="/payment-terms" element={<TermsAndConditions />} />
         <Route path="/search" element={<Search />} />
         <Route path="/guests" element={<GuestList />} />
         <Route path="/company-menu" element={<CompanyMenu />} />
