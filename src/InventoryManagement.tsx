@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import { releaseExpiredUnits } from './inventoryUtils'
+import { ListCardSkeleton } from './LoadingSkeleton'
+import NetworkError from './NetworkError'
 
 const COLORS = {
   bg: '#F8FAFC',
@@ -28,7 +30,7 @@ type InventoryItem = {
   services: { photo_url: string | null; category: string | null } | null
 }
 
-type ServiceOption = { id: string; title: string; category: string | null }
+type ServiceOption = { id: string; title: string; category: string | null; price: number | null; seats_available: number | null }
 
 const CATEGORY_LABELS: Record<string, { plural: string; singular: string; unitPlural: string; icon: string; placeholder: string }> = {
   hotel: { plural: 'Room Types', singular: 'Room Type', unitPlural: 'Rooms', icon: 'bed', placeholder: 'e.g. Executive Room, Suite' },
@@ -43,12 +45,14 @@ const DEFAULT_LABELS = { plural: 'Inventory Types', singular: 'Type', unitPlural
 export default function InventoryManagement() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [netError, setNetError] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [items, setItems] = useState<InventoryItem[]>([])
   const [statusCounts, setStatusCounts] = useState<Record<string, { available: number; occupied: number; reserved: number; maintenance: number }>>({})
   const [services, setServices] = useState<ServiceOption[]>([])
   const [serviceId, setServiceId] = useState('')
   const [saving, setSaving] = useState(false)
+  const [addError, setAddError] = useState('')
   const [holidays, setHolidays] = useState<{ id: string; date: string; label: string | null }[]>([])
   const [showHolidayForm, setShowHolidayForm] = useState(false)
   const [holidayDate, setHolidayDate] = useState('')
@@ -62,33 +66,39 @@ export default function InventoryManagement() {
   const [photoPreview, setPhotoPreview] = useState('')
 
   const load = async () => {
+    setNetError(false)
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) { navigate('/login'); return }
 
-    const { data: company } = await supabase
+    const { data: company, error: companyErr } = await supabase
       .from('companies')
       .select('id')
       .eq('owner_id', userData.user.id)
       .maybeSingle()
 
+    if (companyErr) { setNetError(true); setLoading(false); return }
     if (!company) { setLoading(false); return }
     setCompanyId(company.id)
     loadHolidays(company.id)
     releaseExpiredUnits(company.id).catch(() => {})
 
-    const { data: serviceRows } = await supabase
+    const { data: serviceRows, error: serviceErr } = await supabase
       .from('services')
-      .select('id, title, category')
+      .select('id, title, category, price, seats_available')
       .eq('company_id', company.id)
+
+    if (serviceErr) { setNetError(true); setLoading(false); return }
 
     setServices(serviceRows || [])
     if (serviceRows && serviceRows.length > 0) setServiceId(serviceRows[0].id)
 
-    const { data: inventoryRows } = await supabase
+    const { data: inventoryRows, error: invErr } = await supabase
       .from('inventory_items')
       .select('id, name, total_quantity, price, service_id, image_url, services(photo_url, category)')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
+
+    if (invErr) { setNetError(true); setLoading(false); return }
 
     setItems((inventoryRows || []) as any)
 
@@ -126,6 +136,16 @@ export default function InventoryManagement() {
 
   const handleAdd = async () => {
     if (!companyId || !name.trim() || !quantity) return
+    setAddError('')
+
+    const duplicate = items.some((it) =>
+      it.service_id === (serviceId || null) && it.name.trim().toLowerCase() === name.trim().toLowerCase()
+    )
+    if (duplicate) {
+      setAddError(`"${name.trim()}" already exists in your inventory. Please use a different name.`)
+      return
+    }
+
     setSaving(true)
     const qty = parseInt(quantity, 10)
 
@@ -165,6 +185,7 @@ export default function InventoryManagement() {
     setPhotoPreview('')
     setShowForm(false)
     setSaving(false)
+    setAddError('')
     load()
   }
 
@@ -199,8 +220,24 @@ export default function InventoryManagement() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
-        Loading Inventory...
+      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+        <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Inventory</h1>
+        </div>
+        <div style={{ padding: '16px' }}>
+          <ListCardSkeleton count={3} />
+        </div>
+      </div>
+    )
+  }
+
+  if (netError) {
+    return (
+      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+        <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Inventory</h1>
+        </div>
+        <NetworkError onRetry={() => { setLoading(true); load() }} />
       </div>
     )
   }
@@ -306,10 +343,40 @@ export default function InventoryManagement() {
             <p style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', color: COLORS.text }}>Add {formLabels.singular}</p>
 
             {services.length > 0 && (
-              <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px' }}>
+              <select value={serviceId} onChange={(e) => { setServiceId(e.target.value); setAddError('') }} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px' }}>
                 <option value="">Link to a listing (optional)</option>
                 {services.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
               </select>
+            )}
+
+            {(() => {
+              const linkedService = services.find((s) => s.id === serviceId)
+              const hasNoItemsYet = linkedService && !items.some((it) => it.service_id === linkedService.id)
+              if (!hasNoItemsYet) return null
+              return (
+                <div
+                  onClick={() => {
+                    setName(linkedService.title)
+                    if (linkedService.seats_available != null) setQuantity(String(linkedService.seats_available))
+                    if (linkedService.price != null) setPrice(String(linkedService.price))
+                    setAddError('')
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', background: '#EFF6FF', border: `1px solid #BFDBFE`,
+                    borderRadius: '10px', padding: '10px 12px', marginBottom: '10px', cursor: 'pointer',
+                  }}>
+                  <Icon name="download" size={14} color={COLORS.primary} />
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.primary }}>
+                    Import name, price &amp; quantity from "{linkedService.title}"
+                  </span>
+                </div>
+              )
+            })()}
+
+            {addError && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px' }}>
+                <p style={{ fontSize: '11.5px', color: COLORS.red }}>{addError}</p>
+              </div>
             )}
 
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', border: `1.5px dashed ${COLORS.border}`, borderRadius: '10px', padding: '10px 12px', marginBottom: '10px', cursor: 'pointer' }}>
