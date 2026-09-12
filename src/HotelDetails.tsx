@@ -901,7 +901,12 @@ function HotelDetails() {
 
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '14px', cursor: 'pointer' }}>
           <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} style={{ marginTop: '3px' }} />
-          <span style={{ fontSize: '12px', color: COLORS.textMuted }}>I agree to the Terms &amp; Conditions.</span>
+          <span style={{ fontSize: '12px', color: COLORS.textMuted }}>
+            I agree to the{' '}
+            <span onClick={(e) => { e.stopPropagation(); window.open('#/terms', '_blank') }} style={{ color: COLORS.primary, textDecoration: 'underline', fontWeight: 700 }}>
+              Terms &amp; Conditions
+            </span>.
+          </span>
         </label>
 
         {message && (
