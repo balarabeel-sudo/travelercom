@@ -134,6 +134,7 @@ function Home() {
   const [listingMeta, setListingMeta] = useState<Record<string, { category: string }>>({})
   const [promoPercents, setPromoPercents] = useState<Record<string, number>>({})
   const [heroSlide, setHeroSlide] = useState(0)
+  const [topDestinations, setTopDestinations] = useState<{ city: string; photo: string | null; rating: number; count: number }[]>([])
   useEffect(() => {
     const loadUser = async () => {
       const { data, error } = await supabase.auth.getUser()
@@ -364,6 +365,51 @@ function Home() {
     return () => clearInterval(timer)
   }, [banners.length])
 
+  useEffect(() => {
+    if (accountType !== 'personal') return
+    const loadDestinations = async () => {
+      const { data: svcs } = await supabase
+        .from('services')
+        .select('id, destination, photo_url, category')
+        .in('category', ['tour', 'event_center'])
+        .eq('status', 'active')
+        .not('destination', 'is', null)
+
+      if (!svcs || svcs.length === 0) return
+
+      const ids = svcs.map((s: any) => s.id)
+      const { data: reviewRows } = await supabase.from('reviews').select('service_id, rating').in('service_id', ids)
+
+      const stats: Record<string, { sum: number; count: number }> = {}
+      for (const r of reviewRows || []) {
+        if (!stats[r.service_id]) stats[r.service_id] = { sum: 0, count: 0 }
+        stats[r.service_id].sum += r.rating
+        stats[r.service_id].count += 1
+      }
+
+      const byCity: Record<string, { photo: string | null; rating: number; count: number }> = {}
+      for (const s of svcs as any[]) {
+        const city = (s.destination || '').trim()
+        if (!city) continue
+        const st = stats[s.id]
+        const rating = st ? st.sum / st.count : 0
+        const count = st ? st.count : 0
+        const current = byCity[city]
+        if (!current || rating > current.rating || (rating === current.rating && count > current.count)) {
+          byCity[city] = { photo: s.photo_url, rating, count }
+        }
+      }
+
+      const ranked = Object.entries(byCity)
+        .map(([city, v]) => ({ city, ...v }))
+        .sort((a, b) => (b.count > 0 ? b.rating : -1) - (a.count > 0 ? a.rating : -1) || b.count - a.count)
+        .slice(0, 5)
+
+      setTopDestinations(ranked)
+    }
+    loadDestinations()
+  }, [accountType])
+
   if (loading) {
     return (
       <div style={{
@@ -479,7 +525,7 @@ if (accountType === 'company') {
             style={{
               borderRadius: '20px',
               padding: '24px 20px',
-              minHeight: '108px',
+              height: '140px',
               position: 'relative',
               overflow: 'hidden',
               background: companyCurrentSlide.type === 'default' ? bannerGradient() : bannerGradient(companyCurrentSlide.banner.banner_type),
@@ -709,52 +755,6 @@ const services = [
     { city: 'Kano', icon: 'mapPin', color: '#0369a1' },
     { city: 'Port Harcourt', icon: 'mapPin', color: '#0EA5E9' },
   ]
-  const [topDestinations, setTopDestinations] = useState<{ city: string; photo: string | null; rating: number; count: number }[]>([])
-
-  useEffect(() => {
-    if (accountType !== 'personal') return
-    const loadDestinations = async () => {
-      const { data: svcs } = await supabase
-        .from('services')
-        .select('id, destination, photo_url, category')
-        .in('category', ['tour', 'event_center'])
-        .eq('status', 'active')
-        .not('destination', 'is', null)
-
-      if (!svcs || svcs.length === 0) return
-
-      const ids = svcs.map((s: any) => s.id)
-      const { data: reviewRows } = await supabase.from('reviews').select('service_id, rating').in('service_id', ids)
-
-      const stats: Record<string, { sum: number; count: number }> = {}
-      for (const r of reviewRows || []) {
-        if (!stats[r.service_id]) stats[r.service_id] = { sum: 0, count: 0 }
-        stats[r.service_id].sum += r.rating
-        stats[r.service_id].count += 1
-      }
-
-      const byCity: Record<string, { photo: string | null; rating: number; count: number }> = {}
-      for (const s of svcs as any[]) {
-        const city = (s.destination || '').trim()
-        if (!city) continue
-        const st = stats[s.id]
-        const rating = st ? st.sum / st.count : 0
-        const count = st ? st.count : 0
-        const current = byCity[city]
-        if (!current || rating > current.rating || (rating === current.rating && count > current.count)) {
-          byCity[city] = { photo: s.photo_url, rating, count }
-        }
-      }
-
-      const ranked = Object.entries(byCity)
-        .map(([city, v]) => ({ city, ...v }))
-        .sort((a, b) => (b.count > 0 ? b.rating : -1) - (a.count > 0 ? a.rating : -1) || b.count - a.count)
-        .slice(0, 5)
-
-      setTopDestinations(ranked)
-    }
-    loadDestinations()
-  }, [accountType])
 
   // No real listings yet for tours/events — will be populated once companies start adding services
 
@@ -821,7 +821,7 @@ const services = [
           style={{
             borderRadius: '20px',
             padding: '24px 20px',
-            minHeight: '108px',
+            height: '140px',
             position: 'relative',
             overflow: 'hidden',
             background: currentSlide.type === 'default' ? bannerGradient() : bannerGradient(currentSlide.banner.banner_type),
@@ -955,7 +955,7 @@ const services = [
               key={d.city}
               onClick={() => navigate(`/search?city=${d.city}`)}
               style={{
-                minWidth: '155px',
+                minWidth: '140px',
                 borderRadius: '16px',
                 overflow: 'hidden',
                 background: COLORS.card,
@@ -964,7 +964,7 @@ const services = [
                 flexShrink: 0
               }}>
               <div style={{
-                height: '100px',
+                height: '85px',
                 background: d.photo ? undefined : `linear-gradient(135deg, ${d.color || COLORS.primary}, ${COLORS.primary})`,
                 display: 'flex',
                 alignItems: 'center',
@@ -1028,7 +1028,7 @@ const services = [
                 key={h.id}
                 onClick={() => navigate(`/hotels/${h.id}`)}
                 style={{
-                  width: '165px',
+                  width: '140px',
                   flexShrink: 0,
                   background: COLORS.card,
                   borderRadius: '16px',
@@ -1036,7 +1036,7 @@ const services = [
                   boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
                   cursor: 'pointer'
                 }}>
-                <div style={{ position: 'relative', height: '100px' }}>
+                <div style={{ position: 'relative', height: '85px' }}>
                   <div style={{
                     width: '100%',
                     height: '100%',
@@ -1184,7 +1184,7 @@ function TripCard({ icon, route, company, date, price, photoUrl, isFavorite, onT
     <div
       onClick={onClick}
       style={{
-        width: '165px',
+        width: '140px',
         flexShrink: 0,
         background: COLORS.card,
         borderRadius: '16px',
@@ -1192,7 +1192,7 @@ function TripCard({ icon, route, company, date, price, photoUrl, isFavorite, onT
         boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
         cursor: 'pointer'
       }}>
-      <div style={{ position: 'relative', height: '100px' }}>
+      <div style={{ position: 'relative', height: '85px' }}>
         <div style={{
           width: '100%',
           height: '100%',
