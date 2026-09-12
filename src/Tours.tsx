@@ -328,7 +328,7 @@ function Tours() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {visible.map((t) => (
               <div key={t.id} onClick={() => navigate(`/tour/${t.id}`)} style={{ background: COLORS.card, borderRadius: '16px', padding: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer', display: 'flex', gap: '12px' }}>
-                <div style={{ position: 'relative', width: '125px', height: '150px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0 }}>
+                <div style={{ position: 'relative', width: '108px', height: '135px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0 }}>
                   <div style={{ width: '100%', height: '100%', background: t.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {t.photo_url ? <img src={t.photo_url} alt={t.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="map" size={26} color="white" />}
                   </div>
@@ -346,7 +346,6 @@ function Tours() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                     <p style={{ fontSize: '14.5px', fontWeight: 800, color: COLORS.text, flex: 1, minWidth: 0 }}>{t.title}</p>
-                    <span style={{ flexShrink: 0, padding: '6px 12px', background: COLORS.secondary, color: 'white', borderRadius: '8px', fontWeight: 700, fontSize: '11px' }}>View Details</span>
                   </div>
                   <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon name="mapPin" size={11} color={COLORS.textMuted} /> {t.destination}</p>
 
@@ -390,11 +389,14 @@ function Tours() {
                     )}
                   </div>
 
-                  <div style={{ marginTop: '8px' }}>
-                    <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(t.price).toLocaleString()} <span style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 400 }}>/person</span></p>
-                    <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!t.seats_available || t.seats_available === 0) ? '#DC2626' : COLORS.green }}>
-                      {(!t.seats_available || t.seats_available === 0) ? 'Not available' : `${t.seats_available} slots available`}
-                    </p>
+                  <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '8px' }}>
+                    <div>
+                      <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(t.price).toLocaleString()} <span style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 400 }}>/person</span></p>
+                      <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!t.seats_available || t.seats_available === 0) ? '#DC2626' : COLORS.green }}>
+                        {(!t.seats_available || t.seats_available === 0) ? 'Not available' : `${t.seats_available} slots available`}
+                      </p>
+                    </div>
+                    <span style={{ flexShrink: 0, padding: '8px 14px', background: COLORS.secondary, color: 'white', borderRadius: '8px', fontWeight: 700, fontSize: '11.5px' }}>View Details</span>
                   </div>
                 </div>
               </div>
