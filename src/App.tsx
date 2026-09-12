@@ -25,6 +25,7 @@ import Services from './Services'
 import ServiceDetails from './ServiceDetails'
 import UpgradeBusinessSuite from './UpgradeBusinessSuite'
 import TermsAndConditions from './TermsAndConditions'
+import Search from './Search'
 import GuestList from './GuestList'
 import CompanyMenu from './CompanyMenu'
 import InventoryManagement from './InventoryManagement'
@@ -110,6 +111,7 @@ function App() {
         <Route path="/services/:category/:id" element={<ServiceDetails />} />
         <Route path="/upgrade-business-suite" element={<UpgradeBusinessSuite />} />
         <Route path="/terms" element={<TermsAndConditions />} />
+        <Route path="/search" element={<Search />} />
         <Route path="/guests" element={<GuestList />} />
         <Route path="/company-menu" element={<CompanyMenu />} />
         <Route path="/inventory" element={<InventoryManagement />} />
