@@ -358,7 +358,7 @@ function Hotels() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {visible.map((h) => (
               <div key={h.id} onClick={() => navigate(`/hotels/${h.id}`)} style={{ background: COLORS.card, borderRadius: '16px', padding: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer', display: 'flex', gap: '12px' }}>
-                <div style={{ position: 'relative', width: '130px', height: '160px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0 }}>
+                <div style={{ position: 'relative', width: '108px', height: '135px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0 }}>
                   <div style={{ width: '100%', height: '100%', background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="hotel" size={28} color="white" />}
                   </div>
@@ -376,7 +376,6 @@ function Hotels() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                     <p style={{ fontSize: '14.5px', fontWeight: 800, color: COLORS.text, flex: 1, minWidth: 0 }}>{h.title}</p>
-                    <span style={{ flexShrink: 0, padding: '6px 12px', background: COLORS.secondary, color: 'white', borderRadius: '8px', fontWeight: 700, fontSize: '11px' }}>View Details</span>
                   </div>
                   <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon name="mapPin" size={11} color={COLORS.textMuted} /> {h.destination}</p>
 
@@ -401,11 +400,14 @@ function Hotels() {
                     </div>
                   )}
 
-                  <div style={{ marginTop: '8px' }}>
-                    <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()} <span style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 400 }}>/night</span></p>
-                    <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!(h.realAvailable !== null ? h.realAvailable : h.seats_available)) ? '#DC2626' : COLORS.green }}>
-                      {!(h.realAvailable !== null ? h.realAvailable : h.seats_available) ? 'Not available' : `${h.realAvailable !== null ? h.realAvailable : h.seats_available} rooms available`}
-                    </p>
+                  <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '8px' }}>
+                    <div>
+                      <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()} <span style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 400 }}>/night</span></p>
+                      <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!(h.realAvailable !== null ? h.realAvailable : h.seats_available)) ? '#DC2626' : COLORS.green }}>
+                        {!(h.realAvailable !== null ? h.realAvailable : h.seats_available) ? 'Not available' : `${h.realAvailable !== null ? h.realAvailable : h.seats_available} rooms available`}
+                      </p>
+                    </div>
+                    <span style={{ flexShrink: 0, padding: '8px 14px', background: COLORS.secondary, color: 'white', borderRadius: '8px', fontWeight: 700, fontSize: '11.5px' }}>View Details</span>
                   </div>
                 </div>
               </div>
