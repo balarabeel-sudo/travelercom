@@ -709,6 +709,52 @@ const services = [
     { city: 'Kano', icon: 'mapPin', color: '#0369a1' },
     { city: 'Port Harcourt', icon: 'mapPin', color: '#0EA5E9' },
   ]
+  const [topDestinations, setTopDestinations] = useState<{ city: string; photo: string | null; rating: number; count: number }[]>([])
+
+  useEffect(() => {
+    if (accountType !== 'personal') return
+    const loadDestinations = async () => {
+      const { data: svcs } = await supabase
+        .from('services')
+        .select('id, destination, photo_url, category')
+        .in('category', ['tour', 'event_center'])
+        .eq('status', 'active')
+        .not('destination', 'is', null)
+
+      if (!svcs || svcs.length === 0) return
+
+      const ids = svcs.map((s: any) => s.id)
+      const { data: reviewRows } = await supabase.from('reviews').select('service_id, rating').in('service_id', ids)
+
+      const stats: Record<string, { sum: number; count: number }> = {}
+      for (const r of reviewRows || []) {
+        if (!stats[r.service_id]) stats[r.service_id] = { sum: 0, count: 0 }
+        stats[r.service_id].sum += r.rating
+        stats[r.service_id].count += 1
+      }
+
+      const byCity: Record<string, { photo: string | null; rating: number; count: number }> = {}
+      for (const s of svcs as any[]) {
+        const city = (s.destination || '').trim()
+        if (!city) continue
+        const st = stats[s.id]
+        const rating = st ? st.sum / st.count : 0
+        const count = st ? st.count : 0
+        const current = byCity[city]
+        if (!current || rating > current.rating || (rating === current.rating && count > current.count)) {
+          byCity[city] = { photo: s.photo_url, rating, count }
+        }
+      }
+
+      const ranked = Object.entries(byCity)
+        .map(([city, v]) => ({ city, ...v }))
+        .sort((a, b) => (b.count > 0 ? b.rating : -1) - (a.count > 0 ? a.rating : -1) || b.count - a.count)
+        .slice(0, 5)
+
+      setTopDestinations(ranked)
+    }
+    loadDestinations()
+  }, [accountType])
 
   // No real listings yet for tours/events — will be populated once companies start adding services
 
@@ -904,7 +950,7 @@ const services = [
           overflowX: 'auto',
           padding: '0 16px 4px 16px',
         }}>
-          {destinations.map((d) => (
+          {(topDestinations.length ? topDestinations : destinations).map((d: any) => (
             <div
               key={d.city}
               onClick={() => navigate(`/search?city=${d.city}`)}
@@ -919,20 +965,31 @@ const services = [
               }}>
               <div style={{
                 height: '100px',
-                background: `linear-gradient(135deg, ${d.color}, ${COLORS.primary})`,
+                background: d.photo ? undefined : `linear-gradient(135deg, ${d.color || COLORS.primary}, ${COLORS.primary})`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                overflow: 'hidden',
               }}>
-                <Icon name={d.icon} size={32} color="white" />
+                {d.photo ? (
+                  <img src={d.photo} alt={d.city} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <Icon name={d.icon || 'mapPin'} size={32} color="white" />
+                )}
               </div>
               <div style={{ padding: '10px' }}>
                 <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '2px' }}>
                   {d.city}
                 </p>
-                <p style={{ fontSize: '11px', color: COLORS.primary, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  Explore <Icon name="chevronRight" size={12} color={COLORS.primary} />
-                </p>
+                {d.count > 0 ? (
+                  <p style={{ fontSize: '11px', color: COLORS.textMuted, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <Icon name="star" size={11} color="#D4A017" filled /> {d.rating.toFixed(1)} · {d.count} reviews
+                  </p>
+                ) : (
+                  <p style={{ fontSize: '11px', color: COLORS.primary, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    Explore <Icon name="chevronRight" size={12} color={COLORS.primary} />
+                  </p>
+                )}
               </div>
             </div>
           ))}
