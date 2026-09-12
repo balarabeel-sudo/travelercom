@@ -93,6 +93,7 @@ function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2, filled
     globe: <><circle cx="12" cy="12" r="9" /><line x1="3" y1="12" x2="21" y2="12" /><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z" /></>,
     // --- Added for Business Suite upgrade page ---
     contacts: <><rect x="2" y="5" width="20" height="14" rx="2" /><circle cx="9" cy="11" r="2.3" /><path d="M6 16c0-1.8 1.3-3 3-3s3 1.2 3 3" /><line x1="15" y1="9" x2="19" y2="9" /><line x1="15" y1="13" x2="19" y2="13" /></>,
+    download: <><path d="M12 3v12" /><polyline points="7 10 12 15 17 10" /><path d="M4 19h16" /></>,
   }
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
