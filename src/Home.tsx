@@ -601,7 +601,7 @@ if (accountType === 'company') {
               </div>
             )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '24px' }}>
             {analytics.map((a) => {
               const change = a.statKey && periodStats ? periodStats.changes[a.statKey as keyof typeof periodStats.changes] : null
               const clickable = a.label === 'Active Listings'
@@ -610,18 +610,18 @@ if (accountType === 'company') {
                   onClick={clickable ? () => navigate('/my-listings') : undefined}
                   style={{
                   background: COLORS.card,
-                  borderRadius: '14px',
-                  padding: '16px',
+                  borderRadius: '12px',
+                  padding: '10px 8px',
                   boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
                   cursor: clickable ? 'pointer' : 'default',
                 }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
-                    <Icon name={a.icon} size={20} color={COLORS.primary} />
+                  <div style={{ width: '30px', height: '30px', borderRadius: '9px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '7px' }}>
+                    <Icon name={a.icon} size={15} color={COLORS.primary} />
                   </div>
-                  <p style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text }}>{a.value}</p>
-                  <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{a.label}</p>
+                  <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.value}</p>
+                  <p style={{ fontSize: '9.5px', color: COLORS.textMuted, lineHeight: 1.25 }}>{a.label}</p>
                   {companyPlan === 'business_suite' && change !== null && (
-                    <p style={{ fontSize: '10.5px', fontWeight: 700, marginTop: '6px', color: change >= 0 ? '#16A34A' : '#DC2626' }}>
+                    <p style={{ fontSize: '9.5px', fontWeight: 700, marginTop: '5px', color: change >= 0 ? '#16A34A' : '#DC2626' }}>
                       {change >= 0 ? '↑' : '↓'} {Math.abs(change)}%
                     </p>
                   )}
@@ -632,16 +632,16 @@ if (accountType === 'company') {
               onClick={() => navigate('/verify-booking')}
               style={{
                 background: COLORS.card,
-                borderRadius: '14px',
-                padding: '16px',
+                borderRadius: '12px',
+                padding: '10px 8px',
                 boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
                 cursor: 'pointer'
               }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
-                <Icon name="camera" size={20} color={COLORS.primary} />
+              <div style={{ width: '30px', height: '30px', borderRadius: '9px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '7px' }}>
+                <Icon name="camera" size={15} color={COLORS.primary} />
               </div>
-              <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text }}>Verify</p>
-              <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Booking</p>
+              <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>Verify</p>
+              <p style={{ fontSize: '9.5px', color: COLORS.textMuted }}>Booking</p>
             </div>
           </div> 
          {companyPlan === 'business_suite' && (
