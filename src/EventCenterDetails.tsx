@@ -84,6 +84,7 @@ function EventCenterDetails() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
+  const [reviews, setReviews] = useState<{ id: string; rating: number; comment: string | null; created_at: string; full_name: string | null }[]>([])
 
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -136,6 +137,23 @@ function EventCenterDetails() {
       }
 
       setService(svc as any)
+
+      const { data: reviewRows } = await supabase
+        .from('reviews')
+        .select('id, rating, comment, created_at, user_id')
+        .eq('service_id', id)
+        .order('created_at', { ascending: false })
+
+      if (reviewRows && reviewRows.length > 0) {
+        const userIds = reviewRows.map((r: any) => r.user_id)
+        const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', userIds)
+        const nameMap: Record<string, string | null> = {}
+        for (const p of profs || []) nameMap[p.id] = p.full_name
+        setReviews(reviewRows.map((r: any) => ({
+          id: r.id, rating: r.rating, comment: r.comment, created_at: r.created_at,
+          full_name: nameMap[r.user_id] || null,
+        })))
+      }
 
       const today = new Date().toISOString().split('T')[0]
       const { data: promoRows } = await supabase
@@ -581,6 +599,41 @@ function EventCenterDetails() {
           </div>
         )}
 
+        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: reviews.length ? '12px' : 0 }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>Reviews</p>
+            {reviews.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icon name="star" size={14} color="#D4A017" filled />
+                <span style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>
+                  {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
+                </span>
+                <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>({reviews.length.toLocaleString()})</span>
+              </div>
+            )}
+          </div>
+          {reviews.length === 0 ? (
+            <p style={{ fontSize: '12px', color: COLORS.textMuted }}>No reviews yet.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+              {reviews.slice(0, 5).map((r) => (
+                <div key={r.id} style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{r.full_name || 'Traveler.com user'}</span>
+                    <span style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{new Date(r.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '2px', marginBottom: r.comment ? '4px' : 0 }}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <Icon key={n} name="star" size={12} color={n <= r.rating ? '#D4A017' : COLORS.border} filled={n <= r.rating} />
+                    ))}
+                  </div>
+                  {r.comment && <p style={{ fontSize: '12px', color: COLORS.textMuted, lineHeight: 1.4 }}>{r.comment}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {usingHallTypes ? (
           <div style={{ marginBottom: '16px' }}>
             <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Select a Hall / Package</p>
@@ -860,7 +913,12 @@ function EventCenterDetails() {
 
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '14px', cursor: 'pointer' }}>
           <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} style={{ marginTop: '3px' }} />
-          <span style={{ fontSize: '12px', color: COLORS.textMuted }}>I agree to the Terms &amp; Conditions.</span>
+          <span style={{ fontSize: '12px', color: COLORS.textMuted }}>
+            I agree to the{' '}
+            <span onClick={(e) => { e.stopPropagation(); window.open('#/terms', '_blank') }} style={{ color: COLORS.primary, textDecoration: 'underline', fontWeight: 700 }}>
+              Terms &amp; Conditions
+            </span>.
+          </span>
         </label>
 
         {message && (
