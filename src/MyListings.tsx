@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { ListCardSkeleton } from './LoadingSkeleton'
+import NetworkError from './NetworkError'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -24,7 +26,14 @@ type Listing = {
   photo_url: string | null
   status: string | null
   destination: string | null
+  departure_time: string | null
   created_at: string
+}
+
+function formatDateTime(iso: string | null) {
+  if (!iso) return null
+  const d = new Date(iso)
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
 const CATEGORY_ICON: Record<string, string> = {
@@ -41,6 +50,7 @@ const CATEGORY_ICON: Record<string, string> = {
 // very different category shapes.
 function addListingRouteFor(category: string | null) {
   if (category === 'hotel') return '/add-hotel-listing'
+  if (category === 'bus') return '/add-bus-listing'
   if (category === 'tour') return '/add-tour-listing'
   if (category === 'event_center') return '/add-event-center-listing'
   return '/add-listing'
@@ -55,25 +65,45 @@ export default function MyListings() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [companyCategory, setCompanyCategory] = useState<string | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
+  const [roomTypeCounts, setRoomTypeCounts] = useState<Record<string, { types: number; rooms: number }>>({})
   const [loading, setLoading] = useState(true)
+  const [netError, setNetError] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
+    setNetError(false)
     const { data: userData } = await supabase.auth.getUser()
     if (!userData?.user) { setLoading(false); return }
-    const { data: company } = await supabase.from('companies').select('id, business_type').eq('owner_id', userData.user.id).maybeSingle()
+    const { data: company, error: companyErr } = await supabase.from('companies').select('id, business_type').eq('owner_id', userData.user.id).maybeSingle()
+    if (companyErr) { setNetError(true); setLoading(false); return }
     if (!company) { setLoading(false); return }
     setCompanyId(company.id)
     setCompanyCategory(company.business_type)
 
-    const { data } = await supabase
+    const { data, error: servicesErr } = await supabase
       .from('services')
-      .select('id, title, category, price, photo_url, status, destination, created_at')
+      .select('id, title, category, price, photo_url, status, destination, departure_time, created_at')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
 
-    setListings((data as Listing[]) || [])
+    if (servicesErr) { setNetError(true); setLoading(false); return }
+
+    const rows = (data as Listing[]) || []
+    setListings(rows)
+
+    const hotelIds = rows.filter((r) => r.category === 'hotel').map((r) => r.id)
+    if (hotelIds.length > 0) {
+      const { data: invRows } = await supabase.from('inventory_items').select('service_id, total_quantity').in('service_id', hotelIds)
+      const counts: Record<string, { types: number; rooms: number }> = {}
+      for (const it of invRows || []) {
+        if (!counts[it.service_id]) counts[it.service_id] = { types: 0, rooms: 0 }
+        counts[it.service_id].types += 1
+        counts[it.service_id].rooms += it.total_quantity || 0
+      }
+      setRoomTypeCounts(counts)
+    }
+
     setLoading(false)
   }
 
@@ -124,7 +154,9 @@ export default function MyListings() {
 
       <div style={{ padding: '16px' }}>
         {loading ? (
-          <p style={{ textAlign: 'center', color: COLORS.textMuted, padding: '40px 0', fontSize: '13px' }}>Loading…</p>
+          <ListCardSkeleton count={4} />
+        ) : netError ? (
+          <NetworkError onRetry={load} />
         ) : listings.length === 0 ? (
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '30px', textAlign: 'center' as const }}>
             <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '12px' }}>You haven't added any listings yet.</p>
@@ -156,7 +188,15 @@ export default function MyListings() {
                   <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
                     {l.title}
                   </p>
-                  <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>{formatNaira(l.price)}</p>
+                  {l.category === 'hotel' && roomTypeCounts[l.id] ? (
+                    <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>
+                      {roomTypeCounts[l.id].types} room type{roomTypeCounts[l.id].types === 1 ? '' : 's'} · {roomTypeCounts[l.id].rooms} rooms
+                    </p>
+                  ) : l.category === 'bus' && l.departure_time ? (
+                    <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>{formatDateTime(l.departure_time)}</p>
+                  ) : (
+                    <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>{formatNaira(l.price)}</p>
+                  )}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
                     <span style={{
                       fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px',
