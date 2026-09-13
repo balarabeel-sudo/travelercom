@@ -24,6 +24,8 @@ type ServiceDetail = {
   photo_url: string | null
   title: string
   description: string | null
+  departure_time: string | null
+  arrival_time: string | null
   destination: string
   price: number
   seats_available: number | null
@@ -126,7 +128,7 @@ function EventCenterDetails() {
 
       const { data: svc, error: svcErr } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, capacity, companies(business_name, allow_unit_selection)')
+        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, capacity, departure_time, arrival_time, companies(business_name, allow_unit_selection)')
         .eq('id', id)
         .maybeSingle()
 
@@ -578,6 +580,21 @@ function EventCenterDetails() {
           {service.companies?.business_name || 'Traveler.com Partner'} <Icon name="chevronRight" size={12} color={COLORS.primary} />
         </p>
 
+        {service.departure_time && (
+          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icon name="calendar" size={14} color={COLORS.primary} />
+              <span style={{ fontSize: '12.5px', color: COLORS.text, fontWeight: 700 }}>
+                {new Date(service.departure_time).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+              </span>
+              <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>
+                {new Date(service.departure_time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                {service.arrival_time && ` – ${new Date(service.arrival_time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`}
+              </span>
+            </div>
+          </div>
+        )}
+
         {service.description && (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '6px' }}>About this venue</p>
@@ -915,7 +932,7 @@ function EventCenterDetails() {
           <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} style={{ marginTop: '3px' }} />
           <span style={{ fontSize: '12px', color: COLORS.textMuted }}>
             I agree to the{' '}
-            <span onClick={(e) => { e.stopPropagation(); window.open('#/terms', '_blank') }} style={{ color: COLORS.primary, textDecoration: 'underline', fontWeight: 700 }}>
+            <span onClick={(e) => { e.stopPropagation(); window.open('#/payment-terms', '_blank') }} style={{ color: COLORS.primary, textDecoration: 'underline', fontWeight: 700 }}>
               Terms &amp; Conditions
             </span>.
           </span>
