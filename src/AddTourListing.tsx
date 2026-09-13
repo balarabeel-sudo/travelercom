@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { DetailsSkeleton } from './LoadingSkeleton'
+import NetworkError from './NetworkError'
 
 const COLORS = {
   primary: '#0EA5E9', secondary: '#F97316', bg: '#F8FAFC', card: '#FFFFFF',
-  text: '#1A1A1A', textMuted: '#64748B', border: '#E2E8F0', green: '#16a34a',
+  text: '#1A1A1A', textMuted: '#64748B', border: '#E2E8F0', green: '#16a34a', red: '#DC2626',
 }
 
 const COMMISSION_RATE = 3
@@ -24,17 +26,20 @@ function AddTourListing() {
   const [searchParams] = useSearchParams()
   const editId = searchParams.get('edit')
   const [loading, setLoading] = useState(true)
+  const [netError, setNetError] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [approvalStatus, setApprovalStatus] = useState<string>('pending')
   const [existingPhotoUrl, setExistingPhotoUrl] = useState('')
 
   const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
   const [destination, setDestination] = useState('')
+  const [tourDate, setTourDate] = useState('')
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
+  const [meetingPoint, setMeetingPoint] = useState('')
   const [price, setPrice] = useState('')
   const [quantity, setQuantity] = useState('')
   const [tourType, setTourType] = useState('')
-  const [durationMinutes, setDurationMinutes] = useState('')
   const [gateFee, setGateFee] = useState('')
   const [vehicleFee, setVehicleFee] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -45,38 +50,64 @@ function AddTourListing() {
   const [errorMsg, setErrorMsg] = useState('')
   const [success, setSuccess] = useState(false)
 
-  useEffect(() => {
-    const load = async () => {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) { navigate('/login'); return }
-      const { data: company } = await supabase
-        .from('companies').select('id, business_type, approval_status')
-        .eq('owner_id', userData.user.id).maybeSingle()
-      if (company) {
-        setCompanyId(company.id)
-        setApprovalStatus(company.approval_status)
+  const durationMinutes = (() => {
+    if (!tourDate || !startTime || !endTime) return null
+    const start = new Date(`${tourDate}T${startTime}:00`)
+    const end = new Date(`${tourDate}T${endTime}:00`)
+    const mins = Math.round((end.getTime() - start.getTime()) / 60000)
+    return mins > 0 ? mins : null
+  })()
 
-        if (editId) {
-          const { data: listing } = await supabase.from('services').select('*').eq('id', editId).eq('company_id', company.id).maybeSingle()
-          if (listing) {
-            setTitle(listing.title || '')
-            setDescription(listing.description || '')
-            setDestination(listing.destination || '')
-            setPrice(listing.price ? String(listing.price) : '')
-            setQuantity(listing.seats_available ? String(listing.seats_available) : '')
-            setTourType(listing.tour_type || '')
-            setDurationMinutes(listing.duration_minutes ? String(listing.duration_minutes) : '')
-            setGateFee(listing.gate_fee != null ? String(listing.gate_fee) : '')
-            setVehicleFee(listing.vehicle_fee != null ? String(listing.vehicle_fee) : '')
-            setAmenities(listing.amenities || [])
-            setExistingPhotoUrl(listing.photo_url || '')
+  const formatDuration = (mins: number | null) => {
+    if (mins == null) return null
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    if (h === 0) return `${m} minutes`
+    if (m === 0) return `${h} hour${h > 1 ? 's' : ''}`
+    return `${h}h ${m}m`
+  }
+
+  const load = async () => {
+    setNetError(false)
+    const { data: userData } = await supabase.auth.getUser()
+    if (!userData.user) { navigate('/login'); return }
+    const { data: company, error: companyErr } = await supabase
+      .from('companies').select('id, business_type, approval_status')
+      .eq('owner_id', userData.user.id).maybeSingle()
+
+    if (companyErr) { setNetError(true); setLoading(false); return }
+
+    if (company) {
+      setCompanyId(company.id)
+      setApprovalStatus(company.approval_status)
+
+      if (editId) {
+        const { data: listing, error: listingErr } = await supabase.from('services').select('*').eq('id', editId).eq('company_id', company.id).maybeSingle()
+        if (listingErr) { setNetError(true); setLoading(false); return }
+        if (listing) {
+          setTitle(listing.title || '')
+          setDestination(listing.destination || '')
+          if (listing.departure_time) {
+            const d = new Date(listing.departure_time)
+            setTourDate(d.toISOString().slice(0, 10))
+            setStartTime(d.toISOString().slice(11, 16))
           }
+          if (listing.arrival_time) setEndTime(new Date(listing.arrival_time).toISOString().slice(11, 16))
+          setMeetingPoint(listing.meeting_point || '')
+          setPrice(listing.price ? String(listing.price) : '')
+          setQuantity(listing.seats_available ? String(listing.seats_available) : '')
+          setTourType(listing.tour_type || '')
+          setGateFee(listing.gate_fee != null ? String(listing.gate_fee) : '')
+          setVehicleFee(listing.vehicle_fee != null ? String(listing.vehicle_fee) : '')
+          setAmenities(listing.amenities || [])
+          setExistingPhotoUrl(listing.photo_url || '')
         }
       }
-      setLoading(false)
     }
-    load()
-  }, [navigate, editId])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [navigate, editId])
 
   const toggleAmenity = (a: string) => {
     setAmenities((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a])
@@ -94,6 +125,14 @@ function AddTourListing() {
     setErrorMsg('')
     if (!title.trim() || !price.trim() || !destination.trim()) {
       setErrorMsg('Please fill in title, price, and destination.')
+      return
+    }
+    if (!tourDate || !startTime || !endTime) {
+      setErrorMsg('Please fill in the tour date, start time, and end time.')
+      return
+    }
+    if (durationMinutes == null) {
+      setErrorMsg('End time must be later than start time.')
       return
     }
     if (!companyId) {
@@ -123,17 +162,22 @@ function AddTourListing() {
 
     if (!photoFile && editId) photoUrl = existingPhotoUrl || null
 
+    const startDateTime = new Date(`${tourDate}T${startTime}:00`)
+    const endDateTime = new Date(`${tourDate}T${endTime}:00`)
+
     const payload = {
       company_id: companyId,
       category: 'tour',
       title: title.trim(),
-      description: description.trim() || null,
       destination: destination.trim(),
+      departure_time: startDateTime.toISOString(),
+      arrival_time: endDateTime.toISOString(),
+      duration_minutes: durationMinutes,
+      meeting_point: meetingPoint.trim() || null,
       price: parseFloat(price),
       commission_rate: COMMISSION_RATE,
       seats_available: quantity ? parseInt(quantity, 10) : null,
       tour_type: tourType || null,
-      duration_minutes: durationMinutes ? parseInt(durationMinutes, 10) : null,
       gate_fee: gateFee ? parseFloat(gateFee) : null,
       vehicle_fee: vehicleFee ? parseFloat(vehicleFee) : null,
       photo_url: photoUrl,
@@ -167,7 +211,25 @@ function AddTourListing() {
   }
 
   if (loading) {
-    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textMuted }}>Loading...</div>
+    return (
+      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+        <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Tour Listing</h1>
+        </div>
+        <DetailsSkeleton />
+      </div>
+    )
+  }
+
+  if (netError) {
+    return (
+      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+        <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Tour Listing</h1>
+        </div>
+        <NetworkError onRetry={() => { setLoading(true); load() }} />
+      </div>
+    )
   }
 
   if (approvalStatus !== 'approved') {
@@ -235,13 +297,35 @@ function AddTourListing() {
             <input type="text" placeholder="e.g. Olumo Rock" value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} />
           </Field>
 
-          <Field label="Description">
-            <textarea placeholder="Short description" value={description} onChange={(e) => setDescription(e.target.value)} style={{ ...inputStyle, minHeight: '70px', resize: 'vertical' as const }} />
+          <Field label="Meeting Point">
+            <input type="text" placeholder="e.g. Main gate, Olumo Rock" value={meetingPoint} onChange={(e) => setMeetingPoint(e.target.value)} style={inputStyle} />
           </Field>
 
           <Field label="Destination">
             <input type="text" placeholder="e.g. Abeokuta, Ogun State" value={destination} onChange={(e) => setDestination(e.target.value)} style={inputStyle} />
           </Field>
+
+          <Field label="Tour Date">
+            <input type="date" value={tourDate} onChange={(e) => setTourDate(e.target.value)} style={inputStyle} />
+          </Field>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ flex: 1 }}>
+              <Field label="Start Time">
+                <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={inputStyle} />
+              </Field>
+            </div>
+            <div style={{ flex: 1 }}>
+              <Field label="End Time">
+                <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={inputStyle} />
+              </Field>
+            </div>
+          </div>
+          {startTime && endTime && (
+            <p style={{ fontSize: '11.5px', color: durationMinutes == null ? COLORS.red : COLORS.textMuted, marginTop: '-8px', marginBottom: '14px' }}>
+              {durationMinutes == null ? 'End time must be later than start time.' : <>Duration: <strong style={{ color: COLORS.text }}>{formatDuration(durationMinutes)}</strong></>}
+            </p>
+          )}
 
           <Field label="Tour Type">
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
@@ -265,18 +349,9 @@ function AddTourListing() {
             </div>
           </Field>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <div style={{ flex: 1 }}>
-              <Field label="Price (₦ per person)">
-                <input type="number" placeholder="e.g. 3500" value={price} onChange={(e) => setPrice(e.target.value)} style={inputStyle} />
-              </Field>
-            </div>
-            <div style={{ flex: 1 }}>
-              <Field label="Duration (minutes)">
-                <input type="number" placeholder="e.g. 120" value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} style={inputStyle} />
-              </Field>
-            </div>
-          </div>
+          <Field label="Price (₦ per person)">
+            <input type="number" placeholder="e.g. 3500" value={price} onChange={(e) => setPrice(e.target.value)} style={inputStyle} />
+          </Field>
 
           <Field label="Slots Available">
             <input type="number" placeholder="e.g. 30" value={quantity} onChange={(e) => setQuantity(e.target.value)} style={inputStyle} />
