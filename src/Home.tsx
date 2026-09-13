@@ -1307,7 +1307,7 @@ function CompanyBottomNav({ active, navigate }: { active: string; navigate: (p: 
   const items = [
     { key: 'home', icon: 'home', label: 'Home', path: '/home' },
     { key: 'bookings', icon: 'calendar', label: 'Bookings', path: '/bookings-management' },
-    { key: 'add', icon: 'plus', label: 'Add', path: '/add-listing' },
+    { key: 'add', icon: 'plus', label: 'Add', path: '/add-listing-router' },
     { key: 'wallet', icon: 'wallet', label: 'Wallet', path: '/wallet' },
     { key: 'menu', icon: 'menu', label: 'Menu', path: '/company-menu' },
   ]
