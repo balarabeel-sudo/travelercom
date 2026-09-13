@@ -192,8 +192,8 @@ export default function MyListings() {
                     <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>
                       {roomTypeCounts[l.id].types} room type{roomTypeCounts[l.id].types === 1 ? '' : 's'} · {roomTypeCounts[l.id].rooms} rooms
                     </p>
-                  ) : l.category === 'bus' && l.departure_time ? (
-                    <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>{formatDateTime(l.departure_time)}</p>
+                  ) : (l.category === 'bus' || l.category === 'tour' || l.category === 'event_center') && l.departure_time ? (
+                    <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>{formatDateTime(l.departure_time)} · {formatNaira(l.price)}</p>
                   ) : (
                     <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>{formatNaira(l.price)}</p>
                   )}
