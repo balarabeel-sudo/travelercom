@@ -66,6 +66,7 @@ import AcceptInvite from './AcceptInvite'
 import Flights from './Flights'
 import Profile from './Profile'
 import AddListingRouter from './AddListingRouter'
+import AddBusListing from './AddBusListing'
 
 // Listens for the auth session created when an invited staff member clicks
 // their invite email link, and routes them to the Accept Invite page.
@@ -101,6 +102,7 @@ function App() {
         <Route path="/account" element={<Account />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/add-listing-router" element={<AddListingRouter />} />
+        <Route path="/add-bus-listing" element={<AddBusListing />} />
         <Route path="/add-listing" element={<AddListing />} />
         <Route path="/add-hotel-listing" element={<AddHotelListing />} />
         <Route path="/add-tour-listing" element={<AddTourListing />} />
