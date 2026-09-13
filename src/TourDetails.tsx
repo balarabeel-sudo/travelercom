@@ -41,6 +41,9 @@ type TourDetail = {
   company_id: string
   tour_type: string | null
   duration_minutes: number | null
+  meeting_point: string | null
+  departure_time: string | null
+  arrival_time: string | null
   companies: { business_name: string } | null
 }
 
@@ -105,7 +108,7 @@ function TourDetails() {
 
       const { data: svc } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, tour_type, gate_fee, vehicle_fee, duration_minutes, companies(business_name)')
+        .select('id, title, description, destination, price, seats_available, company_id, photo_url, tour_type, gate_fee, vehicle_fee, duration_minutes, meeting_point, departure_time, arrival_time, companies(business_name)')
         .eq('id', id)
         .maybeSingle()
       setService(svc as any)
@@ -433,6 +436,29 @@ function TourDetails() {
           </div>
         )}
 
+        {(service.departure_time || service.meeting_point) && (
+          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+            {service.departure_time && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: service.meeting_point ? '10px' : 0 }}>
+                <Icon name="calendar" size={14} color={COLORS.primary} />
+                <span style={{ fontSize: '12.5px', color: COLORS.text, fontWeight: 700 }}>
+                  {new Date(service.departure_time).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                </span>
+                <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>
+                  {new Date(service.departure_time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                  {service.arrival_time && ` – ${new Date(service.arrival_time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`}
+                </span>
+              </div>
+            )}
+            {service.meeting_point && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Icon name="mapPin" size={14} color={COLORS.primary} />
+                <span style={{ fontSize: '12.5px', color: COLORS.text }}>Meeting point: <strong>{service.meeting_point}</strong></span>
+              </div>
+            )}
+          </div>
+        )}
+
         {service.description && (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '6px' }}>About this tour</p>
@@ -714,7 +740,7 @@ function TourDetails() {
           <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} style={{ marginTop: '3px' }} />
           <span style={{ fontSize: '12px', color: COLORS.textMuted }}>
             I agree to the{' '}
-            <span onClick={(e) => { e.stopPropagation(); window.open('#/terms', '_blank') }} style={{ color: COLORS.primary, textDecoration: 'underline', fontWeight: 700 }}>
+            <span onClick={(e) => { e.stopPropagation(); window.open('#/payment-terms', '_blank') }} style={{ color: COLORS.primary, textDecoration: 'underline', fontWeight: 700 }}>
               Terms &amp; Conditions
             </span>.
           </span>
