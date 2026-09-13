@@ -88,9 +88,34 @@ function InviteRedirectListener() {
 function App() {
   return (
     <Router>
-      <InviteRedirectListener />
-      <Routes>
-        <Route path="/" element={<SplashScreen />} />
+      <style>{`
+        html, body { margin: 0; padding: 0; }
+        .tc-app-shell { min-height: 100vh; background: transparent; }
+        @media (min-width: 700px) {
+          .tc-app-shell {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            background: #0f172a;
+            padding: 28px 0;
+          }
+          .tc-app-frame {
+            width: 430px;
+            min-height: calc(100vh - 56px);
+            max-height: 900px;
+            border-radius: 28px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+            background: #F8FAFC;
+          }
+        }
+      `}</style>
+      <div className="tc-app-shell">
+        <div className="tc-app-frame">
+          <InviteRedirectListener />
+          <Routes>
+            <Route path="/" element={<SplashScreen />} />
         <Route path="/account-type" element={<AccountType />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -158,6 +183,8 @@ function App() {
         <Route path="/staff" element={<CompanyStaffAccess onBack={() => window.history.back()} />} /> 
         <Route path="/accept-invite" element={<AcceptInvite />} />
       </Routes>
+        </div>
+      </div>
     </Router>
   )
 }
