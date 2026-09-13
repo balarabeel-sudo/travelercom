@@ -27,6 +27,9 @@ type ServiceDetail = {
   seats_available: number | null
   company_id: string
   amenities: string[] | null
+  check_in_time: string | null
+  check_out_time: string | null
+  max_guests: number | null
   companies: { business_name: string; allow_unit_selection: boolean | null } | null
 }
 
@@ -121,7 +124,7 @@ function HotelDetails() {
 
       const { data: svc } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, companies(business_name, allow_unit_selection)')
+        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, check_in_time, check_out_time, max_guests, companies(business_name, allow_unit_selection)')
         .eq('id', id)
         .maybeSingle()
 
@@ -567,6 +570,29 @@ function HotelDetails() {
           </div>
         )}
 
+        {(service.check_in_time || service.check_out_time || service.max_guests) && (
+          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex', flexWrap: 'wrap' as const, gap: '14px' }}>
+            {service.check_in_time && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icon name="clock" size={13} color={COLORS.primary} />
+                <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Check-in from <strong style={{ color: COLORS.text }}>{service.check_in_time.slice(0, 5)}</strong></span>
+              </div>
+            )}
+            {service.check_out_time && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icon name="clock" size={13} color={COLORS.primary} />
+                <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Check-out by <strong style={{ color: COLORS.text }}>{service.check_out_time.slice(0, 5)}</strong></span>
+              </div>
+            )}
+            {service.max_guests && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icon name="users" size={13} color={COLORS.primary} />
+                <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Max <strong style={{ color: COLORS.text }}>{service.max_guests}</strong> guests/room</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {service.amenities && service.amenities.length > 0 && (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Amenities</p>
@@ -903,7 +929,7 @@ function HotelDetails() {
           <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} style={{ marginTop: '3px' }} />
           <span style={{ fontSize: '12px', color: COLORS.textMuted }}>
             I agree to the{' '}
-            <span onClick={(e) => { e.stopPropagation(); window.open('#/terms', '_blank') }} style={{ color: COLORS.primary, textDecoration: 'underline', fontWeight: 700 }}>
+            <span onClick={(e) => { e.stopPropagation(); window.open('#/payment-terms', '_blank') }} style={{ color: COLORS.primary, textDecoration: 'underline', fontWeight: 700 }}>
               Terms &amp; Conditions
             </span>.
           </span>
