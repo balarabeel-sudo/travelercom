@@ -39,15 +39,15 @@ function AddHotelListing() {
   const [netError, setNetError] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [approvalStatus, setApprovalStatus] = useState<string>('pending')
-  const [existingPhotoUrl, setExistingPhotoUrl] = useState('')
+  const [existingPhotoUrls, setExistingPhotoUrls] = useState<string[]>([])
 
   const [title, setTitle] = useState('')
   const [destination, setDestination] = useState('')
   const [checkInTime, setCheckInTime] = useState('14:00')
   const [checkOutTime, setCheckOutTime] = useState('12:00')
   const [maxGuests, setMaxGuests] = useState('')
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
-  const [photoPreview, setPhotoPreview] = useState('')
+  const [photoFiles, setPhotoFiles] = useState<(File | null)[]>([])
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const [amenities, setAmenities] = useState<string[]>([])
   const [roomTypes, setRoomTypes] = useState<RoomTypeRow[]>([newRow()])
 
@@ -81,7 +81,7 @@ function AddHotelListing() {
           setCheckOutTime(listing.check_out_time || '12:00')
           setMaxGuests(listing.max_guests != null ? String(listing.max_guests) : '')
           setAmenities(listing.amenities || [])
-          setExistingPhotoUrl(listing.photo_url || '')
+          setExistingPhotoUrls(listing.photo_urls && listing.photo_urls.length > 0 ? listing.photo_urls : (listing.photo_url ? [listing.photo_url] : []))
 
           const { data: invItems, error: invErr } = await supabase
             .from('inventory_items')
@@ -117,11 +117,22 @@ function AddHotelListing() {
   }
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setPhotoFile(file)
-      setPhotoPreview(URL.createObjectURL(file))
-    }
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    const room = 5 - (existingPhotoUrls.length + photoFiles.length)
+    const toAdd = files.slice(0, Math.max(room, 0))
+    setPhotoFiles((prev) => [...prev, ...toAdd])
+    setPhotoPreviews((prev) => [...prev, ...toAdd.map((f) => URL.createObjectURL(f))])
+    e.target.value = ''
+  }
+
+  const removeExistingPhoto = (index: number) => {
+    setExistingPhotoUrls((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const removeNewPhoto = (index: number) => {
+    setPhotoFiles((prev) => prev.filter((_, i) => i !== index))
+    setPhotoPreviews((prev) => prev.filter((_, i) => i !== index))
   }
 
   const updateRoomType = (key: string, field: 'name' | 'quantity' | 'price', value: string) => {
@@ -158,20 +169,21 @@ function AddHotelListing() {
 
     setSubmitting(true)
 
-    let photoUrl: string | null = null
-    if (photoFile) {
-      const fileExt = photoFile.name.split('.').pop()
-      const fileName = `${companyId}-${Date.now()}.${fileExt}`
-      const { error: uploadErr } = await supabase.storage.from('listing-photos').upload(fileName, photoFile)
+    const uploadedUrls: string[] = []
+    for (const file of photoFiles) {
+      if (!file) continue
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${companyId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${fileExt}`
+      const { error: uploadErr } = await supabase.storage.from('listing-photos').upload(fileName, file)
       if (uploadErr) {
         setSubmitting(false)
         setErrorMsg('Photo upload failed: ' + uploadErr.message)
         return
       }
       const { data: urlData } = supabase.storage.from('listing-photos').getPublicUrl(fileName)
-      photoUrl = urlData.publicUrl
+      uploadedUrls.push(urlData.publicUrl)
     }
-    if (!photoFile && editId) photoUrl = existingPhotoUrl || null
+    const finalPhotoUrls = [...existingPhotoUrls, ...uploadedUrls].slice(0, 5)
 
     const totalRooms = filledRows.reduce((sum, r) => sum + parseInt(r.quantity, 10), 0)
     const minPrice = Math.min(...filledRows.map((r) => parseFloat(r.price)))
@@ -184,7 +196,8 @@ function AddHotelListing() {
       price: minPrice,
       commission_rate: COMMISSION_RATE,
       seats_available: totalRooms,
-      photo_url: photoUrl,
+      photo_url: finalPhotoUrls[0] || null,
+      photo_urls: finalPhotoUrls.length > 0 ? finalPhotoUrls : null,
       amenities: amenities.length > 0 ? amenities : null,
       check_in_time: checkInTime || null,
       check_out_time: checkOutTime || null,
@@ -333,19 +346,37 @@ function AddHotelListing() {
 
         <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', marginBottom: '14px' }}>
 
-          <Field label="Photo">
-            <label style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '100%', height: '140px', border: `2px dashed ${COLORS.border}`, borderRadius: '10px',
-              cursor: 'pointer', overflow: 'hidden', background: COLORS.bg,
-            }}>
-              {photoPreview || existingPhotoUrl ? (
-                <img src={photoPreview || existingPhotoUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <span style={{ fontSize: '13px', color: COLORS.textMuted, display: 'flex', alignItems: 'center', gap: '6px' }}><Icon name="camera" size={16} color={COLORS.textMuted} /> Tap to upload photo</span>
+          <Field label={`Photos (${existingPhotoUrls.length + photoFiles.length}/5)`}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+              {existingPhotoUrls.map((url, i) => (
+                <div key={`ex-${i}`} style={{ position: 'relative', aspectRatio: '1', borderRadius: '10px', overflow: 'hidden' }}>
+                  <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <span onClick={() => removeExistingPhoto(i)} style={{
+                    position: 'absolute', top: '4px', right: '4px', width: '20px', height: '20px', borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  }}><Icon name="x" size={11} color="white" /></span>
+                </div>
+              ))}
+              {photoPreviews.map((url, i) => (
+                <div key={`new-${i}`} style={{ position: 'relative', aspectRatio: '1', borderRadius: '10px', overflow: 'hidden' }}>
+                  <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <span onClick={() => removeNewPhoto(i)} style={{
+                    position: 'absolute', top: '4px', right: '4px', width: '20px', height: '20px', borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  }}><Icon name="x" size={11} color="white" /></span>
+                </div>
+              ))}
+              {existingPhotoUrls.length + photoFiles.length < 5 && (
+                <label style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', aspectRatio: '1',
+                  border: `2px dashed ${COLORS.border}`, borderRadius: '10px', cursor: 'pointer', background: COLORS.bg,
+                }}>
+                  <Icon name="camera" size={18} color={COLORS.textMuted} />
+                  <input type="file" accept="image/*" multiple onChange={handlePhotoChange} style={{ display: 'none' }} />
+                </label>
               )}
-              <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
-            </label>
+            </div>
+            <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '6px' }}>First photo is used as the cover photo shown in listings.</p>
           </Field>
 
           <Field label="Hotel Name">
