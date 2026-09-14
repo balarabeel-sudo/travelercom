@@ -20,6 +20,7 @@ const COLORS = {
 type ServiceDetail = {
   id: string
   photo_url: string | null
+  photo_urls: string[] | null
   title: string
   description: string | null
   destination: string
@@ -84,6 +85,7 @@ function HotelDetails() {
   const [checkOutDate, setCheckOutDate] = useState('')
   const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
   const [reviews, setReviews] = useState<{ id: string; rating: number; comment: string | null; created_at: string; full_name: string | null }[]>([])
+  const [photoIndex, setPhotoIndex] = useState(0)
 
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -124,7 +126,7 @@ function HotelDetails() {
 
       const { data: svc } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, check_in_time, check_out_time, max_guests, companies(business_name, allow_unit_selection)')
+        .select('id, title, description, destination, price, seats_available, company_id, photo_url, photo_urls, amenities, check_in_time, check_out_time, max_guests, companies(business_name, allow_unit_selection)')
         .eq('id', id)
         .maybeSingle()
 
@@ -543,7 +545,27 @@ function HotelDetails() {
           overflow: 'hidden',
           position: 'relative'
         }}>
-          {service.photo_url ? <img src={service.photo_url} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="hotel" size={56} color="white" />}
+          {(() => {
+            const photos = service.photo_urls && service.photo_urls.length > 0 ? service.photo_urls : (service.photo_url ? [service.photo_url] : [])
+            if (photos.length === 0) return <Icon name="hotel" size={56} color="white" />
+            const idx = Math.min(photoIndex, photos.length - 1)
+            return (
+              <>
+                <img src={photos[idx]} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {photos.length > 1 && (
+                  <>
+                    <div onClick={() => setPhotoIndex((idx - 1 + photos.length) % photos.length)} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '40%', cursor: 'pointer' }} />
+                    <div onClick={() => setPhotoIndex((idx + 1) % photos.length)} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '40%', cursor: 'pointer' }} />
+                    <div style={{ position: 'absolute', bottom: '10px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '5px' }}>
+                      {photos.map((_, i) => (
+                        <div key={i} style={{ width: i === idx ? '16px' : '5px', height: '5px', borderRadius: '3px', background: i === idx ? 'white' : 'rgba(255,255,255,0.5)', transition: 'width 0.2s' }} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )
+          })()}
           {activePromo && (
             <div style={{
               position: 'absolute', top: '12px', left: '12px', background: '#6B21A8', color: 'white',
