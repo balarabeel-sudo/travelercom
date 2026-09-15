@@ -3,6 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import { downloadReceiptImage } from './receiptGenerator'
+import { findAvailableUnit, listAvailableUnits } from './inventoryUtils'
+import { DetailsSkeleton } from './LoadingSkeleton'
+import NetworkError from './NetworkError'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -59,6 +62,7 @@ type RoomType = {
   weekendPrice: number | null
   holidayPrice: number | null
   available: number
+  availableFrom: string | null
 }
 
 function generateTicketCode(prefix: string) {
@@ -70,6 +74,7 @@ function HotelDetails() {
   const navigate = useNavigate()
   const { id } = useParams()
   const [loading, setLoading] = useState(true)
+  const [netError, setNetError] = useState(false)
   const [service, setService] = useState<ServiceDetail | null>(null)
   const [userId, setUserId] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -104,9 +109,9 @@ function HotelDetails() {
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'paystack'>('wallet')
   const [agreedTerms, setAgreedTerms] = useState(false)
 
-  useEffect(() => {
-    const load = async () => {
-      const { data: userData, error } = await supabase.auth.getUser()
+  const load = async () => {
+    setNetError(false)
+    const { data: userData, error } = await supabase.auth.getUser()
       if (error || !userData.user) {
         navigate('/login')
         return
@@ -124,11 +129,13 @@ function HotelDetails() {
         .maybeSingle()
       setWalletBalance(wallet ? Number(wallet.balance) : 0)
 
-      const { data: svc } = await supabase
+      const { data: svc, error: svcErr } = await supabase
         .from('services')
         .select('id, title, description, destination, price, seats_available, company_id, photo_url, photo_urls, amenities, check_in_time, check_out_time, max_guests, companies(business_name, allow_unit_selection)')
         .eq('id', id)
         .maybeSingle()
+
+      if (svcErr) { setNetError(true); setLoading(false); return }
 
       setService(svc as any)
 
@@ -178,26 +185,14 @@ function HotelDetails() {
         .eq('service_id', id)
 
       if (items && items.length > 0) {
-        const itemIds = items.map((i) => i.id)
-        const { data: unitRows } = await supabase
-          .from('inventory_units')
-          .select('inventory_item_id, status')
-          .in('inventory_item_id', itemIds)
-
-        const availCounts: Record<string, number> = {}
-        ;(unitRows || []).forEach((u: any) => {
-          if (u.status === 'available') {
-            availCounts[u.inventory_item_id] = (availCounts[u.inventory_item_id] || 0) + 1
-          }
-        })
-
         const mapped: RoomType[] = items.map((i: any) => ({
           id: i.id,
           name: i.name,
           price: Number(i.price) || 0,
           weekendPrice: i.weekend_price !== null ? Number(i.weekend_price) : null,
           holidayPrice: i.holiday_price !== null ? Number(i.holiday_price) : null,
-          available: availCounts[i.id] || 0,
+          available: 1,
+          availableFrom: null,
         }))
         setRoomTypes(mapped)
 
@@ -211,9 +206,9 @@ function HotelDetails() {
       }
 
       setLoading(false)
-    }
-    load()
-  }, [id, navigate])
+  }
+
+  useEffect(() => { load() }, [id, navigate])
 
   const usingRoomTypes = roomTypes.length > 0
   const selectedRoom = roomTypes.find((r) => r.id === selectedRoomTypeId)
@@ -221,19 +216,30 @@ function HotelDetails() {
   useEffect(() => {
     const fetchUnits = async () => {
       if (!selectedRoomTypeId) { setUnitOptions([]); setSelectedUnitId(null); return }
+      if (!checkInDate || !checkOutDate) { setUnitOptions([]); setSelectedUnitId(null); return }
       setLoadingUnits(true)
-      const { data } = await supabase
-        .from('inventory_units')
-        .select('id, unit_number')
-        .eq('inventory_item_id', selectedRoomTypeId)
-        .eq('status', 'available')
-        .order('unit_number', { ascending: true })
-      setUnitOptions(data || [])
-      setSelectedUnitId(data && data.length > 0 ? data[0].id : null)
+      const units = await listAvailableUnits(selectedRoomTypeId, checkInDate, checkOutDate)
+      setUnitOptions(units)
+      setSelectedUnitId(units.length > 0 ? units[0].id : null)
       setLoadingUnits(false)
     }
     fetchUnits()
-  }, [selectedRoomTypeId])
+  }, [selectedRoomTypeId, checkInDate, checkOutDate])
+
+  // Recompute each room type's availability once the customer has picked dates —
+  // a type shown as "available" before dates are chosen may turn out fully booked
+  // for those specific dates, or vice versa.
+  useEffect(() => {
+    const recomputeAvailability = async () => {
+      if (!checkInDate || !checkOutDate || roomTypes.length === 0) return
+      const updated = await Promise.all(roomTypes.map(async (r) => {
+        const result = await findAvailableUnit(r.id, checkInDate, checkOutDate)
+        return { ...r, available: result.available ? 1 : 0, availableFrom: result.available ? null : result.availableFrom }
+      }))
+      setRoomTypes(updated)
+    }
+    recomputeAvailability()
+  }, [checkInDate, checkOutDate])
 
   const nights = (() => {
     if (!checkInDate || !checkOutDate) return 0
@@ -344,20 +350,19 @@ function HotelDetails() {
 
     if (selectedRoom && selectedUnitId) {
       const chosen = unitOptions.find((u) => u.id === selectedUnitId)
-      const { data: claimedRows } = await supabase.rpc('claim_inventory_unit', { p_unit_id: selectedUnitId })
+      const useSpecificUnit = service?.companies?.allow_unit_selection !== false
+
+      const { data: claimedRows } = useSpecificUnit
+        ? await supabase.rpc('claim_specific_unit_for_dates', { p_unit_id: selectedUnitId, p_check_in: checkInDate, p_check_out: checkOutDate })
+        : await supabase.rpc('claim_inventory_unit_for_dates', { p_item_id: selectedRoom.id, p_check_in: checkInDate, p_check_out: checkOutDate })
       const claimed = claimedRows && claimedRows.length > 0 ? claimedRows[0] : null
 
       if (!claimed) {
         setBooking(false)
-        const { data: refreshed } = await supabase
-          .from('inventory_units')
-          .select('id, unit_number')
-          .eq('inventory_item_id', selectedRoom.id)
-          .eq('status', 'available')
-          .order('unit_number', { ascending: true })
-        setUnitOptions(refreshed || [])
-        setSelectedUnitId(refreshed && refreshed.length > 0 ? refreshed[0].id : null)
-        setMessage({ type: 'error', text: `Room ${chosen?.unit_number || ''} was just taken. Please pick another available number below.` })
+        const refreshed = await listAvailableUnits(selectedRoom.id, checkInDate, checkOutDate)
+        setUnitOptions(refreshed)
+        setSelectedUnitId(refreshed.length > 0 ? refreshed[0].id : null)
+        setMessage({ type: 'error', text: `Room ${chosen?.unit_number || ''} was just taken for these dates. Please pick another available number below.` })
         return
       }
       assignedUnitId = claimed.id
@@ -438,8 +443,22 @@ function HotelDetails() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textMuted }}>
-        Loading...
+      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+        <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Hotel</h1>
+        </div>
+        <DetailsSkeleton />
+      </div>
+    )
+  }
+
+  if (netError) {
+    return (
+      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+        <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Hotel</h1>
+        </div>
+        <NetworkError onRetry={() => { setLoading(true); load() }} />
       </div>
     )
   }
