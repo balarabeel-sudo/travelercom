@@ -404,7 +404,7 @@ function Hotels() {
                     <div>
                       <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()} <span style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 400 }}>/night</span></p>
                       <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!(h.realAvailable !== null ? h.realAvailable : h.seats_available)) ? '#DC2626' : COLORS.green }}>
-                        {!(h.realAvailable !== null ? h.realAvailable : h.seats_available) ? 'Not available' : `${h.realAvailable !== null ? h.realAvailable : h.seats_available} rooms available`}
+                        {!(h.realAvailable !== null ? h.realAvailable : h.seats_available) ? 'Not available' : 'Available'}
                       </p>
                     </div>
                     <span style={{ flexShrink: 0, padding: '8px 14px', background: COLORS.secondary, color: 'white', borderRadius: '8px', fontWeight: 700, fontSize: '11.5px' }}>View Details</span>
