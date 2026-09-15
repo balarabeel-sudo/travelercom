@@ -256,6 +256,8 @@ function BusDetails() {
       }
       assignedUnitId = claimed.id
       assignedNumber = claimed.unit_number
+      setSeatTypes((prev) => prev.map((s) => s.id === selectedSeat.id ? { ...s, available: Math.max(0, s.available - 1) } : s))
+      setUnitOptions((prev) => prev.filter((u) => u.id !== claimed.id))
     }
 
     const { data: newBooking, error: bookingErr } = await supabase.from('bookings').insert({
@@ -651,7 +653,7 @@ function BusDetails() {
               <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} style={{ marginTop: '3px' }} />
               <span style={{ fontSize: '12px', color: COLORS.textMuted }}>
             I agree to the{' '}
-            <span onClick={(e) => { e.stopPropagation(); window.open('#/terms', '_blank') }} style={{ color: COLORS.primary, textDecoration: 'underline', fontWeight: 700 }}>
+            <span onClick={(e) => { e.stopPropagation(); window.open('#/payment-terms', '_blank') }} style={{ color: COLORS.primary, textDecoration: 'underline', fontWeight: 700 }}>
               Terms &amp; Conditions
             </span>.
           </span>
