@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import { downloadReceiptImage } from './receiptGenerator'
-import { findAvailableUnit, listAvailableUnits } from './inventoryUtils'
+import { findAvailableUnit } from './inventoryUtils'
 import { DetailsSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
 
@@ -81,9 +81,6 @@ function HotelDetails() {
 
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<string | null>(null)
-  const [unitOptions, setUnitOptions] = useState<{ id: string; unit_number: string }[]>([])
-  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
-  const [loadingUnits, setLoadingUnits] = useState(false)
   const [holidayDates, setHolidayDates] = useState<string[]>([])
   const [checkInDate, setCheckInDate] = useState('')
   const [checkOutDate, setCheckOutDate] = useState('')
@@ -212,19 +209,6 @@ function HotelDetails() {
   const usingRoomTypes = roomTypes.length > 0
   const selectedRoom = roomTypes.find((r) => r.id === selectedRoomTypeId)
 
-  useEffect(() => {
-    const fetchUnits = async () => {
-      if (!selectedRoomTypeId) { setUnitOptions([]); setSelectedUnitId(null); return }
-      if (!checkInDate || !checkOutDate) { setUnitOptions([]); setSelectedUnitId(null); return }
-      setLoadingUnits(true)
-      const units = await listAvailableUnits(selectedRoomTypeId, checkInDate, checkOutDate)
-      setUnitOptions(units)
-      setSelectedUnitId(units.length > 0 ? units[0].id : null)
-      setLoadingUnits(false)
-    }
-    fetchUnits()
-  }, [selectedRoomTypeId, checkInDate, checkOutDate])
-
   // Recompute each room type's availability once the customer has picked dates —
   // a type shown as "available" before dates are chosen may turn out fully booked
   // for those specific dates, or vice versa.
@@ -293,9 +277,7 @@ function HotelDetails() {
     else setStep(STEP_ORDER[idx - 1])
   }
 
-  const canContinueFromDetails = nights > 0 && (usingRoomTypes
-    ? !!selectedRoomTypeId && (service?.companies?.allow_unit_selection === false || !!selectedUnitId)
-    : true)
+  const canContinueFromDetails = nights > 0 && (usingRoomTypes ? !!selectedRoomTypeId : true)
 
   // Branded receipt image — built only from real confirmed booking data.
   const downloadReceipt = () => {
@@ -326,8 +308,8 @@ function HotelDetails() {
     if (!service) return
     setMessage(null)
 
-    if (usingRoomTypes && !selectedUnitId) {
-      setMessage({ type: 'error', text: 'This room type just sold out. Please pick another type.' })
+    if (usingRoomTypes && !selectedRoomTypeId) {
+      setMessage({ type: 'error', text: 'Please select a room type.' })
       return
     }
 
@@ -347,21 +329,16 @@ function HotelDetails() {
     let assignedUnitId: string | null = null
     let assignedNumber = ''
 
-    if (selectedRoom && selectedUnitId) {
-      const chosen = unitOptions.find((u) => u.id === selectedUnitId)
-      const useSpecificUnit = service?.companies?.allow_unit_selection !== false
-
-      const { data: claimedRows } = useSpecificUnit
-        ? await supabase.rpc('claim_specific_unit_for_dates', { p_unit_id: selectedUnitId, p_check_in: checkInDate, p_check_out: checkOutDate })
-        : await supabase.rpc('claim_inventory_unit_for_dates', { p_item_id: selectedRoom.id, p_check_in: checkInDate, p_check_out: checkOutDate })
+    if (selectedRoom) {
+      const { data: claimedRows } = await supabase.rpc('claim_inventory_unit_for_dates', {
+        p_item_id: selectedRoom.id, p_check_in: checkInDate, p_check_out: checkOutDate,
+      })
       const claimed = claimedRows && claimedRows.length > 0 ? claimedRows[0] : null
 
       if (!claimed) {
         setBooking(false)
-        const refreshed = await listAvailableUnits(selectedRoom.id, checkInDate, checkOutDate)
-        setUnitOptions(refreshed)
-        setSelectedUnitId(refreshed.length > 0 ? refreshed[0].id : null)
-        setMessage({ type: 'error', text: `Room ${chosen?.unit_number || ''} was just taken for these dates. Please pick another available number below.` })
+        setRoomTypes((prev) => prev.map((r) => r.id === selectedRoom.id ? { ...r, available: 0 } : r))
+        setMessage({ type: 'error', text: 'No available rooms for your check-in dates. Please try different dates or another room type.' })
         return
       }
       assignedUnitId = claimed.id
@@ -770,44 +747,11 @@ function HotelDetails() {
               )
             })}
 
-            {selectedRoom && (() => {
-              const allowPicking = service.companies?.allow_unit_selection ?? true
-              return (
-              <div style={{ marginTop: '4px' }}>
-                {allowPicking ? (
-                  <>
-                    <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, marginBottom: '8px' }}>Pick a Room Number</p>
-                    {loadingUnits ? (
-                      <p style={{ fontSize: '12px', color: COLORS.textMuted }}>Loading available rooms...</p>
-                    ) : unitOptions.length === 0 ? (
-                      <p style={{ fontSize: '12px', color: COLORS.red }}>No rooms available for this type right now.</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {unitOptions.map((u) => (
-                          <div
-                            key={u.id}
-                            onClick={() => setSelectedUnitId(u.id)}
-                            style={{
-                              minWidth: '44px', padding: '9px 6px', textAlign: 'center', borderRadius: '9px', cursor: 'pointer',
-                              background: selectedUnitId === u.id ? COLORS.primary : COLORS.card,
-                              color: selectedUnitId === u.id ? 'white' : COLORS.text,
-                              border: `1.5px solid ${selectedUnitId === u.id ? COLORS.primary : COLORS.border}`,
-                              fontWeight: 700, fontSize: '13px'
-                            }}>
-                            {u.unit_number}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p style={{ fontSize: '12px', color: COLORS.textMuted, fontStyle: 'italic' as const }}>
-                    {loadingUnits ? 'Checking availability...' : unitOptions.length === 0 ? 'No rooms available for this type right now.' : 'A room will be assigned automatically at booking.'}
-                  </p>
-                )}
-              </div>
-              )
-            })()}
+            {selectedRoom && (
+              <p style={{ fontSize: '11.5px', color: COLORS.textMuted, fontStyle: 'italic' as const, marginTop: '4px' }}>
+                A room will be assigned automatically when you complete your booking.
+              </p>
+            )}
           </div>
         ) : (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
@@ -924,9 +868,6 @@ function HotelDetails() {
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Room</p>
             <SummaryRow label="Room type" value={selectedRoom?.name || 'Standard'} />
-            {selectedUnitId && unitOptions.find((u) => u.id === selectedUnitId) && (
-              <SummaryRow label="Room number" value={unitOptions.find((u) => u.id === selectedUnitId)!.unit_number} />
-            )}
           </div>
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Guest</p>
