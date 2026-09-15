@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { downloadReceiptImage, ReceiptData } from './receiptGenerator'
+import { ListCardSkeleton } from './LoadingSkeleton'
+import NetworkError from './NetworkError'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -33,6 +36,8 @@ type BookingRow = {
   booking_status: string | null
   amount_paid: number
   assigned_unit_number: string | null
+  check_in_date: string | null
+  check_out_date: string | null
   created_at: string | null
   company_id: string
   service_id: string
@@ -47,9 +52,14 @@ type BookingRow = {
   } | null
 }
 
+const CATEGORY_LABEL: Record<string, string> = {
+  hotel: 'Hotel Stay', bus: 'Bus Trip', train: 'Train Trip', flight: 'Flight', tour: 'Tour', event_center: 'Event Booking',
+}
+
 function MyBookings() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [netError, setNetError] = useState(false)
   const [bookings, setBookings] = useState<BookingRow[]>([])
   const [filter, setFilter] = useState<'all' | 'confirmed' | 'completed' | 'cancelled'>('all')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
@@ -65,36 +75,57 @@ function MyBookings() {
     return () => clearInterval(tick)
   }, [])
 
-  useEffect(() => {
-    const load = async () => {
-      const { data: userData, error } = await supabase.auth.getUser()
-      if (error || !userData.user) { navigate('/login'); return }
+  const load = async () => {
+    setNetError(false)
+    const { data: userData, error } = await supabase.auth.getUser()
+    if (error || !userData.user) { navigate('/login'); return }
 
-      const { data, error: qErr } = await supabase
-        .from('bookings')
-        .select('id, ticket_code, booking_status, amount_paid, assigned_unit_number, created_at, company_id, service_id, services(title, origin, destination, departure_time, category, photo_url, companies(business_name))')
-        .eq('user_id', userData.user.id)
-        .order('created_at', { ascending: false })
+    const { data, error: qErr } = await supabase
+      .from('bookings')
+      .select('id, ticket_code, booking_status, amount_paid, assigned_unit_number, check_in_date, check_out_date, created_at, company_id, service_id, services(title, origin, destination, departure_time, category, photo_url, companies(business_name))')
+      .eq('user_id', userData.user.id)
+      .order('created_at', { ascending: false })
 
-      if (!qErr) setBookings((data as any) || [])
+    if (qErr) { setNetError(true); setLoading(false); return }
+    setBookings((data as any) || [])
 
-      const { data: reviewRows } = await supabase
-        .from('reviews')
-        .select('booking_id, rating, comment')
-        .eq('user_id', userData.user.id)
-      const map: Record<string, { rating: number; comment: string | null }> = {}
-      ;(reviewRows || []).forEach((r: any) => { if (r.booking_id) map[r.booking_id] = { rating: r.rating, comment: r.comment } })
-      setReviewsMap(map)
+    const { data: reviewRows } = await supabase
+      .from('reviews')
+      .select('booking_id, rating, comment')
+      .eq('user_id', userData.user.id)
+    const map: Record<string, { rating: number; comment: string | null }> = {}
+    ;(reviewRows || []).forEach((r: any) => { if (r.booking_id) map[r.booking_id] = { rating: r.rating, comment: r.comment } })
+    setReviewsMap(map)
 
-      setLoading(false)
-    }
-    load()
-  }, [navigate])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [navigate])
 
   const filtered = filter === 'all' ? bookings : bookings.filter((b) => (b.booking_status || '').toLowerCase() === filter)
 
   if (loading) {
-    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textMuted }}>Loading your bookings...</div>
+    return (
+      <div style={{ minHeight: '100vh', background: COLORS.bg }}>
+        <div style={{ background: 'white', padding: '18px 20px', borderBottom: `1px solid ${COLORS.border}` }}>
+          <p style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>My Bookings</p>
+        </div>
+        <div style={{ maxWidth: '480px', margin: '0 auto', padding: '16px 20px' }}>
+          <ListCardSkeleton count={3} />
+        </div>
+      </div>
+    )
+  }
+
+  if (netError) {
+    return (
+      <div style={{ minHeight: '100vh', background: COLORS.bg }}>
+        <div style={{ background: 'white', padding: '18px 20px', borderBottom: `1px solid ${COLORS.border}` }}>
+          <p style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>My Bookings</p>
+        </div>
+        <NetworkError onRetry={() => { setLoading(true); load() }} />
+      </div>
+    )
   }
 
   return (
@@ -170,6 +201,36 @@ function MyBookings() {
             setDraftComment('')
           }
 
+          const handleDownloadReceipt = async () => {
+            const category = (b.services?.category || 'hotel') as ReceiptData['category']
+            const rows: ReceiptData['rows'] = []
+
+            if (b.services?.companies?.business_name) {
+              rows.push({ label: 'Company', value: b.services.companies.business_name })
+            }
+            if (b.check_in_date) rows.push({ label: 'Check-in', value: new Date(b.check_in_date).toLocaleDateString() })
+            if (b.check_out_date) rows.push({ label: 'Check-out', value: new Date(b.check_out_date).toLocaleDateString() })
+            if (!b.check_in_date && b.services?.departure_time) {
+              rows.push({ label: 'Date', value: new Date(b.services.departure_time).toLocaleString() })
+            }
+            if (b.assigned_unit_number) {
+              rows.push({ label: category === 'hotel' ? 'Room number' : 'Seat number', value: b.assigned_unit_number })
+            }
+            rows.push({ label: 'Status', value: status.charAt(0).toUpperCase() + status.slice(1) })
+
+            await downloadReceiptImage({
+              category,
+              serviceName: b.services?.title || 'Booking',
+              serviceTypeLabel: CATEGORY_LABEL[category] || 'Booking',
+              location: b.services?.origin ? `${b.services.origin} → ${b.services.destination}` : (b.services?.destination || ''),
+              bookingReference: b.ticket_code || b.id,
+              paymentDate: b.created_at ? new Date(b.created_at).toLocaleDateString() : undefined,
+              rows,
+              amountPaid: Number(b.amount_paid),
+              filenamePrefix: category,
+            })
+          }
+
           return (
             <div key={b.id} style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
@@ -198,7 +259,18 @@ function MyBookings() {
                   <p style={{ fontSize: '10px', color: COLORS.textMuted }}>Ticket Code</p>
                   <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{b.ticket_code || '—'}{b.assigned_unit_number ? ` · Seat ${b.assigned_unit_number}` : ''}</p>
                 </div>
-                <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.secondary }}>₦{Number(b.amount_paid).toLocaleString()}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.secondary }}>₦{Number(b.amount_paid).toLocaleString()}</p>
+                  <span
+                    onClick={handleDownloadReceipt}
+                    title="Download receipt"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px',
+                      borderRadius: '8px', background: COLORS.bg, border: `1px solid ${COLORS.border}`, cursor: 'pointer',
+                    }}>
+                    <Icon name="download" size={14} color={COLORS.primary} />
+                  </span>
+                </div>
               </div>
 
               {canCancel && (
