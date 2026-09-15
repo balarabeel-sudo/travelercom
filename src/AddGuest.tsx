@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { findAvailableUnit } from './inventoryUtils'
+import { DetailsSkeleton } from './LoadingSkeleton'
+import NetworkError from './NetworkError'
 
 const COLORS = {
   bg: '#F8FAFC',
@@ -31,11 +34,12 @@ const DETAIL_PLACEHOLDER: Record<string, string> = {
 }
 
 type ServiceOption = { id: string; title: string; category: string; commission_rate: number | null; price: number; photo_url: string | null }
-type InvType = { id: string; name: string; price: number; weekendPrice: number | null; holidayPrice: number | null; available: number; occupiedQuantity: number }
+type InvType = { id: string; name: string; price: number; weekendPrice: number | null; holidayPrice: number | null; available: number; availableFrom: string | null }
 
 export default function AddGuest() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [netError, setNetError] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [services, setServices] = useState<ServiceOption[]>([])
   const [serviceId, setServiceId] = useState('')
@@ -65,42 +69,46 @@ export default function AddGuest() {
   const [assignedUnitNumber, setAssignedUnitNumber] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
-  useEffect(() => {
-    const load = async () => {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) { navigate('/login'); return }
+  const load = async () => {
+    setNetError(false)
+    const { data: userData } = await supabase.auth.getUser()
+    if (!userData.user) { navigate('/login'); return }
 
-      const { data: company } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('owner_id', userData.user.id)
+    const { data: company, error: companyErr } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('owner_id', userData.user.id)
+      .maybeSingle()
+
+    if (companyErr) { setNetError(true); setLoading(false); return }
+
+    let resolvedCompanyId: string | null = company?.id || null
+    if (!resolvedCompanyId) {
+      const { data: staffRow } = await supabase
+        .from('company_staff')
+        .select('company_id')
+        .eq('user_id', userData.user.id)
+        .eq('status', 'active')
         .maybeSingle()
-
-      let resolvedCompanyId: string | null = company?.id || null
-      if (!resolvedCompanyId) {
-        const { data: staffRow } = await supabase
-          .from('company_staff')
-          .select('company_id')
-          .eq('user_id', userData.user.id)
-          .eq('status', 'active')
-          .maybeSingle()
-        if (staffRow) resolvedCompanyId = staffRow.company_id
-      }
-
-      if (!resolvedCompanyId) { setLoading(false); return }
-      setCompanyId(resolvedCompanyId)
-
-      const { data: serviceRows } = await supabase
-        .from('services')
-        .select('id, title, category, commission_rate, price, photo_url')
-        .eq('company_id', resolvedCompanyId)
-
-      setServices(serviceRows || [])
-      if (serviceRows && serviceRows.length > 0) setServiceId(serviceRows[0].id)
-      setLoading(false)
+      if (staffRow) resolvedCompanyId = staffRow.company_id
     }
-    load()
-  }, [navigate])
+
+    if (!resolvedCompanyId) { setLoading(false); return }
+    setCompanyId(resolvedCompanyId)
+
+    const { data: serviceRows, error: servicesErr } = await supabase
+      .from('services')
+      .select('id, title, category, commission_rate, price, photo_url')
+      .eq('company_id', resolvedCompanyId)
+
+    if (servicesErr) { setNetError(true); setLoading(false); return }
+
+    setServices(serviceRows || [])
+    if (serviceRows && serviceRows.length > 0) setServiceId(serviceRows[0].id)
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [navigate])
 
   const selectedService = services.find((s) => s.id === serviceId)
   const isHotel = selectedService?.category === 'hotel'
@@ -115,30 +123,39 @@ export default function AddGuest() {
 
       const { data: items } = await supabase
         .from('inventory_items')
-        .select('id, name, price, weekend_price, holiday_price, total_quantity, occupied_quantity, reserved_quantity')
+        .select('id, name, price, weekend_price, holiday_price, total_quantity')
         .eq('service_id', serviceId)
 
       if (items && items.length > 0) {
-        const itemIds = items.map((i) => i.id)
-        const { data: unitRows } = await supabase
-          .from('inventory_units')
-          .select('inventory_item_id, status')
-          .in('inventory_item_id', itemIds)
+        let mapped: InvType[]
 
-        const availCounts: Record<string, number> = {}
-        ;(unitRows || []).forEach((u: any) => {
-          if (u.status === 'available') availCounts[u.inventory_item_id] = (availCounts[u.inventory_item_id] || 0) + 1
-        })
+        if (isHotel && checkInDate && checkOutDate) {
+          mapped = await Promise.all(items.map(async (i: any) => {
+            const result = await findAvailableUnit(i.id, checkInDate, checkOutDate)
+            return {
+              id: i.id,
+              name: i.name,
+              price: Number(i.price) || 0,
+              weekendPrice: i.weekend_price !== null ? Number(i.weekend_price) : null,
+              holidayPrice: i.holiday_price !== null ? Number(i.holiday_price) : null,
+              available: result.available ? 1 : 0,
+              availableFrom: result.available ? null : result.availableFrom,
+            }
+          }))
+        } else {
+          // Dates not chosen yet (or not a hotel category) — the real check happens
+          // again at save time regardless, this is just so the list isn't empty.
+          mapped = items.map((i: any) => ({
+            id: i.id,
+            name: i.name,
+            price: Number(i.price) || 0,
+            weekendPrice: i.weekend_price !== null ? Number(i.weekend_price) : null,
+            holidayPrice: i.holiday_price !== null ? Number(i.holiday_price) : null,
+            available: 1,
+            availableFrom: null,
+          }))
+        }
 
-        const mapped: InvType[] = items.map((i: any) => ({
-          id: i.id,
-          name: i.name,
-          price: Number(i.price) || 0,
-          weekendPrice: i.weekend_price !== null ? Number(i.weekend_price) : null,
-          holidayPrice: i.holiday_price !== null ? Number(i.holiday_price) : null,
-          available: availCounts[i.id] || 0,
-          occupiedQuantity: i.occupied_quantity,
-        }))
         setInvTypes(mapped)
         setSelectedTypeId(mapped[0]?.id || null)
       } else {
@@ -163,7 +180,7 @@ export default function AddGuest() {
       setLoadingTypes(false)
     }
     loadTypesAndPromo()
-  }, [serviceId, companyId])
+  }, [serviceId, companyId, checkInDate, checkOutDate, isHotel])
 
   // keep checkout in sync with nights whenever check-in or nights changes
   useEffect(() => {
@@ -224,7 +241,30 @@ export default function AddGuest() {
 
     let assignedUnitId: string | null = null
     let assignedNumber = ''
-    if (selectedType) {
+
+    if (selectedType && isHotel) {
+      const { data: claimed, error: claimErr } = await supabase.rpc('claim_inventory_unit_for_dates', {
+        p_item_id: selectedType.id, p_check_in: checkInDate, p_check_out: checkOutDate,
+      })
+      if (claimErr) {
+        setSaving(false)
+        setErrorMsg('Could not check availability: ' + claimErr.message)
+        return
+      }
+      const claimedUnit = claimed?.[0]
+      if (!claimedUnit) {
+        setSaving(false)
+        const preview = await findAvailableUnit(selectedType.id, checkInDate, checkOutDate)
+        setErrorMsg(
+          !preview.available && preview.availableFrom
+            ? `No ${unitLabel.toLowerCase()} of this type free for these dates — the next one becomes available from ${new Date(preview.availableFrom).toLocaleDateString()}.`
+            : `No available ${unitLabel.toLowerCase()} of this type right now. Please pick a different type.`
+        )
+        return
+      }
+      assignedUnitId = claimedUnit.id
+      assignedNumber = claimedUnit.unit_number
+    } else if (selectedType) {
       const { data: freeUnit, error: freeUnitErr } = await supabase
         .from('inventory_units')
         .select('id, unit_number')
@@ -276,7 +316,7 @@ export default function AddGuest() {
       return
     }
 
-    if (assignedUnitId) {
+    if (assignedUnitId && !isHotel) {
       const { error: unitErr } = await supabase.from('inventory_units').update({ status: 'occupied', booking_id: newBooking?.id || null }).eq('id', assignedUnitId)
       if (unitErr) {
         // Booking already saved successfully -- don't block success on this,
@@ -300,8 +340,22 @@ export default function AddGuest() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
-        Loading...
+      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+        <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Guest</h1>
+        </div>
+        <DetailsSkeleton />
+      </div>
+    )
+  }
+
+  if (netError) {
+    return (
+      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+        <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Guest</h1>
+        </div>
+        <NetworkError onRetry={() => { setLoading(true); load() }} />
       </div>
     )
   }
@@ -357,6 +411,11 @@ export default function AddGuest() {
                     <span style={{ display: 'inline-block', marginTop: '5px', fontSize: '10.5px', fontWeight: 700, padding: '3px 9px', borderRadius: '7px', background: selectedType.available > 0 ? '#f0fdf4' : '#fef2f2', color: selectedType.available > 0 ? COLORS.green : COLORS.red }}>
                       {selectedType.available > 0 ? 'Available' : 'Not Available'}
                     </span>
+                  )}
+                  {usingTypes && selectedType && selectedType.available === 0 && selectedType.availableFrom && (
+                    <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '4px' }}>
+                      Next available from {new Date(selectedType.availableFrom).toLocaleDateString()}
+                    </p>
                   )}
                 </div>
                 <Icon name="chevronRight" size={18} color={COLORS.textMuted} />
