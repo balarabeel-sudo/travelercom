@@ -45,12 +45,11 @@ const AMENITY_ICON: Record<string, string> = {
   Catering: 'restaurant', 'Sound System': 'speaker', Seating: 'seat',
 }
 
-type Step = 'details' | 'guest' | 'dates' | 'payment' | 'summary'
-const STEP_ORDER: Step[] = ['details', 'guest', 'dates', 'payment', 'summary']
+type Step = 'details' | 'guest' | 'payment' | 'summary'
+const STEP_ORDER: Step[] = ['details', 'guest', 'payment', 'summary']
 const STEP_LABELS: { key: Step; label: string }[] = [
   { key: 'details', label: 'Hotel' },
   { key: 'guest', label: 'Guest' },
-  { key: 'dates', label: 'Stay' },
   { key: 'payment', label: 'Payment' },
   { key: 'summary', label: 'Review' },
 ]
@@ -294,9 +293,9 @@ function HotelDetails() {
     else setStep(STEP_ORDER[idx - 1])
   }
 
-  const canContinueFromDetails = usingRoomTypes
+  const canContinueFromDetails = nights > 0 && (usingRoomTypes
     ? !!selectedRoomTypeId && (service?.companies?.allow_unit_selection === false || !!selectedUnitId)
-    : true
+    : true)
 
   // Branded receipt image — built only from real confirmed booking data.
   const downloadReceipt = () => {
@@ -536,7 +535,6 @@ function HotelDetails() {
         <p style={{ fontSize: '17px', fontWeight: 800, marginTop: '10px' }}>
           {step === 'details' && 'Hotel Details'}
           {step === 'guest' && 'Guest Information'}
-          {step === 'dates' && 'Select Your Stay'}
           {step === 'payment' && 'Payment'}
           {step === 'summary' && 'Review & Confirm'}
         </p>
@@ -683,6 +681,57 @@ function HotelDetails() {
           )}
         </div>
 
+        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+          <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Select Your Stay</p>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: nights > 0 ? '10px' : 0 }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>Check-in</p>
+              <input
+                type="date"
+                value={checkInDate}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setCheckInDate(e.target.value)}
+                style={{ width: '100%', padding: '9px 10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, fontSize: '12.5px', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>Check-out</p>
+              <input
+                type="date"
+                value={checkOutDate}
+                min={checkInDate || new Date().toISOString().split('T')[0]}
+                onChange={(e) => setCheckOutDate(e.target.value)}
+                style={{ width: '100%', padding: '9px 10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, fontSize: '12.5px', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+          {checkOutDate && checkInDate && nights <= 0 && (
+            <p style={{ fontSize: '11.5px', color: COLORS.red }}>Check-out must be after check-in.</p>
+          )}
+          {activePromo && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px', background: '#F5F3FF',
+              border: '1px solid #DDD6FE', borderRadius: '8px', padding: '8px 10px', marginTop: '10px'
+            }}>
+              <span style={{ display: 'flex' }}><Icon name="tag" size={13} color="#6B21A8" /></span>
+              <p style={{ fontSize: '11.5px', fontWeight: 700, color: '#6B21A8' }}>
+                {activePromo.title} — {activePromo.discount_type === 'percentage' ? `${activePromo.discount_value}% OFF` : `₦${activePromo.discount_value.toLocaleString()} OFF`}
+              </p>
+            </div>
+          )}
+          {nights > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '10px', marginTop: '10px', borderTop: `1px solid ${COLORS.border}` }}>
+              <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>{nights} night{nights > 1 ? 's' : ''} × applicable rate</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {activePromo && (
+                  <span style={{ fontSize: '11.5px', color: COLORS.textMuted, textDecoration: 'line-through' }}>₦{calculatedTotal.toLocaleString()}</span>
+                )}
+                <span style={{ fontSize: '14px', fontWeight: 800, color: COLORS.primary }}>₦{discountedTotal.toLocaleString()}</span>
+              </span>
+            </div>
+          )}
+        </div>
+
         {usingRoomTypes ? (
           <div style={{ marginBottom: '16px' }}>
             <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Select a Room Type</p>
@@ -798,71 +847,12 @@ function HotelDetails() {
           <FormField label="Phone Number" value={gPhone} onChange={setGPhone} error={guestErrors.phone} placeholder="Enter your phone number" type="tel" last />
 
           <button
-            onClick={() => { if (validateGuest()) setStep('dates') }}
+            onClick={() => { if (validateGuest()) setStep('payment') }}
             style={{ width: '100%', padding: '15px', background: COLORS.secondary, color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' }}>
             Continue
           </button>
         </div>
       )}
-
-      {step === 'dates' && (<>
-        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: nights > 0 ? '10px' : 0 }}>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>Check-in</p>
-              <input
-                type="date"
-                value={checkInDate}
-                min={new Date().toISOString().split('T')[0]}
-                onChange={(e) => setCheckInDate(e.target.value)}
-                style={{ width: '100%', padding: '9px 10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, fontSize: '12.5px', boxSizing: 'border-box' }}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>Check-out</p>
-              <input
-                type="date"
-                value={checkOutDate}
-                min={checkInDate || new Date().toISOString().split('T')[0]}
-                onChange={(e) => setCheckOutDate(e.target.value)}
-                style={{ width: '100%', padding: '9px 10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, fontSize: '12.5px', boxSizing: 'border-box' }}
-              />
-            </div>
-          </div>
-          {checkOutDate && checkInDate && nights <= 0 && (
-            <p style={{ fontSize: '11.5px', color: COLORS.red, marginBottom: '8px' }}>Check-out must be after check-in.</p>
-          )}
-          {activePromo && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '6px', background: '#F5F3FF',
-              border: '1px solid #DDD6FE', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px'
-            }}>
-              <span style={{ display: 'flex' }}><Icon name="tag" size={13} color="#6B21A8" /></span>
-              <p style={{ fontSize: '11.5px', fontWeight: 700, color: '#6B21A8' }}>
-                {activePromo.title} — {activePromo.discount_type === 'percentage' ? `${activePromo.discount_value}% OFF` : `₦${activePromo.discount_value.toLocaleString()} OFF`}
-              </p>
-            </div>
-          )}
-          {nights > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '10px', borderTop: `1px solid ${COLORS.border}` }}>
-              <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>{nights} night{nights > 1 ? 's' : ''} × applicable rate</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {activePromo && (
-                  <span style={{ fontSize: '11.5px', color: COLORS.textMuted, textDecoration: 'line-through' }}>₦{calculatedTotal.toLocaleString()}</span>
-                )}
-                <span style={{ fontSize: '14px', fontWeight: 800, color: COLORS.primary }}>₦{discountedTotal.toLocaleString()}</span>
-              </span>
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={() => setStep('payment')}
-          disabled={nights <= 0}
-          style={{ width: '100%', padding: '15px', background: nights > 0 ? COLORS.secondary : '#94a3b8', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: nights > 0 ? 'pointer' : 'not-allowed' }}>
-          Continue
-        </button>
-      </>)}
 
       {step === 'payment' && (<>
         <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
