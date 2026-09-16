@@ -53,6 +53,8 @@ type Summary = {
   rejected_this_week: number
   suspended: number
   suspended_this_week: number
+  premium: number
+  premium_new_this_week: number
 }
 
 type ChipFilter = 'all' | 'pending' | 'verified' | 'rejected' | 'suspended'
@@ -349,6 +351,8 @@ export default function AdminCompanies() {
           delta={summary ? `${summary.rejected_this_week} this week` : undefined} deltaGood={false} icon="x" color={COLORS.red} bg={COLORS.redBg} />
         <StatCard label="Suspended" value={summary?.suspended ?? 0}
           delta={summary ? `${summary.suspended_this_week} this week` : undefined} deltaGood={false} icon="x" color={COLORS.purple} bg={COLORS.purpleBg} />
+        <StatCard label="Premium Companies" value={summary?.premium ?? 0}
+          delta={summary ? `↑ ${summary.premium_new_this_week} this week` : undefined} deltaGood icon="briefcase" color={COLORS.gold} bg={COLORS.goldBg} />
       </div>
 
       {/* Search */}
