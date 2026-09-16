@@ -17,6 +17,8 @@ const COLORS = {
   orangeBg: '#FFFBEB',
   purple: '#7c3aed',
   purpleBg: '#F5F3FF',
+  gold: '#B45309',
+  goldBg: '#FEF3C7',
 }
 
 type Company = {
@@ -30,6 +32,7 @@ type Company = {
   email: string | null
   description: string | null
   plan: string | null
+  plan_expires_at: string | null
   verification_status: string | null
   created_at: string
   bookings_count?: number
@@ -98,6 +101,16 @@ function StatusBadge({ status }: { status: string | null }) {
   return (
     <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 9px', borderRadius: '6px', background: s.bg, color: s.color, display: 'inline-block' }}>
       {s.label.toUpperCase()}
+    </span>
+  )
+}
+
+function PremiumBadge({ plan, expiresAt }: { plan: string | null; expiresAt?: string | null }) {
+  if (plan !== 'business_suite') return null
+  const title = expiresAt ? `Premium until ${new Date(expiresAt).toLocaleDateString()}` : 'Premium'
+  return (
+    <span title={title} style={{ fontSize: '10px', fontWeight: 700, padding: '4px 9px', borderRadius: '6px', background: COLORS.goldBg, color: COLORS.gold, display: 'inline-block' }}>
+      PREMIUM
     </span>
   )
 }
@@ -303,6 +316,7 @@ export default function AdminCompanies() {
           isDesktop={isDesktop}
           onBack={() => setViewingCompany(null)}
           onAction={(c) => setSelected(c)}
+          onPremiumChanged={fetchCompanies}
         />
       ) : (
       <>
@@ -382,7 +396,7 @@ export default function AdminCompanies() {
           <table style={{ width: '100%', borderCollapse: 'collapse' as const, minWidth: '760px' }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${COLORS.border}` }}>
-                {['Company', 'Business Type', 'Location', 'Status', 'Registered', 'Actions'].map((h) => (
+                {['Company', 'Business Type', 'Location', 'Status', 'Plan', 'Registered', 'Actions'].map((h) => (
                   <th key={h} style={{ textAlign: 'left' as const, padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const }}>{h}</th>
                 ))}
               </tr>
@@ -404,6 +418,7 @@ export default function AdminCompanies() {
                   <td style={{ padding: '12px 16px', fontSize: '12px', color: COLORS.text }}>{c.business_type || '—'}</td>
                   <td style={{ padding: '12px 16px', fontSize: '12px', color: COLORS.text }}>{c.city || 'No city set'}</td>
                   <td style={{ padding: '12px 16px' }}><StatusBadge status={c.verification_status} /></td>
+                  <td style={{ padding: '12px 16px' }}>{c.plan === 'business_suite' ? <PremiumBadge plan={c.plan} expiresAt={c.plan_expires_at} /> : <span style={{ fontSize: '12px', color: COLORS.textMuted }}>Free</span>}</td>
                   <td style={{ padding: '12px 16px', fontSize: '12px', color: COLORS.text }}>{new Date(c.created_at).toLocaleDateString()}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <button onClick={() => setSelected(c)}
@@ -439,6 +454,7 @@ export default function AdminCompanies() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '6px' }}>
                 <StatusBadge status={c.verification_status} />
+                <PremiumBadge plan={c.plan} expiresAt={c.plan_expires_at} />
                 <Icon name="arrowUpRight" size={13} color={COLORS.textMuted} />
               </div>
             </div>
@@ -482,6 +498,7 @@ export default function AdminCompanies() {
                 <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{selected.business_name}</p>
                 <div style={{ display: 'flex', gap: '6px', marginTop: '4px', alignItems: 'center' }}>
                   <StatusBadge status={selected.verification_status} />
+                  <PremiumBadge plan={selected.plan} expiresAt={selected.plan_expires_at} />
                   {selected.business_type && <span style={{ fontSize: '11px', color: COLORS.textMuted }}>{selected.business_type}</span>}
                 </div>
               </div>
@@ -695,18 +712,60 @@ function periodStartDate(key: string): Date | null {
 }
 
 function CompanyDetailsView({
-  company, isDesktop, onBack, onAction,
+  company, isDesktop, onBack, onAction, onPremiumChanged,
 }: {
   company: Company
   isDesktop: boolean
   onBack: () => void
   onAction: (c: Company) => void
+  onPremiumChanged: () => void
 }) {
   const [period, setPeriod] = useState('all')
   const [bookings, setBookings] = useState<{ id: string; amount_paid: number | null; booking_status: string | null; created_at: string }[]>([])
   const [refundsCount, setRefundsCount] = useState(0)
   const [activity, setActivity] = useState<{ id: string; action: string; module: string; created_at: string; actor_name?: string | null }[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Premium (free Business Suite) grant/revoke
+  const [localPlan, setLocalPlan] = useState(company.plan)
+  const [localExpiresAt, setLocalExpiresAt] = useState(company.plan_expires_at)
+  const [showPremiumForm, setShowPremiumForm] = useState(false)
+  const [premiumExpiryInput, setPremiumExpiryInput] = useState('')
+  const [premiumNoteInput, setPremiumNoteInput] = useState('')
+  const [premiumLoading, setPremiumLoading] = useState(false)
+  const [premiumError, setPremiumError] = useState('')
+
+  useEffect(() => {
+    setLocalPlan(company.plan)
+    setLocalExpiresAt(company.plan_expires_at)
+    setShowPremiumForm(false)
+    setPremiumError('')
+  }, [company.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const runPremiumAction = async (action: 'grant_premium' | 'revoke_premium') => {
+    if (action === 'grant_premium' && !premiumExpiryInput) {
+      setPremiumError('Please select an expiry date')
+      return
+    }
+    setPremiumLoading(true)
+    setPremiumError('')
+    const body: Record<string, unknown> = { action, target_company_id: company.id, note: premiumNoteInput || undefined }
+    if (action === 'grant_premium') {
+      body.expires_at = new Date(`${premiumExpiryInput}T23:59:59`).toISOString()
+    }
+    const { data, error } = await supabase.functions.invoke('admin-manage-companies', { body })
+    setPremiumLoading(false)
+    if (error || (data && data.error)) {
+      setPremiumError((data && data.error) || error?.message || 'Action failed')
+      return
+    }
+    setLocalPlan(action === 'grant_premium' ? 'business_suite' : 'free')
+    setLocalExpiresAt(action === 'grant_premium' ? (body.expires_at as string) : null)
+    setShowPremiumForm(false)
+    setPremiumNoteInput('')
+    setPremiumExpiryInput('')
+    onPremiumChanged()
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -779,6 +838,7 @@ function CompanyDetailsView({
             <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>{company.business_type || 'No type set'} · {company.city || 'No city set'}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
               <StatusBadge status={company.verification_status} />
+              <PremiumBadge plan={localPlan} expiresAt={localExpiresAt} />
               <span style={{ fontSize: '11px', color: COLORS.textMuted }}>Joined {new Date(company.created_at).toLocaleDateString()}</span>
             </div>
           </div>
@@ -848,6 +908,91 @@ function CompanyDetailsView({
             <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text, textAlign: 'right' as const, maxWidth: '60%' }}>{value}</span>
           </div>
         ))}
+      </div>
+
+      {/* Premium Access */}
+      <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text, marginBottom: '8px' }}>Premium Access</p>
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '14px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showPremiumForm ? '12px' : 0 }}>
+          <div>
+            <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>
+              {localPlan === 'business_suite' ? 'Premium (free grant) active' : 'On Free plan'}
+            </p>
+            {localPlan === 'business_suite' && localExpiresAt && (
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>
+                Expires {new Date(localExpiresAt).toLocaleDateString()}
+              </p>
+            )}
+            {localPlan !== 'business_suite' && (
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>
+                Grant this company free Business Suite access before real premium billing exists.
+              </p>
+            )}
+          </div>
+          {!showPremiumForm && (
+            localPlan === 'business_suite' ? (
+              <button onClick={() => setShowPremiumForm(true)}
+                style={{ padding: '9px 14px', background: COLORS.redBg, color: COLORS.red, border: `1px solid ${COLORS.red}`, borderRadius: '9px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
+                Revoke Premium
+              </button>
+            ) : (
+              <button onClick={() => setShowPremiumForm(true)}
+                style={{ padding: '9px 14px', background: COLORS.gold, color: 'white', border: 'none', borderRadius: '9px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
+                Grant Premium
+              </button>
+            )
+          )}
+        </div>
+
+        {premiumError && (
+          <div style={{ background: COLORS.redBg, borderRadius: '8px', padding: '9px 11px', marginBottom: '10px' }}>
+            <p style={{ fontSize: '11.5px', color: COLORS.red, fontWeight: 600 }}>{premiumError}</p>
+          </div>
+        )}
+
+        {showPremiumForm && (
+          <div>
+            {localPlan !== 'business_suite' && (
+              <div style={{ marginBottom: '10px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '5px', display: 'block' }}>Expires on *</label>
+                <input
+                  type="date"
+                  value={premiumExpiryInput}
+                  min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+                  onChange={(e) => setPremiumExpiryInput(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '13px', color: COLORS.text, boxSizing: 'border-box' as const, outline: 'none' }}
+                />
+              </div>
+            )}
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '5px', display: 'block' }}>
+                Note {localPlan === 'business_suite' ? '(reason for revoking)' : '(reason for granting)'}
+              </label>
+              <textarea
+                value={premiumNoteInput}
+                onChange={(e) => setPremiumNoteInput(e.target.value)}
+                placeholder="e.g. Partner promo, early-adopter incentive..."
+                rows={2}
+                style={{ width: '100%', padding: '10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, fontSize: '12.5px', resize: 'none' as const, fontFamily: 'inherit', boxSizing: 'border-box' as const, outline: 'none' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '9px' }}>
+              <button
+                onClick={() => runPremiumAction(localPlan === 'business_suite' ? 'revoke_premium' : 'grant_premium')}
+                disabled={premiumLoading}
+                style={{
+                  flex: 1, padding: '11px', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '12.5px', cursor: 'pointer', color: 'white', opacity: premiumLoading ? 0.7 : 1,
+                  background: localPlan === 'business_suite' ? COLORS.red : COLORS.gold,
+                }}>
+                {premiumLoading ? 'Working...' : localPlan === 'business_suite' ? 'Confirm Revoke' : 'Confirm Grant'}
+              </button>
+              <button onClick={() => { setShowPremiumForm(false); setPremiumError(''); setPremiumNoteInput(''); setPremiumExpiryInput('') }}
+                style={{ padding: '11px 16px', background: COLORS.bg, color: COLORS.text, border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontWeight: 'bold', fontSize: '12.5px', cursor: 'pointer' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Verification Documents */}
