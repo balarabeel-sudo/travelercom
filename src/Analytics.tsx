@@ -57,8 +57,78 @@ type Promo = {
   active: boolean
   services: { title: string } | null
 }
+import HotelAnalytics from './HotelAnalytics'
 
 export default function Analytics() {
+  const navigate = useNavigate()
+  const [resolving, setResolving] = useState(true)
+  const [companyId, setCompanyId] = useState<string | null>(null)
+  const [businessType, setBusinessType] = useState<string | null>(null)
+  const [isOwner, setIsOwner] = useState(false)
+
+  useEffect(() => {
+    const resolve = async () => {
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData.user) { navigate('/login'); return }
+
+      const { data: company } = await supabase
+        .from('companies')
+        .select('id, business_type')
+        .eq('owner_id', userData.user.id)
+        .maybeSingle()
+
+      let cId: string | null = company?.id || null
+      let bType: string | null = company?.business_type || null
+      const owner = !!company
+
+      if (!cId) {
+        const { data: staffRow } = await supabase
+          .from('company_staff')
+          .select('company_id, companies(business_type)')
+          .eq('user_id', userData.user.id)
+          .eq('status', 'active')
+          .maybeSingle()
+        if (staffRow) {
+          cId = staffRow.company_id
+          bType = (staffRow as any).companies?.business_type || null
+        }
+      }
+
+      setCompanyId(cId)
+      setBusinessType(bType)
+      setIsOwner(owner)
+      setResolving(false)
+    }
+    resolve()
+  }, [navigate])
+
+  if (resolving) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
+        Loading Analytics...
+      </div>
+    )
+  }
+
+  if (!companyId) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted, padding: '20px', textAlign: 'center' as const }}>
+        No company found for this account.
+      </div>
+    )
+  }
+
+  if (businessType === 'hotel') {
+    return <HotelAnalytics companyId={companyId} isOwner={isOwner} />
+  }
+
+  return <GenericAnalytics companyId={companyId} />
+}
+
+// Generic analytics view, used by every company type other than hotel
+// (bus/train/flight/tour/event_center), until each gets its own
+// category-specific analytics page.
+function GenericAnalytics({ companyId }: { companyId: string }) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -69,28 +139,6 @@ export default function Analytics() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) { navigate('/login'); return }
-
-      const { data: company } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('owner_id', userData.user.id)
-        .maybeSingle()
-
-      let companyId: string | null = company?.id || null
-      if (!companyId) {
-        const { data: staffRow } = await supabase
-          .from('company_staff')
-          .select('company_id')
-          .eq('user_id', userData.user.id)
-          .eq('status', 'active')
-          .maybeSingle()
-        if (staffRow) companyId = staffRow.company_id
-      }
-
-      if (!companyId) { setLoading(false); return }
-
       const { data: rows } = await supabase
         .from('bookings')
         .select('id, created_at, checked_in, check_out_date, booking_status, amount_paid, booking_source, payment_method, inventory_item_id, service_id, services(title), inventory_items(name)')
@@ -127,7 +175,7 @@ export default function Analytics() {
       setLoading(false)
     }
     load()
-  }, [navigate])
+  }, [companyId])
 
   if (loading) {
     return (
