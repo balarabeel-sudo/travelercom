@@ -128,7 +128,7 @@ function aggregateByDeparture(trips: Trip[], sold: Record<string, number>, bucke
 }
 
 // ---------- Main component ----------
-export default function TransportAnalytics({ companyId, isOwner }: { companyId: string; isOwner: boolean }) {
+export default function TransportAnalytics({ companyId, isOwner, category }: { companyId: string; isOwner: boolean; category: string }) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
@@ -163,7 +163,7 @@ export default function TransportAnalytics({ companyId, isOwner }: { companyId: 
       .from('services')
       .select('id, title, origin, destination, departure_time, arrival_time, price, capacity, seats_available, vehicle_info, status, created_at')
       .eq('company_id', companyId)
-      .eq('category', 'bus')
+      .eq('category', category)
       .order('departure_time', { ascending: false })
 
     if (tripErr) { setErrorMsg('Could not load trip data: ' + tripErr.message); setLoading(false); return }
@@ -180,7 +180,7 @@ export default function TransportAnalytics({ companyId, isOwner }: { companyId: 
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [companyId, isOwner]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [companyId, isOwner, category]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
