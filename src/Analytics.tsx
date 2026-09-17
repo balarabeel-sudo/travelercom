@@ -59,6 +59,8 @@ type Promo = {
 }
 import HotelAnalytics from './HotelAnalytics'
 import TransportAnalytics from './TransportAnalytics'
+import TourAnalytics from './TourAnalytics'
+import EventCenterAnalytics from './EventCenterAnalytics'
 
 export default function Analytics() {
   const navigate = useNavigate()
@@ -125,6 +127,14 @@ export default function Analytics() {
 
   if (businessType === 'bus' || businessType === 'train') {
     return <TransportAnalytics companyId={companyId} isOwner={isOwner} category={businessType} />
+  }
+
+  if (businessType === 'tour') {
+    return <TourAnalytics companyId={companyId} isOwner={isOwner} />
+  }
+
+  if (businessType === 'event_center') {
+    return <EventCenterAnalytics companyId={companyId} isOwner={isOwner} />
   }
 
   return <GenericAnalytics companyId={companyId} />
