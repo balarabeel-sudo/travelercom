@@ -2,7 +2,8 @@
 // (HotelAnalytics.tsx, TransportAnalytics.tsx, and future ones).
 // Keeping these in one place is what lets each category page reuse the
 // same professional trend-chart engine instead of rebuilding it.
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createChart, AreaSeries, ColorType, type IChartApi, type ISeriesApi } from 'lightweight-charts'
 
 export const COLORS = {
   primary: '#0EA5E9',
@@ -125,11 +126,21 @@ export function EmptyNote({ text }: { text: string }) {
   return <p style={{ fontSize: '12px', color: COLORS.textMuted, textAlign: 'center' as const, padding: '18px 0' }}>{text}</p>
 }
 
-// ---------- Trend chart (TradingView-style interaction: crosshair, tooltip, touch) ----------
-// Generic over any set of named metric series so every category page can
-// plug in its own metrics without rebuilding the chart engine.
+// ---------- Trend chart ----------
+// Built on TradingView's own `lightweight-charts` library (npm: lightweight-charts)
+// per Rabeel's explicit choice, instead of the earlier hand-built SVG version.
+// Note: the library's free/open-source usage requires keeping its small
+// attribution logo visible in the chart corner (layout.attributionLogo) —
+// this isn't optional styling, it's a license condition, so it's left on.
+function timeKey(d: Date) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function TrendChart({
-  buckets, series, allSeries, activeMetric, valueFormatter, renderTooltipRows,
+  buckets, series, activeMetric, valueFormatter, renderTooltipRows,
 }: {
   buckets: Bucket[]
   series: number[]
@@ -138,94 +149,91 @@ export function TrendChart({
   valueFormatter: (key: string, v: number) => string
   renderTooltipRows: (idx: number) => { label: string; value: string }[]
 }) {
-  const svgRef = useRef<SVGSVGElement>(null)
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const chartRef = useRef<IChartApi | null>(null)
+  const seriesRef = useRef<ISeriesApi<'Area'> | null>(null)
+  const timeIndexRef = useRef<Record<string, number>>({})
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; idx: number } | null>(null)
+
+  const hasData = buckets.length >= 2 && !series.every((v) => v === 0)
+
+  // Create the chart once.
+  useEffect(() => {
+    if (!containerRef.current) return
+    const chart = createChart(containerRef.current, {
+      width: containerRef.current.clientWidth,
+      height: 220,
+      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: COLORS.textMuted, fontSize: 10, attributionLogo: true },
+      grid: { vertLines: { visible: false }, horzLines: { color: COLORS.border, style: 1 } },
+      rightPriceScale: { borderColor: COLORS.border },
+      timeScale: { borderColor: COLORS.border, fixLeftEdge: true, fixRightEdge: true },
+      crosshair: {
+        vertLine: { color: COLORS.textMuted, width: 1, style: 2, labelVisible: false },
+        horzLine: { visible: false, labelVisible: false },
+      },
+      handleScroll: false,
+      handleScale: false,
+    })
+    const areaSeries = chart.addSeries(AreaSeries, {
+      lineColor: COLORS.primary,
+      topColor: 'rgba(14,165,233,0.28)',
+      bottomColor: 'rgba(14,165,233,0)',
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    })
+    chartRef.current = chart
+    seriesRef.current = areaSeries
+
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.point || !param.time) { setTooltip(null); return }
+      const idx = timeIndexRef.current[String(param.time)]
+      if (idx === undefined) { setTooltip(null); return }
+      setTooltip({ x: param.point.x, y: param.point.y, idx })
+    })
+
+    const ro = new ResizeObserver(() => {
+      if (containerRef.current) chart.resize(containerRef.current.clientWidth, 220)
+    })
+    ro.observe(containerRef.current)
+
+    return () => { ro.disconnect(); chart.remove(); chartRef.current = null; seriesRef.current = null }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Push new data whenever the buckets/series/metric change.
+  useEffect(() => {
+    if (!seriesRef.current || !chartRef.current || !hasData) return
+    const idxMap: Record<string, number> = {}
+    const points = buckets.map((bk, i) => {
+      const key = timeKey(bk.start)
+      idxMap[key] = i
+      return { time: key as any, value: series[i] }
+    })
+    timeIndexRef.current = idxMap
+    seriesRef.current.setData(points)
+    chartRef.current.applyOptions({
+      localization: { priceFormatter: (v: number) => valueFormatter(activeMetric, v) },
+    })
+    chartRef.current.timeScale().fitContent()
+    setTooltip(null)
+  }, [buckets, series, activeMetric, valueFormatter, hasData])
 
   if (buckets.length < 2) return <EmptyNote text="Not enough data to display this trend." />
-  if (series.every((v) => v === 0)) return <EmptyNote text="No data available for this period." />
-
-  const W = 340, H = 170, PAD_TOP = 16, PAD_BOTTOM = 26, PAD_LEFT = 4, PAD_RIGHT = 4
-  const plotW = W - PAD_LEFT - PAD_RIGHT
-  const plotH = H - PAD_TOP - PAD_BOTTOM
-  const n = series.length
-
-  const maxVal = Math.max(...series, activeMetric === 'occupancy' ? 100 : 1) * 1.08
-  const minVal = 0
-  const range = maxVal - minVal || 1
-
-  const xFor = (i: number) => PAD_LEFT + (n <= 1 ? 0 : (i / (n - 1)) * plotW)
-  const yFor = (v: number) => PAD_TOP + plotH - ((v - minVal) / range) * plotH
-
-  const linePoints = series.map((v, i) => `${xFor(i)},${yFor(v)}`).join(' ')
-  const areaPoints = `${xFor(0)},${yFor(minVal)} ${linePoints} ${xFor(n - 1)},${yFor(minVal)}`
-  const gridFracs = [0, 0.33, 0.66, 1]
-  const labelStep = Math.max(1, Math.ceil(n / 5))
-
-  const handlePointer = (clientX: number) => {
-    if (!svgRef.current) return
-    const rect = svgRef.current.getBoundingClientRect()
-    const relX = ((clientX - rect.left) / rect.width) * W
-    const t = Math.max(0, Math.min(1, (relX - PAD_LEFT) / plotW))
-    setHoverIdx(Math.round(t * (n - 1)))
-  }
-
-  const hi = hoverIdx !== null ? Math.max(0, Math.min(n - 1, hoverIdx)) : null
-  const leftPct = hi !== null ? (xFor(hi) / W) * 100 : 50
-  const tooltipTransform = leftPct < 18 ? 'translateX(0%)' : leftPct > 82 ? 'translateX(-100%)' : 'translateX(-50%)'
+  if (!hasData) return <EmptyNote text="No data available for this period." />
 
   return (
     <div style={{ position: 'relative' as const }}>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
-        width="100%"
-        height={H}
-        style={{ display: 'block', touchAction: 'pan-y' }}
-        onPointerMove={(e) => handlePointer(e.clientX)}
-        onPointerDown={(e) => { (e.target as Element).setPointerCapture?.(e.pointerId); handlePointer(e.clientX) }}
-        onPointerLeave={() => setHoverIdx(null)}
-      >
-        <defs>
-          <linearGradient id="analyticsTrendFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={COLORS.primary} stopOpacity="0.28" />
-            <stop offset="100%" stopColor={COLORS.primary} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {gridFracs.map((f) => {
-          const y = PAD_TOP + plotH * f
-          const val = maxVal - range * f
-          return (
-            <g key={f}>
-              <line x1={PAD_LEFT} x2={W - PAD_RIGHT} y1={y} y2={y} stroke={COLORS.border} strokeWidth="1" strokeDasharray="3,3" />
-              <text x={PAD_LEFT} y={y - 3} fontSize="8" fill={COLORS.textMuted}>{valueFormatter(activeMetric, val)}</text>
-            </g>
-          )
-        })}
-
-        {buckets.map((bk, i) => (
-          i % labelStep === 0 ? <text key={i} x={xFor(i)} y={H - 8} fontSize="8" fill={COLORS.textMuted} textAnchor="middle">{bk.label}</text> : null
-        ))}
-
-        <polygon points={areaPoints} fill="url(#analyticsTrendFill)" />
-        <polyline points={linePoints} fill="none" stroke={COLORS.primary} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-
-        {hi !== null && (
-          <g>
-            <line x1={xFor(hi)} x2={xFor(hi)} y1={PAD_TOP} y2={PAD_TOP + plotH} stroke={COLORS.textMuted} strokeWidth="1" strokeDasharray="2,2" />
-            <circle cx={xFor(hi)} cy={yFor(series[hi])} r="4" fill={COLORS.primary} stroke="white" strokeWidth="2" />
-          </g>
-        )}
-      </svg>
-
-      {hi !== null && (
+      <div ref={containerRef} style={{ width: '100%', touchAction: 'pan-y' }} />
+      {tooltip && (
         <div style={{
-          position: 'absolute' as const, top: '4px', left: `${leftPct}%`, transform: tooltipTransform,
+          position: 'absolute' as const, top: '4px',
+          left: `${Math.max(4, Math.min(66, (tooltip.x / (containerRef.current?.clientWidth || 340)) * 100))}%`,
+          transform: tooltip.x > (containerRef.current?.clientWidth || 340) * 0.66 ? 'translateX(-100%)' : 'translateX(0%)',
           background: COLORS.text, color: 'white', borderRadius: '9px', padding: '9px 11px', fontSize: '11px',
           minWidth: '132px', pointerEvents: 'none' as const, boxShadow: '0 6px 18px rgba(0,0,0,0.25)', zIndex: 5,
         }}>
-          <p style={{ fontWeight: 700, marginBottom: '5px', opacity: 0.85 }}>{buckets[hi].fullLabel}</p>
-          {renderTooltipRows(hi).map((row) => (
+          <p style={{ fontWeight: 700, marginBottom: '5px', opacity: 0.85 }}>{buckets[tooltip.idx].fullLabel}</p>
+          {renderTooltipRows(tooltip.idx).map((row) => (
             <p key={row.label}>{row.label}: <b>{row.value}</b></p>
           ))}
         </div>
