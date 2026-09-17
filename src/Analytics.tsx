@@ -58,6 +58,7 @@ type Promo = {
   services: { title: string } | null
 }
 import HotelAnalytics from './HotelAnalytics'
+import TransportAnalytics from './TransportAnalytics'
 
 export default function Analytics() {
   const navigate = useNavigate()
@@ -120,6 +121,10 @@ export default function Analytics() {
 
   if (businessType === 'hotel') {
     return <HotelAnalytics companyId={companyId} isOwner={isOwner} />
+  }
+
+  if (businessType === 'bus') {
+    return <TransportAnalytics companyId={companyId} isOwner={isOwner} />
   }
 
   return <GenericAnalytics companyId={companyId} />
