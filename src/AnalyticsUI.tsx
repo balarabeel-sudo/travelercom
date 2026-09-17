@@ -21,7 +21,6 @@ export const COLORS = {
   purple: '#7c3aed',
   purpleBg: '#F5F3FF',
 }
-
 export const DAY_MS = 86400000
 
 export function formatNaira(n: number) {
