@@ -123,8 +123,8 @@ export default function Analytics() {
     return <HotelAnalytics companyId={companyId} isOwner={isOwner} />
   }
 
-  if (businessType === 'bus') {
-    return <TransportAnalytics companyId={companyId} isOwner={isOwner} />
+  if (businessType === 'bus' || businessType === 'train') {
+    return <TransportAnalytics companyId={companyId} isOwner={isOwner} category={businessType} />
   }
 
   return <GenericAnalytics companyId={companyId} />
