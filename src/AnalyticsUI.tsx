@@ -21,6 +21,7 @@ export const COLORS = {
   purple: '#7c3aed',
   purpleBg: '#F5F3FF',
 }
+
 export const DAY_MS = 86400000
 
 export function formatNaira(n: number) {
@@ -38,6 +39,74 @@ export function pctChange(curr: number, prev: number) {
 }
 export function sum(arr: number[]) { return arr.reduce((a, b) => a + b, 0) }
 export function startOfDay(d: Date) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()) }
+
+// ---------- Shared "scheduled item" aggregation ----------
+// Used by any category where each services row is one bookable instance on
+// a specific date (bus/train trips, tour/event dates) rather than an
+// always-available listing (hotel rooms). Two deliberately different date
+// attributions: booking-creation-date for money/demand metrics, and the
+// item's own date (departure_time) for schedule/capacity metrics.
+export type AnalyticsBooking = { created_at: string; booking_status: string; amount_paid: number; quantity: number; service_id: string | null }
+export type AnalyticsItem = { id: string; departure_time: string | null; capacity: number | null; seats_available: number | null }
+
+export function bookedQtyMap(bookings: AnalyticsBooking[]): Record<string, number> {
+  const map: Record<string, number> = {}
+  bookings.forEach((b) => {
+    if (b.booking_status !== 'cancelled' && b.service_id) {
+      map[b.service_id] = (map[b.service_id] || 0) + (b.quantity || 1)
+    }
+  })
+  return map
+}
+// Capacity for one instance: its explicit capacity field if set, else what's
+// currently marked available plus whatever has already sold — a real,
+// data-derived total rather than an invented one, for listings created
+// before a capacity field was always required.
+export function itemCapacity(item: AnalyticsItem, sold: number) {
+  return item.capacity ?? ((item.seats_available || 0) + sold)
+}
+
+export function aggregateByCreated(bookings: AnalyticsBooking[], buckets: { start: Date; end: Date }[]) {
+  const n = buckets.length
+  const revenue = new Array(n).fill(0)
+  const bookingsCount = new Array(n).fill(0)
+  const units = new Array(n).fill(0) // passengers / participants / guests
+  const indexFor = (d: Date) => {
+    for (let i = 0; i < n; i++) if (d >= buckets[i].start && d < buckets[i].end) return i
+    return -1
+  }
+  bookings.forEach((b) => {
+    const idx = indexFor(new Date(b.created_at))
+    if (idx < 0) return
+    bookingsCount[idx] += 1
+    if (b.booking_status !== 'cancelled') {
+      revenue[idx] += Number(b.amount_paid) || 0
+      units[idx] += b.quantity || 1
+    }
+  })
+  return { revenue, bookingsCount, units }
+}
+
+export function aggregateByDeparture(items: AnalyticsItem[], sold: Record<string, number>, buckets: { start: Date; end: Date }[]) {
+  const n = buckets.length
+  const itemsCount = new Array(n).fill(0)
+  const unitsSold = new Array(n).fill(0)
+  const capacity = new Array(n).fill(0)
+  const indexFor = (d: Date) => {
+    for (let i = 0; i < n; i++) if (d >= buckets[i].start && d < buckets[i].end) return i
+    return -1
+  }
+  items.forEach((it) => {
+    if (!it.departure_time) return
+    const idx = indexFor(new Date(it.departure_time))
+    if (idx < 0) return
+    itemsCount[idx] += 1
+    const s = sold[it.id] || 0
+    unitsSold[idx] += s
+    capacity[idx] += itemCapacity(it, s)
+  })
+  return { itemsCount, unitsSold, capacity }
+}
 
 // ---------- Date range ----------
 export type RangeKey = 'today' | '7d' | '30d' | '3m' | '6m' | '1y'
