@@ -117,6 +117,11 @@ const NAV: NavGroup[] = [
 
 const ALL_ITEMS: NavItem[] = NAV.flatMap((g) => g.items)
 
+// Only sections with no real component wired up yet show "Coming Soon".
+// Keep this in sync with the sectionContent JSX below — every other
+// SectionKey must have a matching component there.
+const NO_COMPONENT_YET = new Set<SectionKey>(['notifications'])
+
 const SECTION_PERMISSION: Partial<Record<SectionKey, string | string[]>> = {
   users: 'users.view',
   companies: ['companies.view', 'verification.view'],
@@ -292,6 +297,99 @@ function SystemStatusRow({ label, status, note }: { label: string; status: 'chec
   )
 }
 
+type StaffRow = {
+  user_id: string
+  is_super_admin: boolean
+  suspended: boolean
+  role_name: string
+  full_name: string | null
+  email: string | null
+}
+
+function StaffOverviewCard() {
+  const [staff, setStaff] = useState<StaffRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      setError('')
+      const { data, error } = await supabase.rpc('staff_overview_directory')
+      if (error) setError(error.message)
+      else setStaff((data as StaffRow[]) || [])
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const total = staff.length
+  const active = staff.filter((s) => !s.suspended).length
+  const suspended = total - active
+  const roleCounts: Record<string, number> = {}
+  staff.forEach((s) => { roleCounts[s.role_name] = (roleCounts[s.role_name] || 0) + 1 })
+
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '18px' }}>
+      <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '14px' }}>Staff Overview</p>
+
+      {loading ? (
+        <p style={{ fontSize: '12px', color: COLORS.textMuted }}>Loading...</p>
+      ) : error ? (
+        <p style={{ fontSize: '12px', color: COLORS.red }}>{error}</p>
+      ) : total === 0 ? (
+        <p style={{ fontSize: '12px', color: COLORS.textMuted }}>No staff accounts yet.</p>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' as const }}>
+            <div style={{ flex: '1 1 28%', background: '#F8FAFC', borderRadius: '10px', padding: '10px' }}>
+              <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text }}>{total}</p>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Total Staff</p>
+            </div>
+            <div style={{ flex: '1 1 28%', background: '#F8FAFC', borderRadius: '10px', padding: '10px' }}>
+              <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.green }}>{active}</p>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Active</p>
+            </div>
+            <div style={{ flex: '1 1 28%', background: '#F8FAFC', borderRadius: '10px', padding: '10px' }}>
+              <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.red }}>{suspended}</p>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Suspended</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '6px', marginBottom: '14px' }}>
+            {Object.entries(roleCounts).map(([role, count]) => (
+              <span key={role} style={{ fontSize: '11px', fontWeight: 600, color: COLORS.primary, background: '#EFF6FF', padding: '4px 10px', borderRadius: '20px' }}>
+                {role} · {count}
+              </span>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2px', maxHeight: '280px', overflowY: 'auto' as const }}>
+            {staff.map((s) => {
+              const displayName = s.full_name || s.email || 'Unnamed'
+              return (
+                <div key={s.user_id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: `1px solid ${COLORS.border}` }}>
+                  <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: s.is_super_admin ? '#FBBF24' : COLORS.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px', fontWeight: 700, flexShrink: 0 }}>
+                    {displayName[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</p>
+                    <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{s.role_name}</p>
+                  </div>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: s.suspended ? COLORS.red : COLORS.green, display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: s.suspended ? COLORS.red : COLORS.green }} />
+                    {s.suspended ? 'Suspended' : 'Active'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function OverviewPanel() {
   const [data, setData] = useState<OverviewData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -390,6 +488,10 @@ function OverviewPanel() {
           <SystemStatusRow label="Authentication" status={authStatus} />
           <SystemStatusRow label="Payments (Paystack)" status="unmonitored" note="Needs a server-side check — not yet built" />
         </div>
+      </div>
+
+      <div style={{ marginTop: '16px' }}>
+        <StaffOverviewCard />
       </div>
     </div>
   )
@@ -514,7 +616,7 @@ function AdminDashboard() {
       {section === 'audit' && <AdminAuditLogs />}
       {section === 'settings' && <AdminSettings />}
       {section === 'approvals' && <AdminApprovals />}
-      {section !== 'overview' && section !== 'users' && section !== 'companies' && section !== 'bookings' && section !== 'reviews' && section !== 'finance' && section !== 'wallet' && section !== 'refunds' && section !== 'withdrawals' && section !== 'support' && section !== 'analytics' && section !== 'marketing' && section !== 'platform' && section !== 'staff' && section !== 'audit' && section !== 'settings' && section !== 'approvals' && <ComingSoonPanel label={currentLabel} />}
+      {NO_COMPONENT_YET.has(section) && <ComingSoonPanel label={currentLabel} />}
     </>
   )
 
