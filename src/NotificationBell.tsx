@@ -86,13 +86,13 @@ function NotificationBell({ iconColor = COLORS.text }: { iconColor?: string }) {
 
   useEffect(() => {
     if (!open) return
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         setOpen(false)
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('pointerdown', handleClickOutside)
+    return () => document.removeEventListener('pointerdown', handleClickOutside)
   }, [open])
 
   const handleItemClick = async (n: NotificationRow) => {
@@ -116,7 +116,7 @@ function NotificationBell({ iconColor = COLORS.text }: { iconColor?: string }) {
   return (
     <div style={{ position: 'relative' }}>
       <div
-        onClick={() => setOpen(o => !o)}
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }}
         style={{ cursor: 'pointer', display: 'flex', position: 'relative' }}>
         <Icon name="bell" size={19} color={iconColor} />
         {unreadCount > 0 && (
