@@ -96,6 +96,15 @@ const paths: Record<string, string> = {
   megaphone: 'M3 10v4a1 1 0 0 0 1 1h2l7 4V5L6 9H4a1 1 0 0 0-1 1ZM17 8a4 4 0 0 1 0 8',
   train: 'M4 15V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4Zm0 0h16M8 21l-2 2M16 21l2 2M8 6v5M16 6v5',
   userPlus: 'M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6',
+
+  // --- Added: referenced in Settings.tsx / Account.tsx / Login.tsx / CompanyMenu.tsx
+  chat: 'M4 4h16v12H8l-4 4V4Z',
+  creditCard: 'M2 6h20v4H2V6Zm0 4h20v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-9Zm3 6h6',
+  fileText: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6ZM14 2v6h6M9 13h6M9 17h6M9 9h2',
+  helpCircle: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-1.5-9a1.5 1.5 0 1 1 2.6 1c-.6.5-1.1.9-1.1 2M12 17h.01',
+  info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13h.01M11 11h1v6h1',
+  logOut: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+  settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.4-3a7.4 7.4 0 0 0-.1-1.2l2-1.6-2-3.4-2.3 1a7.4 7.4 0 0 0-2-1.2L14.6 3H9.4l-.4 2.6a7.4 7.4 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.6a7.4 7.4 0 0 0 0 2.4l-2 1.6 2 3.4 2.3-1a7.4 7.4 0 0 0 2 1.2l.4 2.6h5.2l.4-2.6a7.4 7.4 0 0 0 2-1.2l2.3 1 2-3.4-2-1.6a7.4 7.4 0 0 0 .1-1.2Z',
 }
 
 export default function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2, filled }: IconProps) {
