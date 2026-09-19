@@ -12,6 +12,7 @@ const DEDICATED_PATH: Record<string, string> = {
   bus: '/add-bus-listing',
   tour: '/add-tour-listing',
   event_center: '/add-event-center-listing',
+  vehicle_rental: '/add-vehicle-rental-listing',
 }
 
 function AddListingRouter() {
