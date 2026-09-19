@@ -1,105 +1,128 @@
-function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2, filled = false }: {
-  name: string; size?: number; color?: string; strokeWidth?: number; filled?: boolean
-}) {
-  const icons: Record<string, JSX.Element> = {
-    box: <><path d="M3 7l9-4 9 4-9 4-9-4z" /><path d="M3 7v10l9 4 9-4V7" /><path d="M12 11v10" /></>,
-    trendingUp: <><polyline points="3 17 9 11 13 15 21 7" /><polyline points="14 7 21 7 21 14" /></>,
-    clock: <><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></>,
-    checkCircle: <><circle cx="12" cy="12" r="9" /><polyline points="8 12 11 15 16 9" /></>,
-    clipboard: <><rect x="6" y="4" width="12" height="16" rx="2" /><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" /><path d="M9 10h6M9 14h6" /></>,
-    alertCircle: <><circle cx="12" cy="12" r="9" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>,
-    fileText: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 13h6M9 17h6" /></>,
-    plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
-    camera: <><path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" /><circle cx="12" cy="13" r="3.5" /></>,
-    wallet: <><path d="M3 7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v2h2a1 1 0 0 1 1 1v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M16 13h2" /></>,
-    logOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></>,
-    home: <><path d="M4 11l8-7 8 7" /><path d="M6 10v9a1 1 0 0 0 1 1h4v-6h2v6h4a1 1 0 0 0 1-1v-9" /></>,
-    calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /><path d="M8 3v4M16 3v4" /></>,
-    user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></>,
-    menu: <><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" /></>,
-    plusCircle: <><circle cx="12" cy="12" r="9" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></>,
-    bell: <><path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 12 6 8z" /><path d="M9.5 17a2.5 2.5 0 0 0 5 0" /></>,
-    helpCircle: <><circle cx="12" cy="12" r="9" /><path d="M9.2 9a2.8 2.8 0 0 1 5.4 1c0 1.8-2.4 2-2.4 3.7" /><line x1="12" y1="17" x2="12.01" y2="17" /></>,
-    settings: <><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" /></>,
-    shield: <><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" /></>,
-    info: <><circle cx="12" cy="12" r="9" /><line x1="12" y1="11" x2="12" y2="16" /><line x1="12" y1="8" x2="12.01" y2="8" /></>,
-    chevronRight: <><polyline points="9 6 15 12 9 18" /></>,
-    chevronDown: <><polyline points="6 9 12 15 18 9" /></>,
-    arrowLeft: <><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></>,
-    users: <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" /><circle cx="17" cy="9" r="2.6" /><path d="M15.5 14c2.2.3 3.8 1.9 3.8 5" /></>,
-    userPlus: <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" /><line x1="18" y1="8" x2="18" y2="14" /><line x1="15" y1="11" x2="21" y2="11" /></>,
-    barChart: <><line x1="5" y1="20" x2="5" y2="12" /><line x1="12" y1="20" x2="12" y2="7" /><line x1="19" y1="20" x2="19" y2="15" /></>,
-    megaphone: <><path d="M3 10v4a1 1 0 0 0 1 1h2l5 4V5l-5 4H4a1 1 0 0 0-1 1z" /><path d="M16 9a4 4 0 0 1 0 6" /></>,
-    star: <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1-5.4 3.1 1.3-6-4.6-4.1 6.1-.6z" fill={filled ? color : 'none'} />,
-    edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></>,
-    crown: <><path d="M3 8l4 3 5-6 5 6 4-3-2 10H5L3 8z" /><path d="M5 21h14" /></>,
-    moreHorizontal: <><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></>,
-    trash: <><path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" /></>,
-    minus: <><line x1="5" y1="12" x2="19" y2="12" /></>,
-    calendarX: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /><path d="M8 3v4M16 3v4" /><line x1="9" y1="15" x2="15" y2="19" /><line x1="15" y1="15" x2="9" y2="19" /></>,
-    // --- Added for emoji replacement across the app ---
-    hotel: <><path d="M3 21V6a1 1 0 0 1 1-1h5v16" /><path d="M15 21V9a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v12" /><path d="M9 21v-4a2 2 0 0 1 4 0v4" /><line x1="3" y1="21" x2="21" y2="21" /><line x1="6" y1="8" x2="6" y2="8.01" /><line x1="6" y1="11" x2="6" y2="11.01" /><line x1="6" y1="14" x2="6" y2="14.01" /></>,
-    bus: <><rect x="3" y="5" width="18" height="12" rx="2" /><line x1="3" y1="11" x2="21" y2="11" /><line x1="7" y1="19" x2="7" y2="21" /><line x1="17" y1="19" x2="17" y2="21" /><circle cx="7.5" cy="17" r="0.01" /><circle cx="16.5" cy="17" r="0.01" /></>,
-    train: <><rect x="6" y="3" width="12" height="13" rx="3" /><line x1="6" y1="10" x2="18" y2="10" /><line x1="9" y1="19" x2="7" y2="22" /><line x1="15" y1="19" x2="17" y2="22" /><circle cx="9" cy="13" r="0.01" /><circle cx="15" cy="13" r="0.01" /></>,
-    plane: <path d="M3 13l7-2 4-8 2 1-2 7 6 1v2l-6 1 2 7-2 1-4-8-7-2v-2z" />,
-    map: <><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" /><line x1="9" y1="4" x2="9" y2="18" /><line x1="15" y1="6" x2="15" y2="20" /></>,
-    tent: <><path d="M12 4l9 16H3z" /><path d="M12 4l5 16" /><path d="M12 4L7 20" /><line x1="9" y1="20" x2="15" y2="20" /></>,
-    heart: <path d="M12 20s-7-4.3-9.5-8.8C.8 8 2 4.5 5.5 4c2-.3 3.7.8 4.5 2.3C10.8 4.8 12.5 3.7 14.5 4 18 4.5 19.2 8 17.5 11.2 15 15.7 12 20 12 20z" fill={filled ? color : 'none'} />,
-    wifi: <><path d="M2 8.5a16 16 0 0 1 20 0" /><path d="M5.5 12a11 11 0 0 1 13 0" /><path d="M9 15.5a6 6 0 0 1 6 0" /><line x1="12" y1="19" x2="12.01" y2="19" /></>,
-    wifiOff: <><line x1="2" y1="2" x2="22" y2="22" /><path d="M8.5 16.5a6 6 0 0 1 7 0" /><path d="M5 12.5a11 11 0 0 1 3.5-2.5" /><path d="M19 12.5a11 11 0 0 0-2.5-2" /><path d="M2 8.5a16 16 0 0 1 5-3" /><path d="M22 8.5a16 16 0 0 0-8-4" /><line x1="12" y1="19" x2="12.01" y2="19" /></>,
-    search: <><circle cx="10.5" cy="10.5" r="6.5" /><line x1="20" y1="20" x2="15.3" y2="15.3" /></>,
-    filter: <path d="M3 4h18l-7 8v6l-4 2v-8z" />,
-    mapPin: <><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z" /><circle cx="12" cy="9" r="2.3" /></>,
-    phone: <path d="M5 3h3l1.5 4.5-2 2a13 13 0 0 0 6 6l2-2L20 15v3a1.5 1.5 0 0 1-1.6 1.5A16 16 0 0 1 3.5 4.6 1.5 1.5 0 0 1 5 3z" />,
-    mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><polyline points="3 7 12 13 21 7" /></>,
-    ticket: <><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.5a1.75 1.75 0 0 0 0 3V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3.5a1.75 1.75 0 0 0 0-3z" /><line x1="10" y1="7" x2="10" y2="17" strokeDasharray="2 2" /></>,
-    refresh: <><path d="M4 12a8 8 0 0 1 14-5.2M4 12a8 8 0 0 0 14 5.2" /><polyline points="18 3 18 7 14 7" /><polyline points="6 21 6 17 10 17" /></>,
-    headphones: <><path d="M4 14v-2a8 8 0 0 1 16 0v2" /><rect x="2" y="14" width="5" height="6" rx="1.5" /><rect x="17" y="14" width="5" height="6" rx="1.5" /></>,
-    creditCard: <><rect x="3" y="6" width="18" height="13" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="6" y1="15" x2="10" y2="15" /></>,
-    briefcase: <><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" /><line x1="3" y1="13" x2="21" y2="13" /></>,
-    sun: <><circle cx="12" cy="12" r="4.5" /><line x1="12" y1="2.5" x2="12" y2="5" /><line x1="12" y1="19" x2="12" y2="21.5" /><line x1="4.2" y1="4.2" x2="6" y2="6" /><line x1="18" y1="18" x2="19.8" y2="19.8" /><line x1="2.5" y1="12" x2="5" y2="12" /><line x1="19" y1="12" x2="21.5" y2="12" /><line x1="4.2" y1="19.8" x2="6" y2="18" /><line x1="18" y1="6" x2="19.8" y2="4.2" /></>,
-    luggage: <><rect x="5" y="8" width="14" height="13" rx="2" /><path d="M9 8V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v3" /><line x1="9" y1="12" x2="9" y2="17" /><line x1="15" y1="12" x2="15" y2="17" /></>,
-    check: <polyline points="5 13 10 18 19 6" />,
-    x: <><line x1="6" y1="6" x2="18" y2="18" /><line x1="6" y1="18" x2="18" y2="6" /></>,
-    eye: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></>,
-    eyeOff: <><path d="M3 3l18 18" /><path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c6 0 10 7 10 7a17.5 17.5 0 0 1-3.2 4.1" /><path d="M6.5 6.5C3.4 8.5 2 12 2 12s4 7 10 7c1.4 0 2.7-.3 3.9-.8" /><path d="M9.5 9.7a3 3 0 0 0 4.2 4.2" /></>,
-    snowflake: <><line x1="12" y1="2" x2="12" y2="22" /><line x1="4.5" y1="7" x2="19.5" y2="17" /><line x1="4.5" y1="17" x2="19.5" y2="7" /></>,
-    plug: <><path d="M9 2v6M15 2v6" /><path d="M6 8h12v4a6 6 0 0 1-12 0z" /><path d="M12 18v4" /></>,
-    food: <><rect x="3" y="6" width="18" height="14" rx="2" /><line x1="12" y1="6" x2="12" y2="20" /><line x1="3" y1="13" x2="21" y2="13" /></>,
-    seat: <><path d="M6 3v10a2 2 0 0 0 2 2h8" /><path d="M6 13H5a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h1" /><line x1="8" y1="20" x2="8" y2="16" /><line x1="16" y1="20" x2="16" y2="16" /></>,
-    toilet: <><path d="M6 4h8a1 1 0 0 1 1 1v3H5V5a1 1 0 0 1 1-1z" /><path d="M5 8h10l-1 4a4 4 0 0 1-8 0z" /><path d="M9 16v2M13 16v2" /><line x1="7" y1="20" x2="15" y2="20" /></>,
-    cash: <><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="3" /><line x1="6" y1="9" x2="6" y2="9.01" /><line x1="18" y1="15" x2="18" y2="15.01" /></>,
-    parking: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M9 16V7h3.5a3 3 0 0 1 0 6H9" /></>,
-    restaurant: <><path d="M6 2v7a2 2 0 0 0 4 0V2" /><line x1="8" y1="9" x2="8" y2="22" /><path d="M16 2v6a2 2 0 0 1-2 2h0v12" /></>,
-    pool: <><path d="M2 15c1.5-1.5 3-1.5 4.5 0s3 1.5 4.5 0 3-1.5 4.5 0 3 1.5 4.5 0" /><path d="M2 19.5c1.5-1.5 3-1.5 4.5 0s3 1.5 4.5 0 3-1.5 4.5 0 3 1.5 4.5 0" /><path d="M6 12V4a2 2 0 0 1 2-2h1" /><circle cx="15" cy="4" r="1.5" /></>,
-    gym: <><rect x="2" y="9" width="3" height="6" rx="1" /><rect x="19" y="9" width="3" height="6" rx="1" /><line x1="5" y1="12" x2="19" y2="12" /><rect x="6" y="7" width="2" height="10" rx="0.5" /><rect x="16" y="7" width="2" height="10" rx="0.5" /></>,
-    building: <><rect x="4" y="3" width="16" height="18" rx="1" /><line x1="8" y1="7" x2="8" y2="7.01" /><line x1="12" y1="7" x2="12" y2="7.01" /><line x1="16" y1="7" x2="16" y2="7.01" /><line x1="8" y1="11" x2="8" y2="11.01" /><line x1="12" y1="11" x2="12" y2="11.01" /><line x1="16" y1="11" x2="16" y2="11.01" /><line x1="8" y1="15" x2="8" y2="15.01" /><line x1="12" y1="15" x2="12" y2="15.01" /><line x1="16" y1="15" x2="16" y2="15.01" /><rect x="10" y="18" width="4" height="3" /></>,
-    laundry: <><circle cx="12" cy="13" r="6" /><circle cx="12" cy="13" r="3" /><circle cx="7" cy="6" r="0.7" /><circle cx="10" cy="6" r="0.7" /><line x1="4" y1="4" x2="20" y2="4" /></>,
-    coffee: <><path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z" /><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17" /><line x1="7" y1="3" x2="7" y2="5" /><line x1="10" y1="2.5" x2="10" y2="5" /></>,
-    tag: <><path d="M12 3h6a2 2 0 0 1 2 2v6l-9 9-8-8z" /><circle cx="15.5" cy="7.5" r="1.2" /></>,
-    compass: <><circle cx="12" cy="12" r="9" /><path d="M15 9l-2 6-4 2 2-6z" /></>,
-    van: <><path d="M2 15V8a1 1 0 0 1 1-1h11l4 4v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" /><circle cx="7" cy="16.5" r="1.7" /><circle cx="16.5" cy="16.5" r="1.7" /><line x1="13" y1="7" x2="13" y2="15" /></>,
-    speaker: <><rect x="6" y="2" width="12" height="20" rx="2" /><circle cx="12" cy="7" r="1.6" /><circle cx="12" cy="15" r="3.2" /></>,
-    mic: <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="8" y1="22" x2="16" y2="22" /></>,
-    rings: <><circle cx="9" cy="14" r="5" /><circle cx="15" cy="14" r="5" /></>,
-    party: <><path d="M3 21l6-2 11-11-4-4L5 15z" /><circle cx="18" cy="6" r="1" /><circle cx="15" cy="3" r="1" /><circle cx="20" cy="9" r="1" /></>,
-    image: <><rect x="3" y="4" width="18" height="15" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M21 15l-5-5-9 9" /></>,
-    square: <rect x="4" y="4" width="16" height="16" rx="2" />,
-    hourglass: <><path d="M6 2h12M6 22h12M6 2c0 6 6 8 6 10s-6 4-6 10M18 2c0 6-6 8-6 10s6 4 6 10" /></>,
-    chat: <path d="M4 4h16v12H8l-4 4z" />,
-    lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>,
-    bed: <><path d="M2 18v-6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h6a2 2 0 0 1 2 2v4" /><path d="M2 20v-2h20v2" /><circle cx="6" cy="12" r="1.5" /></>,
-    wrench: <path d="M21 3l-4 4-1-1 4-4a5 5 0 0 0-6.5 6.5L5 16l3 3 8.5-8.5A5 5 0 0 0 21 3z" />,
-    globe: <><circle cx="12" cy="12" r="9" /><line x1="3" y1="12" x2="21" y2="12" /><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z" /></>,
-    // --- Added for Business Suite upgrade page ---
-    contacts: <><rect x="2" y="5" width="20" height="14" rx="2" /><circle cx="9" cy="11" r="2.3" /><path d="M6 16c0-1.8 1.3-3 3-3s3 1.2 3 3" /><line x1="15" y1="9" x2="19" y2="9" /><line x1="15" y1="13" x2="19" y2="13" /></>,
-    download: <><path d="M12 3v12" /><polyline points="7 10 12 15 17 10" /><path d="M4 19h16" /></>,
+type IconProps = {
+  name: string
+  size?: number
+  color?: string
+  strokeWidth?: number
+  filled?: boolean
+}
+
+const paths: Record<string, string> = {
+  home: 'M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10',
+  cart: 'M3 3h2l.4 2M7 13h10l3-8H5.4M7 13L5.4 5M7 13l-1.3 4.3A1 1 0 0 0 6.7 19H18M9 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm9 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z',
+  building: 'M4 21V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v16M12 21v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6M8 7h.01M8 11h.01M8 15h.01M4 21h16',
+  robot: 'M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M5 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Zm3 5h.01M16 12h.01M9 17h6',
+  users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm11 10v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  tractor: 'M3 17a3 3 0 1 0 6 0 3 3 0 0 0-6 0Zm12 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0ZM6 17h6M9 17V9h4l3 4h2v4M9 9V5H6',
+  bookmark: 'M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z',
+  search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm10 2-4.35-4.35',
+  bell: 'M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9Zm-7 13a2 2 0 0 0 4 0',
+  message: 'M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z',
+  user: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+  heart: 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z',
+  comment: 'M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z',
+  share: 'M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13',
+  chevronRight: 'M9 18l6-6-6-6',
+  chevronLeft: 'M15 18l-6-6 6-6',
+  arrowLeft: 'M19 12H5M12 19l-7-7 7-7',
+  arrowRight: 'M5 12h14M12 5l7 7-7 7',
+  plus: 'M12 5v14M5 12h14',
+  close: 'M18 6 6 18M6 6l12 12',
+  edit: 'M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z',
+  lock: 'M5 11h14v10H5V11Zm3 0V7a4 4 0 0 1 8 0v4',
+  globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-9-9h18M12 3a14 14 0 0 1 4 9 14 14 0 0 1-4 9 14 14 0 0 1-4-9 14 14 0 0 1 4-9Z',
+  currency: 'M17 5H9.5a3.5 3.5 0 0 0 0 7h1a3.5 3.5 0 0 1 0 7H4M7 19h8M12 2v2M12 20v2',
+  moon: 'M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z',
+  crown: 'M3 8l4 4 5-7 5 7 4-4-2 11H5L3 8Zm2 13h14',
+  leaf: 'M11 20A7 7 0 0 1 4 13c0-6 7-11 15-11 0 8-5 15-11 15a7 7 0 0 1-6-3.5',
+  mapPin: 'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
+  star: 'M12 2l2.9 6.6L22 9.3l-5 4.9 1.2 7.2L12 17.8l-6.2 3.6L7 14.2 2 9.3l7.1-.7L12 2Z',
+  menu: 'M4 6h16M4 12h16M4 18h16',
+  wrench: 'M14.7 6.3a4 4 0 0 1 5 5l-6.1 6.1a2 2 0 0 1-2.8 0L4.6 11.2a2 2 0 0 1 0-2.8l6.1-6.1a4 4 0 0 1 4 4Z',
+  truck: 'M2 8h11v8H2V8Zm11 3h4l3 3v2h-7v-5Zm-8 8a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm11 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z',
+  seedling: 'M12 21v-8M12 13c0-4-3-7-7-7 0 4 3 7 7 7Zm0 0c0-5 3-9 8-9 0 5-3 9-8 9Z',
+  droplet: 'M12 2s6 7 6 12a6 6 0 0 1-12 0c0-5 6-12 6-12Z',
+  checkCircle: 'M22 11.1V12a10 10 0 1 1-6-9.2M22 4 12 14.1l-3-3',
+  filter: 'M4 4h16l-6 8v6l-4 2v-8L4 4Z',
+  camera: 'M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Zm8 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z',
+  send: 'M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z',
+  logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+  refresh: 'M23 4v6h-6M1 20v-6h6M3.5 9a9 9 0 0 1 15-4.5L23 9M1 15l4.5 4.5A9 9 0 0 0 20.5 15',
+  alertTriangle: 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01',
+
+  // --- Added: already referenced by existing listing/booking/payment UI
+  // (Hotel & Bus amenity icons, receipt rows, payment method icons) but
+  // missing from this file, so they were rendering as the fallback circle.
+  hotel: 'M3 18v-6a3 3 0 0 1 3-3h3a3 3 0 0 1 3 3M3 18v3M3 18h18M12 12h6a3 3 0 0 1 3 3v3M21 18v3M6 12V9a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v3',
+  trash: 'M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6h14ZM10 11v6M14 11v6',
+  x: 'M18 6 6 18M6 6l12 12',
+  check: 'M20 6 9 17l-5-5',
+  hourglass: 'M6 2h12M6 22h12M6 2c0 6 6 8 6 10s-6 4-6 10M18 2c0 6-6 8-6 10s6 4 6 10',
+  wifi: 'M5 12.6a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0M12 20h.01M2 8.8a15 15 0 0 1 20 0',
+  parking: 'M7 4v16M7 4h5a4 4 0 1 1 0 8H7',
+  restaurant: 'M6 2v8a2 2 0 0 0 4 0V2M8 10v12M16 2v20M16 2c-2 0-3 2-3 5s1 5 3 5',
+  pool: 'M2 18c1.5-1.5 3-1.5 4.5 0s3 1.5 4.5 0 3-1.5 4.5 0 3 1.5 4.5 0M2 12c1.5-1.5 3-1.5 4.5 0s3 1.5 4.5 0 3-1.5 4.5 0 3 1.5 4.5 0',
+  gym: 'M6 7v10M18 7v10M2 9v6M22 9v6M6 12h12',
+  laundry: 'M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm8 14a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z',
+  snowflake: 'M12 2v20M4.2 7l15.6 10M4.2 17 19.8 7',
+  coffee: 'M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8ZM6 1v3M10 1v3M14 1v3',
+  plane: 'M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z',
+  food: 'M11 2v20M11 2c-2 0-3 3-3 6s1 4 3 4M20 2v20M20 2c-3 1-4 4-4 8 0 2 1 3 2 3',
+  plug: 'M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0V8ZM12 18v4',
+  seat: 'M5 11V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v5M4 11h16v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6ZM6 18v3M18 18v3',
+  toilet: 'M5 12h14M7 12V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v7M7 12a5 5 0 0 0 10 0M9 22h6l1-5H8l1 5Z',
+  compass: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm2.5-13.5-2 5.5-5.5 2 2-5.5 5.5-2Z',
+  van: 'M2 9h13l4 4v5h-3M2 9v9h3M2 9V6h9l4 3M6 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm12 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
+  shield: 'M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4Z',
+  speaker: 'M9 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm3 15h.01M12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z',
+  wallet: 'M21 12V7H5a2 2 0 0 1 0-4h14v4M3 5v14a2 2 0 0 0 2 2h16v-5M18 12a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z',
+  cash: 'M4 6h16v12H4V6Zm8 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM4 10h.01M20 14h.01',
+
+  // --- Added: used by the new Vehicle Rental listing form and the Staff
+  // Overview panel.
+  car: 'M5 17h14M5 17a2 2 0 1 0 4 0M15 17a2 2 0 1 0 4 0M3 17v-4l2-5h14l2 5v4M5 8h14',
+  bluetooth: 'M7 7l10 10-5 5V2l5 5L7 17',
+  bus: 'M4 16V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10M4 16a2 2 0 0 0 2 2h1M4 16h16m0 0a2 2 0 0 1-2 2h-1M7 18v2M17 18v2M7 9h10',
+  map: 'M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3ZM9 3v15M15 6v15',
+  tent: 'M4 20 12 4l8 16M2 20h20M12 12l3 8H9l3-8Z',
+  ticket: 'M2 9a3 3 0 0 1 0 6v3a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3a3 3 0 0 1 0-6V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v3ZM13 5v14',
+  trendingUp: 'M23 6 13.5 15.5 8.5 10.5 1 18M17 6h6v6',
+
+  // --- Added: also referenced in Home.tsx (company stats icons, bottom nav)
+  barChart: 'M3 3v18h18M8 17V10M13 17V6M18 17v-4',
+  box: 'M21 8 12 3 3 8v8l9 5 9-5V8ZM3 8l9 5 9-5M12 13v8',
+  calendar: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z',
+  clipboard: 'M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1ZM6 4h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-14v5l3 3',
+  megaphone: 'M3 10v4a1 1 0 0 0 1 1h2l7 4V5L6 9H4a1 1 0 0 0-1 1ZM17 8a4 4 0 0 1 0 8',
+  train: 'M4 15V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4Zm0 0h16M8 21l-2 2M16 21l2 2M8 6v5M16 6v5',
+  userPlus: 'M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6',
+}
+
+export default function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2, filled }: IconProps) {
+  const d = paths[name]
+
+  if (!d) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth={strokeWidth} />
+      </svg>
+    )
   }
+
+  const shouldFill = filled ?? (name === 'heart' || name === 'star')
+
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-      {icons[name]}
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={d} fill={shouldFill ? color : 'none'} />
     </svg>
   )
 }
-
-export default Icon
