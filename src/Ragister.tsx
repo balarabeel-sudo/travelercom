@@ -12,6 +12,7 @@ const BUSINESS_TYPES = [
   { value: 'hotel', label: 'Hotel' },
   { value: 'tour', label: 'Travel Agency / Tours' },
   { value: 'event_center', label: 'Event Center' },
+  { value: 'vehicle_rental', label: 'Vehicle Rental' },
 ]
 
 function isEmailValid(email: string) {
