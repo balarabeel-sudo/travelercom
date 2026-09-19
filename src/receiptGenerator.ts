@@ -18,7 +18,7 @@ const WEBSITE = 'travelercom.vercel.app'
 export type ReceiptRow = { label: string; value: string; icon?: string }
 
 export type ReceiptData = {
-  category: 'hotel' | 'tour' | 'event_center' | 'bus' | 'train' | 'flight'
+  category: 'hotel' | 'tour' | 'event_center' | 'bus' | 'train' | 'flight' | 'vehicle_rental'
   serviceName: string
   serviceTypeLabel: string
   location: string
@@ -199,22 +199,35 @@ const drawTrain: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.08, () =
   ctx.beginPath(); ctx.arc(x + s * 0.66, y + s * 0.85, s * 0.09, 0, Math.PI * 2); ctx.stroke()
 })
 
+const drawCar: IconFn = (ctx, x, y, s, c) => withStroke(ctx, c, s * 0.08, () => {
+  ctx.beginPath()
+  ctx.moveTo(x + s * 0.1, y + s * 0.6)
+  ctx.lineTo(x + s * 0.22, y + s * 0.28)
+  ctx.lineTo(x + s * 0.78, y + s * 0.28)
+  ctx.lineTo(x + s * 0.9, y + s * 0.6)
+  ctx.stroke()
+  roundRect(ctx, x + s * 0.06, y + s * 0.55, s * 0.88, s * 0.28, s * 0.08); ctx.stroke()
+  ctx.beginPath(); ctx.arc(x + s * 0.26, y + s * 0.88, s * 0.1, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.arc(x + s * 0.74, y + s * 0.88, s * 0.1, 0, Math.PI * 2); ctx.stroke()
+})
+
 const ICON_MAP: Record<string, IconFn> = {
   person: drawPerson, mail: drawMail, phone: drawPhone, bed: drawBed, calendar: drawCalendar,
   moon: drawMoon, shield: drawShieldCheck, document: drawDocument, mapPin: drawMapPin,
   globe: drawGlobe, headset: drawHeadset, tent: drawTent, compass: drawCompass,
-  bus: drawBus, plane: drawPlane, train: drawTrain,
+  bus: drawBus, plane: drawPlane, train: drawTrain, car: drawCar,
 }
 
 const CATEGORY_ICON: Record<ReceiptData['category'], string> = {
-  hotel: 'bed', tour: 'compass', event_center: 'tent', bus: 'bus', train: 'train', flight: 'plane',
+  hotel: 'bed', tour: 'compass', event_center: 'tent', bus: 'bus', train: 'train', flight: 'plane', vehicle_rental: 'car',
 }
 
 // Best-effort icon per row label — purely cosmetic, falls back to a generic document icon if unmatched.
 function iconForLabel(label: string): string {
   const l = label.toLowerCase()
   if (l.includes('room') || l.includes('hall')) return 'bed'
-  if (l.includes('check-in') || l.includes('check-out') || l.includes('date') || l.includes('start') || l.includes('end')) return 'calendar'
+  if (l.includes('vehicle') || l.includes('plate') || l.includes('registration')) return 'car'
+  if (l.includes('check-in') || l.includes('check-out') || l.includes('date') || l.includes('start') || l.includes('end') || l.includes('pickup') || l.includes('return')) return 'calendar'
   if (l.includes('night')) return 'moon'
   if (l.includes('name') || l.includes('guest') || l.includes('customer')) return 'person'
   if (l.includes('email')) return 'mail'
