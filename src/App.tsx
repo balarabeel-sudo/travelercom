@@ -67,6 +67,9 @@ import Flights from './Flights'
 import Profile from './Profile'
 import AddListingRouter from './AddListingRouter'
 import AddBusListing from './AddBusListing'
+import AddVehicleRentalListing from './AddVehicleRentalListing'
+import VehicleRentals from './VehicleRentals'
+import VehicleRentalDetails from './VehicleRentalDetails'
 
 // Listens for the auth session created when an invited staff member clicks
 // their invite email link, and routes them to the Accept Invite page.
@@ -132,6 +135,7 @@ function App() {
         <Route path="/add-hotel-listing" element={<AddHotelListing />} />
         <Route path="/add-tour-listing" element={<AddTourListing />} />
         <Route path="/add-event-center-listing" element={<AddEventCenterListing />} />
+        <Route path="/add-vehicle-rental-listing" element={<AddVehicleRentalListing />} />
         <Route path="/my-listings" element={<MyListings />} />
         <Route path="/hotels" element={<Hotels />} />
         <Route path="/wallet" element={<Wallet />} />
@@ -165,6 +169,8 @@ function App() {
         <Route path="/flights" element={<Flights />} />
         <Route path="/flight/:id" element={<FlightDetails />} />
         <Route path="/bus" element={<Bus />} />
+        <Route path="/vehicle-rentals" element={<VehicleRentals />} />
+        <Route path="/vehicle-rentals/:id" element={<VehicleRentalDetails />} />
         <Route path="/bus/:id" element={<BusDetails />} />
         <Route path="/train" element={<Train />} />
         <Route path="/train/:id" element={<TrainDetails />} />
