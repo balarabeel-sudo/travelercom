@@ -62,6 +62,7 @@ import TransportAnalytics from './TransportAnalytics'
 import TourAnalytics from './TourAnalytics'
 import EventCenterAnalytics from './EventCenterAnalytics'
 import FlightAnalytics from './FlightAnalytics'
+import VehicleRentalAnalytics from './VehicleRentalAnalytics'
 
 export default function Analytics() {
   const navigate = useNavigate()
@@ -140,6 +141,10 @@ export default function Analytics() {
 
   if (businessType === 'event_center') {
     return <EventCenterAnalytics companyId={companyId} isOwner={isOwner} />
+  }
+
+  if (businessType === 'vehicle_rental') {
+    return <VehicleRentalAnalytics companyId={companyId} isOwner={isOwner} />
   }
 
   return <GenericAnalytics companyId={companyId} />
