@@ -18,6 +18,12 @@ const COLORS = {
 
 const CATEGORY_ROUTE: Record<string, (id: string) => string> = {
   hotel: (id) => `/hotels/${id}`,
+  bus: (id) => `/bus/${id}`,
+  train: (id) => `/train/${id}`,
+  flight: (id) => `/flight/${id}`,
+  tour: (id) => `/tour/${id}`,
+  event_center: (id) => `/event-center/${id}`,
+  vehicle_rental: (id) => `/vehicle-rentals/${id}`,
 }
 
 type Company = {
@@ -41,6 +47,11 @@ type ServiceRow = {
   photo_url: string | null
   category: string
   amenities: string[] | null
+}
+
+const CATEGORY_ICON: Record<string, string> = {
+  hotel: 'hotel', bus: 'bus', train: 'train', flight: 'plane', tour: 'tent',
+  event_center: 'party', vehicle_rental: 'car',
 }
 
 const AMENITY_ICON: Record<string, string> = {
@@ -153,7 +164,8 @@ export default function CompanyStorefront() {
   }
 
   const goToListing = (s: ServiceRow) => {
-    if (s.category === 'hotel') navigate(`/hotels/${s.id}`)
+    const route = CATEGORY_ROUTE[s.category]
+    if (route) navigate(route(s.id))
     else navigate(`/services/${s.category}/${s.id}`)
   }
 
@@ -264,7 +276,7 @@ export default function CompanyStorefront() {
               return (
                 <div key={s.id} style={{ background: COLORS.card, borderRadius: '14px', overflow: 'hidden', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex' }}>
                   <div style={{ width: '96px', height: '96px', flexShrink: 0, position: 'relative', background: s.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {s.photo_url ? <img src={s.photo_url} alt={s.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="hotel" size={26} color="white" />}
+                    {s.photo_url ? <img src={s.photo_url} alt={s.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name={CATEGORY_ICON[s.category] || 'box'} size={26} color="white" />}
                     {promo && (
                       <div style={{
                         position: 'absolute', top: '5px', left: '5px', background: COLORS.purple, color: 'white',
