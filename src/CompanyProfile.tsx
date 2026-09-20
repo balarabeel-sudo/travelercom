@@ -28,6 +28,7 @@ type Company = {
   address: string | null
   city: string | null
   cover_photo_url: string | null
+  logo_url: string | null
 }
 
 type ServiceRow = { id: string; title: string; price: number; photo_url: string | null; category: string }
@@ -60,6 +61,7 @@ export default function CompanyProfile() {
   const [city, setCity] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
 
   const load = async () => {
     const { data: userData } = await supabase.auth.getUser()
@@ -67,7 +69,7 @@ export default function CompanyProfile() {
 
     const { data: comp } = await supabase
       .from('companies')
-      .select('id, business_name, business_type, approval_status, plan, description, phone, email, address, city, cover_photo_url')
+      .select('id, business_name, business_type, approval_status, plan, description, phone, email, address, city, cover_photo_url, logo_url')
       .eq('owner_id', userData.user.id)
       .maybeSingle()
 
@@ -122,6 +124,21 @@ export default function CompanyProfile() {
       load()
     }
     setUploadingCover(false)
+  }
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !company) return
+    setUploadingLogo(true)
+    const fileExt = file.name.split('.').pop()
+    const filePath = `logos/${company.id}-${Date.now()}.${fileExt}`
+    const { error: uploadError } = await supabase.storage.from('listing-photos').upload(filePath, file)
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage.from('listing-photos').getPublicUrl(filePath)
+      await supabase.from('companies').update({ logo_url: urlData.publicUrl }).eq('id', company.id)
+      load()
+    }
+    setUploadingLogo(false)
   }
 
   const saveProfile = async () => {
@@ -199,9 +216,26 @@ export default function CompanyProfile() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
           <div style={{
             width: '64px', height: '64px', borderRadius: '16px', background: COLORS.secondary,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', fontWeight: 800, color: 'white', flexShrink: 0
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', fontWeight: 800, color: 'white',
+            flexShrink: 0, position: 'relative', overflow: 'hidden'
           }}>
-            {company.business_name.charAt(0).toUpperCase()}
+            {company.logo_url ? (
+              <img src={company.logo_url} alt={company.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              company.business_name.charAt(0).toUpperCase()
+            )}
+            <label style={{
+              position: 'absolute', bottom: 0, right: 0, width: '22px', height: '22px', borderRadius: '50%',
+              background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+            }}>
+              <Icon name="edit" size={11} color="white" />
+              <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} disabled={uploadingLogo} />
+            </label>
+            {uploadingLogo && (
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: 700, textAlign: 'center' as const }}>
+                Uploading...
+              </div>
+            )}
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
