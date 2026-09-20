@@ -6,6 +6,7 @@ import NotificationBell from './NotificationBell'
 import AdminUsers from './AdminUsers'
 import AdminCompanies from './AdminCompanies'
 import AdminHotels from './AdminHotels'
+import AdminVehicleRentals from './AdminVehicleRentals'
 import AdminTransport from './AdminTransport'
 import AdminFlights from './AdminFlights'
 import AdminTours from './AdminTours'
@@ -41,7 +42,7 @@ const COLORS = {
 }
 
 type SectionKey =
-  | 'overview' | 'users' | 'companies' | 'hotels' | 'transport' | 'flights' | 'tours' | 'events' | 'bookings' | 'reviews'
+  | 'overview' | 'users' | 'companies' | 'hotels' | 'transport' | 'flights' | 'tours' | 'events' | 'vehicle_rental' | 'bookings' | 'reviews'
   | 'finance' | 'wallet' | 'refunds' | 'withdrawals' | 'approvals'
   | 'support' | 'analytics' | 'marketing'
   | 'platform' | 'staff' | 'audit' | 'notifications' | 'settings'
@@ -60,6 +61,7 @@ const NAV: NavGroup[] = [
       { key: 'flights', label: 'Flights', icon: 'plane' },
       { key: 'tours', label: 'Tours', icon: 'map' },
       { key: 'events', label: 'Event Centers', icon: 'tent' },
+      { key: 'vehicle_rental', label: 'Vehicle Rental', icon: 'car' },
       { key: 'bookings', label: 'Bookings', icon: 'ticket' },
       { key: 'reviews', label: 'Reviews & Ratings', icon: 'star' },
     ]
@@ -106,6 +108,7 @@ const SECTION_PERMISSION: Partial<Record<SectionKey, string | string[]>> = {
   flights: ['companies.view', 'verification.view'],
   tours: ['companies.view', 'verification.view'],
   events: ['companies.view', 'verification.view'],
+  vehicle_rental: ['companies.view', 'verification.view'],
   bookings: 'bookings.view',
   reviews: 'reviews.manage',
   finance: 'finance.view',
@@ -241,6 +244,7 @@ function AdminDashboard() {
       {section === 'users' && <AdminUsers />}
       {section === 'companies' && <AdminCompanies />}
       {section === 'hotels' && <AdminHotels />}
+      {section === 'vehicle_rental' && <AdminVehicleRentals />}
       {section === 'transport' && <AdminTransport />}
       {section === 'flights' && <AdminFlights />}
       {section === 'tours' && <AdminTours />}
