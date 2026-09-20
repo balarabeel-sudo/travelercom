@@ -111,6 +111,8 @@ const paths: Record<string, string> = {
   premium: 'M3 8l4 4 5-7 5 7 4-4-2 11H5L3 8Zm2 13h14M8 15h8',
   eye: 'M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Zm11 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
   eyeOff: 'M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 11 7 11 7a13.2 13.2 0 0 1-3.4 4.2M6.6 6.6C3.7 8.4 2 12 2 12s2.5 4.5 7.1 6.3M14.1 14.1 9.9 9.9',
+  arrowUpRight: 'M7 17 17 7M7 7h10v10',
+  minus: 'M5 12h14',
 }
 
 export default function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2, filled }: IconProps) {
