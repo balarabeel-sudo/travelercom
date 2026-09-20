@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import { downloadReceiptImage } from './receiptGenerator'
-import { findAvailableUnit } from './inventoryUtils'
 import { DetailsSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
 
@@ -54,6 +53,8 @@ const STEP_LABELS: { key: Step; label: string }[] = [
   { key: 'summary', label: 'Review' },
 ]
 
+type AvailableUnit = { id: string; unit_number: string }
+
 type RoomType = {
   id: string
   name: string
@@ -62,6 +63,7 @@ type RoomType = {
   holidayPrice: number | null
   available: number
   availableFrom: string | null
+  availableUnits: AvailableUnit[]
 }
 
 function generateTicketCode(prefix: string) {
@@ -81,6 +83,7 @@ function HotelDetails() {
 
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<string | null>(null)
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
   const [holidayDates, setHolidayDates] = useState<string[]>([])
   const [checkInDate, setCheckInDate] = useState('')
   const [checkOutDate, setCheckOutDate] = useState('')
@@ -187,8 +190,11 @@ function HotelDetails() {
           price: Number(i.price) || 0,
           weekendPrice: i.weekend_price !== null ? Number(i.weekend_price) : null,
           holidayPrice: i.holiday_price !== null ? Number(i.holiday_price) : null,
-          available: 1,
+          // Real availability isn't known until the customer picks check-in/check-out —
+          // left empty here, filled in by the recomputeAvailability effect below.
+          available: 0,
           availableFrom: null,
+          availableUnits: [],
         }))
         setRoomTypes(mapped)
 
@@ -209,20 +215,29 @@ function HotelDetails() {
   const usingRoomTypes = roomTypes.length > 0
   const selectedRoom = roomTypes.find((r) => r.id === selectedRoomTypeId)
 
-  // Recompute each room type's availability once the customer has picked dates —
-  // a type shown as "available" before dates are chosen may turn out fully booked
-  // for those specific dates, or vice versa.
+  // Recompute each room type's real availability once the customer has picked
+  // dates — a type shown as "available" before dates are chosen may turn out
+  // fully booked for those specific dates, or vice versa. Also clears any
+  // previously chosen specific room, since the old pick may no longer be valid.
   useEffect(() => {
     const recomputeAvailability = async () => {
-      if (!checkInDate || !checkOutDate || roomTypes.length === 0) return
+      if (!checkInDate || !checkOutDate || checkOutDate <= checkInDate || roomTypes.length === 0) return
       const updated = await Promise.all(roomTypes.map(async (r) => {
-        const result = await findAvailableUnit(r.id, checkInDate, checkOutDate)
-        return { ...r, available: result.available ? 1 : 0, availableFrom: result.available ? null : result.availableFrom }
+        const { data } = await supabase.rpc('list_available_units_for_dates', {
+          p_item_id: r.id, p_check_in: checkInDate, p_check_out: checkOutDate,
+        })
+        const units: AvailableUnit[] = data || []
+        return { ...r, available: units.length, availableUnits: units, availableFrom: null }
       }))
       setRoomTypes(updated)
+      setSelectedUnitId(null)
     }
     recomputeAvailability()
   }, [checkInDate, checkOutDate])
+
+  // If the customer changes room type after already picking a specific room
+  // number, that pick no longer applies to the new type.
+  useEffect(() => { setSelectedUnitId(null) }, [selectedRoomTypeId])
 
   const nights = (() => {
     if (!checkInDate || !checkOutDate) return 0
@@ -231,6 +246,11 @@ function HotelDetails() {
     const diff = Math.round((outD.getTime() - inD.getTime()) / 86400000)
     return diff > 0 ? diff : 0
   })()
+
+  const datesChosen = !!checkInDate && !!checkOutDate && nights > 0
+  const allowUnitSelection = !!service?.companies?.allow_unit_selection
+  const noRoomsForDates = usingRoomTypes && datesChosen && roomTypes.every((r) => r.available === 0)
+  const selectedUnit = selectedRoom?.availableUnits.find((u) => u.id === selectedUnitId) || null
 
   const priceForDate = (dateStr: string): number => {
     if (!selectedRoom) return 0
@@ -277,7 +297,9 @@ function HotelDetails() {
     else setStep(STEP_ORDER[idx - 1])
   }
 
-  const canContinueFromDetails = nights > 0 && (usingRoomTypes ? !!selectedRoomTypeId : true)
+  const canContinueFromDetails = nights > 0 && (usingRoomTypes
+    ? !!selectedRoomTypeId && (!allowUnitSelection || !!selectedUnitId)
+    : true)
 
   // Branded receipt image — built only from real confirmed booking data.
   const downloadReceipt = () => {
@@ -294,6 +316,7 @@ function HotelDetails() {
       filenamePrefix: 'Hotel',
       rows: [
         { label: 'Room Type', value: selectedRoom?.name || 'Standard' },
+        ...(assignedUnitNumber ? [{ label: 'Room Number', value: assignedUnitNumber }] : []),
         { label: 'Check-in', value: checkInDate },
         { label: 'Check-out', value: checkOutDate },
         { label: 'Nights', value: String(nights) },
@@ -330,15 +353,25 @@ function HotelDetails() {
     let assignedNumber = ''
 
     if (selectedRoom) {
-      const { data: claimedRows } = await supabase.rpc('claim_inventory_unit_for_dates', {
-        p_item_id: selectedRoom.id, p_check_in: checkInDate, p_check_out: checkOutDate,
-      })
+      const { data: claimedRows } = selectedUnitId
+        ? await supabase.rpc('claim_specific_unit_for_dates', {
+            p_unit_id: selectedUnitId, p_check_in: checkInDate, p_check_out: checkOutDate,
+          })
+        : await supabase.rpc('claim_inventory_unit_for_dates', {
+            p_item_id: selectedRoom.id, p_check_in: checkInDate, p_check_out: checkOutDate,
+          })
       const claimed = claimedRows && claimedRows.length > 0 ? claimedRows[0] : null
 
       if (!claimed) {
         setBooking(false)
-        setRoomTypes((prev) => prev.map((r) => r.id === selectedRoom.id ? { ...r, available: 0 } : r))
-        setMessage({ type: 'error', text: 'No available rooms for your check-in dates. Please try different dates or another room type.' })
+        setRoomTypes((prev) => prev.map((r) => r.id === selectedRoom.id ? { ...r, available: 0, availableUnits: [] } : r))
+        setSelectedUnitId(null)
+        setMessage({
+          type: 'error',
+          text: selectedUnitId
+            ? 'That room was just booked by someone else. Please choose another room or different dates.'
+            : 'No available rooms for your check-in dates. Please try different dates or another room type.',
+        })
         return
       }
       assignedUnitId = claimed.id
@@ -712,8 +745,27 @@ function HotelDetails() {
         {usingRoomTypes ? (
           <div style={{ marginBottom: '16px' }}>
             <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Select a Room Type</p>
+
+            {!datesChosen && (
+              <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '10px' }}>
+                Pick your check-in and check-out dates above to see real availability.
+              </p>
+            )}
+
+            {noRoomsForDates && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2',
+                border: '1px solid #fca5a5', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px',
+              }}>
+                <Icon name="x" size={14} color={COLORS.red} />
+                <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.red }}>
+                  No rooms available for these dates. Please try a different check-in date.
+                </p>
+              </div>
+            )}
+
             {roomTypes.map((room) => {
-              const isAvailable = room.available > 0
+              const isAvailable = !datesChosen || room.available > 0
               const isSelected = selectedRoomTypeId === room.id
               return (
                 <div
@@ -728,26 +780,52 @@ function HotelDetails() {
                     boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
                     cursor: isAvailable ? 'pointer' : 'not-allowed',
                     opacity: isAvailable ? 1 : 0.5,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
                   }}>
-                  <div>
-                    <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>{room.name}</p>
-                    <p style={{ fontSize: '13px', color: COLORS.primary, fontWeight: 700, marginTop: '2px' }}>₦{room.price.toLocaleString()}</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>{room.name}</p>
+                      <p style={{ fontSize: '13px', color: COLORS.primary, fontWeight: 700, marginTop: '2px' }}>₦{room.price.toLocaleString()}</p>
+                    </div>
+                    {datesChosen && (
+                      <span style={{
+                        fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px',
+                        background: isAvailable ? '#f0fdf4' : '#fef2f2',
+                        color: isAvailable ? COLORS.green : COLORS.red
+                      }}>
+                        {isAvailable ? `${room.available} room${room.available > 1 ? 's' : ''} available` : 'Not Available'}
+                      </span>
+                    )}
                   </div>
-                  <span style={{
-                    fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px',
-                    background: isAvailable ? '#f0fdf4' : '#fef2f2',
-                    color: isAvailable ? COLORS.green : COLORS.red
-                  }}>
-                    {isAvailable ? 'Available' : 'Not Available'}
-                  </span>
+
+                  {isSelected && datesChosen && isAvailable && allowUnitSelection && (
+                    <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${COLORS.border}` }} onClick={(e) => e.stopPropagation()}>
+                      <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '8px' }}>Choose your room</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+                        {room.availableUnits.map((unit) => {
+                          const unitSelected = selectedUnitId === unit.id
+                          return (
+                            <span
+                              key={unit.id}
+                              onClick={() => setSelectedUnitId(unit.id)}
+                              style={{
+                                fontSize: '12.5px', fontWeight: 700, padding: '7px 14px', borderRadius: '9px',
+                                border: `2px solid ${unitSelected ? COLORS.primary : COLORS.border}`,
+                                background: unitSelected ? COLORS.primary : COLORS.card,
+                                color: unitSelected ? 'white' : COLORS.text,
+                                cursor: 'pointer',
+                              }}>
+                              Room {unit.unit_number}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
 
-            {selectedRoom && (
+            {selectedRoom && datesChosen && !allowUnitSelection && selectedRoom.available > 0 && (
               <p style={{ fontSize: '11.5px', color: COLORS.textMuted, fontStyle: 'italic' as const, marginTop: '4px' }}>
                 A room will be assigned automatically when you complete your booking.
               </p>
@@ -868,6 +946,7 @@ function HotelDetails() {
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Room</p>
             <SummaryRow label="Room type" value={selectedRoom?.name || 'Standard'} />
+            {selectedUnit && <SummaryRow label="Room number" value={selectedUnit.unit_number} />}
           </div>
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase' as const, marginBottom: '6px' }}>Guest</p>
