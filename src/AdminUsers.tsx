@@ -207,7 +207,7 @@ export default function AdminUsers() {
 
   useEffect(() => { setPage(1) }, [chip, search, pageSize])
 
-  const runAction = async (action: 'suspend' | 'restore', reason?: string) => {
+  const runAction = async (action: 'suspend' | 'restore' | 'delete', reason?: string) => {
     if (!selected) return
     setActionLoading(true)
     setActionError('')
@@ -510,6 +510,22 @@ export default function AdminUsers() {
                 onClick={() => setShowReasonBox(true)}
                 style={{ width: '100%', padding: '13px', background: COLORS.redBg, color: COLORS.red, border: `1px solid ${COLORS.red}`, borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer', marginBottom: '10px' }}>
                 Suspend User
+              </button>
+            )}
+
+            {!showReasonBox && (
+              <button
+                onClick={() => {
+                  const companyWarning = selected.account_type === 'company'
+                    ? '\n\nThis account owns a company — deleting it will PERMANENTLY delete that company and everything under it (listings, bookings, staff records).'
+                    : ''
+                  if (window.confirm(`Permanently delete ${selected.full_name || selected.email || 'this user'}? This cannot be undone.${companyWarning}`)) {
+                    runAction('delete')
+                  }
+                }}
+                disabled={actionLoading}
+                style={{ width: '100%', padding: '13px', background: 'white', color: COLORS.red, border: `1.5px solid ${COLORS.red}`, borderRadius: '10px', fontWeight: 'bold', fontSize: '13.5px', cursor: 'pointer', marginBottom: '10px', opacity: actionLoading ? 0.7 : 1 }}>
+                {actionLoading ? 'Please wait...' : 'Delete User'}
               </button>
             )}
 
