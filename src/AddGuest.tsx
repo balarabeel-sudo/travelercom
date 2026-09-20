@@ -20,10 +20,10 @@ const COLORS = {
 }
 
 const PREFIX_MAP: Record<string, string> = {
-  hotel: 'HTL', bus: 'BUS', train: 'TRN', flight: 'ALN', tour: 'TUR', event_center: 'EVT',
+  hotel: 'HTL', bus: 'BUS', train: 'TRN', flight: 'ALN', tour: 'TUR', event_center: 'EVT', vehicle_rental: 'VHR',
 }
 const UNIT_LABELS: Record<string, string> = {
-  hotel: 'Room', bus: 'Seat', train: 'Seat', flight: 'Seat', tour: 'Slot', event_center: 'Ticket',
+  hotel: 'Room', bus: 'Seat', train: 'Seat', flight: 'Seat', tour: 'Slot', event_center: 'Ticket', vehicle_rental: 'Vehicle',
 }
 const DETAIL_PLACEHOLDER: Record<string, string> = {
   bus: 'Route (e.g. Lagos → Abuja), travel date',
@@ -31,6 +31,16 @@ const DETAIL_PLACEHOLDER: Record<string, string> = {
   flight: 'Route, flight date',
   tour: 'Tour date, no. of participants',
   event_center: 'Event date',
+}
+// Categories that book a date range (check-in/out or pickup/return) with
+// per-day pricing and date-safe inventory claiming, instead of a single
+// free-text detail + manual amount.
+const DATE_RANGE_LABELS: Record<string, { unit: string; start: string; end: string }> = {
+  hotel: { unit: 'Night', start: 'Check-in Date', end: 'Check-out Date' },
+  vehicle_rental: { unit: 'Day', start: 'Pickup Date', end: 'Return Date' },
+}
+const CATEGORY_ICON: Record<string, string> = {
+  hotel: 'hotel', bus: 'bus', train: 'bus', flight: 'plane', tour: 'map', event_center: 'tent', vehicle_rental: 'car',
 }
 
 type ServiceOption = { id: string; title: string; category: string; commission_rate: number | null; price: number; photo_url: string | null }
@@ -111,8 +121,10 @@ export default function AddGuest() {
   useEffect(() => { load() }, [navigate])
 
   const selectedService = services.find((s) => s.id === serviceId)
-  const isHotel = selectedService?.category === 'hotel'
-  const unitLabel = UNIT_LABELS[selectedService?.category || 'hotel'] || 'Item'
+  const category = selectedService?.category || 'hotel'
+  const dateRangeLabels = DATE_RANGE_LABELS[category]
+  const isDateRange = !!dateRangeLabels
+  const unitLabel = UNIT_LABELS[category] || 'Item'
   const usingTypes = invTypes.length > 0
   const selectedType = invTypes.find((t) => t.id === selectedTypeId)
 
@@ -129,7 +141,7 @@ export default function AddGuest() {
       if (items && items.length > 0) {
         let mapped: InvType[]
 
-        if (isHotel && checkInDate && checkOutDate) {
+        if (isDateRange && checkInDate && checkOutDate) {
           mapped = await Promise.all(items.map(async (i: any) => {
             const result = await findAvailableUnit(i.id, checkInDate, checkOutDate)
             return {
@@ -180,7 +192,7 @@ export default function AddGuest() {
       setLoadingTypes(false)
     }
     loadTypesAndPromo()
-  }, [serviceId, companyId, checkInDate, checkOutDate, isHotel])
+  }, [serviceId, companyId, checkInDate, checkOutDate, isDateRange])
 
   // keep checkout in sync with nights whenever check-in or nights changes
   useEffect(() => {
@@ -199,7 +211,7 @@ export default function AddGuest() {
   }
 
   const rawTotal = (() => {
-    if (isHotel) {
+    if (isDateRange) {
       if (usingTypes && selectedType) {
         if (!checkInDate || nights <= 0) return 0
         let total = 0
@@ -222,7 +234,7 @@ export default function AddGuest() {
   })()
 
   const canSave = companyId && serviceId && customerName.trim() && customerPhone.trim() &&
-    (isHotel ? checkInDate && checkOutDate && nights > 0 : !!amountOverride) &&
+    (isDateRange ? checkInDate && checkOutDate && nights > 0 : !!amountOverride) &&
     (!usingTypes || (selectedType && selectedType.available > 0))
 
   const handleSave = async () => {
@@ -236,13 +248,13 @@ export default function AddGuest() {
     const random = Math.random().toString(36).substring(2, 8).toUpperCase()
     const ticketCode = `${prefix}-${year}-${random}`
     const rate = Number(selectedService?.commission_rate ?? 3)
-    const amount = isHotel ? finalTotal : (activePromo ? finalTotal : parseFloat(amountOverride))
+    const amount = isDateRange ? finalTotal : (activePromo ? finalTotal : parseFloat(amountOverride))
     const commission = amount * (rate / 100)
 
     let assignedUnitId: string | null = null
     let assignedNumber = ''
 
-    if (selectedType && isHotel) {
+    if (selectedType && isDateRange) {
       const { data: claimed, error: claimErr } = await supabase.rpc('claim_inventory_unit_for_dates', {
         p_item_id: selectedType.id, p_check_in: checkInDate, p_check_out: checkOutDate,
       })
@@ -301,9 +313,9 @@ export default function AddGuest() {
       booking_status: 'confirmed',
       booking_source: 'offline',
       payment_method: paymentMethod,
-      booking_details: isHotel ? null : bookingDetails.trim() || null,
-      check_in_date: isHotel ? checkInDate : null,
-      check_out_date: isHotel ? checkOutDate : null,
+      booking_details: isDateRange ? null : bookingDetails.trim() || null,
+      check_in_date: isDateRange ? checkInDate : null,
+      check_out_date: isDateRange ? checkOutDate : null,
       ticket_code: ticketCode,
       checked_in: true,
       checked_in_at: new Date().toISOString(),
@@ -316,7 +328,7 @@ export default function AddGuest() {
       return
     }
 
-    if (assignedUnitId && !isHotel) {
+    if (assignedUnitId && !isDateRange) {
       const { error: unitErr } = await supabase.from('inventory_units').update({ status: 'occupied', booking_id: newBooking?.id || null }).eq('id', assignedUnitId)
       if (unitErr) {
         // Booking already saved successfully -- don't block success on this,
@@ -380,7 +392,9 @@ export default function AddGuest() {
 
         {successCode && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '14px', padding: '16px', marginBottom: '16px', textAlign: 'center' }}>
-            <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.green, marginBottom: '4px' }}>✅ Guest booking saved</p>
+            <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.green, marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <Icon name="checkCircle" size={15} color={COLORS.green} /> Guest booking saved
+            </p>
             <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{successCode}</p>
             {assignedUnitNumber && <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.purple, marginTop: '4px' }}>Assigned: {unitLabel} {assignedUnitNumber}</p>}
           </div>
@@ -398,13 +412,13 @@ export default function AddGuest() {
                 onClick={() => setShowServicePicker(!showServicePicker)}
                 style={{ display: 'flex', gap: '12px', alignItems: 'center', cursor: 'pointer' }}>
                 <div style={{ width: '72px', height: '72px', borderRadius: '12px', flexShrink: 0, overflow: 'hidden', background: selectedService?.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {selectedService?.photo_url ? <img src={selectedService.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '24px' }}>🏨</span>}
+                  {selectedService?.photo_url ? <img src={selectedService.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name={CATEGORY_ICON[category] || 'box'} size={26} color="white" />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text }}>{selectedType ? selectedType.name : selectedService?.title}</p>
                   {activePromo && (
-                    <p style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.purple, marginTop: '2px' }}>
-                      🏷️ {activePromo.discount_type === 'percentage' ? `${activePromo.discount_value}% OFF` : `₦${activePromo.discount_value.toLocaleString()} OFF`}
+                    <p style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.purple, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Icon name="ticket" size={11} color={COLORS.purple} /> {activePromo.discount_type === 'percentage' ? `${activePromo.discount_value}% OFF` : `₦${activePromo.discount_value.toLocaleString()} OFF`}
                     </p>
                   )}
                   {usingTypes && selectedType && (
@@ -459,7 +473,7 @@ export default function AddGuest() {
                 </div>
               )}
 
-              <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '10px' }}>Price per night</p>
+              <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '10px' }}>Price per {(dateRangeLabels?.unit || 'Night').toLowerCase()}</p>
               <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.purple }}>₦{(selectedType?.price ?? selectedService?.price ?? 0).toLocaleString()}</p>
             </div>
 
@@ -488,18 +502,18 @@ export default function AddGuest() {
             {/* Booking Details */}
             <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '10px' }}>Booking Details</p>
             <div style={{ background: COLORS.card, borderRadius: '16px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              {isHotel ? (
+              {isDateRange ? (
                 <>
                   <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>Check-in Date *</p>
+                      <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>{dateRangeLabels?.start || 'Start Date'} *</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', border: `1px solid ${COLORS.border}`, borderRadius: '10px', padding: '9px 10px' }}>
                         <Icon name="calendar" size={14} color={COLORS.textMuted} />
                         <input value={checkInDate} onChange={(e) => setCheckInDate(e.target.value)} type="date" min={new Date().toISOString().split('T')[0]} style={{ border: 'none', outline: 'none', fontSize: '12.5px', flex: 1, width: '100%' }} />
                       </div>
                     </div>
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>Check-out Date *</p>
+                      <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>{dateRangeLabels?.end || 'End Date'} *</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', border: `1px solid ${COLORS.border}`, borderRadius: '10px', padding: '9px 10px', background: '#f8fafc' }}>
                         <Icon name="calendar" size={14} color={COLORS.textMuted} />
                         <p style={{ fontSize: '12.5px', color: COLORS.text }}>{checkOutDate || 'Select date'}</p>
@@ -509,7 +523,7 @@ export default function AddGuest() {
 
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch' }}>
                     <div>
-                      <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>Nights</p>
+                      <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>{dateRangeLabels?.unit || 'Night'}s</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${COLORS.border}`, borderRadius: '10px', padding: '7px 10px' }}>
                         <div onClick={() => setNights(Math.max(1, nights - 1))} style={{ cursor: 'pointer', color: COLORS.textMuted }}>
                           <Icon name="minus" size={14} color={COLORS.textMuted} />
@@ -523,14 +537,14 @@ export default function AddGuest() {
                     <div style={{ flex: 1, background: '#F5F3FF', borderRadius: '10px', padding: '10px 14px' }}>
                       <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Total Amount</p>
                       <p style={{ fontSize: '17px', fontWeight: 800, color: COLORS.purple }}>₦{finalTotal.toLocaleString()}</p>
-                      <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{nights} Night{nights > 1 ? 's' : ''}</p>
+                      <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{nights} {dateRangeLabels?.unit || 'Night'}{nights > 1 ? 's' : ''}</p>
                     </div>
                   </div>
                 </>
               ) : (
                 <>
                   <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>Details</p>
-                  <textarea value={bookingDetails} onChange={(e) => setBookingDetails(e.target.value)} rows={3} placeholder={DETAIL_PLACEHOLDER[selectedService?.category || 'bus']} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '12px', fontSize: '13px', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'none' }} />
+                  <textarea value={bookingDetails} onChange={(e) => setBookingDetails(e.target.value)} rows={3} placeholder={DETAIL_PLACEHOLDER[category] || 'Booking details'} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '12px', fontSize: '13px', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'none' }} />
                   <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>Amount Paid (₦) *</p>
                   <input value={amountOverride} onChange={(e) => setAmountOverride(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="18000" inputMode="decimal" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', boxSizing: 'border-box' }} />
                 </>
@@ -573,7 +587,7 @@ export default function AddGuest() {
             )}
 
             <div style={{ background: '#F5F3FF', borderRadius: '12px', padding: '14px', display: 'flex', gap: '10px' }}>
-              <span style={{ fontSize: '16px' }}>🛡️</span>
+              <Icon name="shield" size={16} color={COLORS.purple} />
               <p style={{ fontSize: '11.5px', color: COLORS.textMuted, lineHeight: 1.5 }}>
                 This booking will be saved as a walk-in guest. You can view and manage it in your bookings list.
               </p>
