@@ -62,6 +62,10 @@ export default function InventoryDetail() {
   const [savingReserve, setSavingReserve] = useState(false)
 
   const [soldOutDates, setSoldOutDates] = useState<string[]>([])
+  // Real occupancy for "today", computed from confirmed bookings — see
+  // InventoryManagement.tsx for why the static status column alone can't
+  // show this (booking claim functions never touch it, by design).
+  const [occupiedTodaySet, setOccupiedTodaySet] = useState<Set<string>>(new Set())
 
   const load = async () => {
     const { data } = await supabase
@@ -95,13 +99,31 @@ export default function InventoryDetail() {
       .eq('status', 'sold_out')
 
     setSoldOutDates((availRows || []).map((r: any) => r.date))
+
+    const today = new Date().toISOString().split('T')[0]
+    const { data: bookingRows } = await supabase
+      .from('bookings')
+      .select('assigned_unit_number, check_in_date, check_out_date')
+      .eq('inventory_item_id', id)
+      .eq('booking_status', 'confirmed')
+      .not('assigned_unit_number', 'is', null)
+
+    const occSet = new Set<string>()
+    ;(bookingRows || []).forEach((b: any) => {
+      const occupiedToday = b.check_out_date
+        ? b.check_in_date <= today && b.check_out_date > today
+        : b.check_in_date === today
+      if (occupiedToday) occSet.add(b.assigned_unit_number)
+    })
+    setOccupiedTodaySet(occSet)
+
     setLoading(false)
   }
 
   useEffect(() => { load() }, [id])
 
-  const availableUnits = units.filter((u) => u.status === 'available')
-  const occupiedCount = units.filter((u) => u.status === 'occupied').length
+  const availableUnits = units.filter((u) => u.status === 'available' && !occupiedTodaySet.has(u.unit_number))
+  const occupiedCount = units.filter((u) => u.status === 'available' && occupiedTodaySet.has(u.unit_number)).length
   const reservedUnits = units.filter((u) => u.status === 'reserved')
   const maintenanceUnits = units.filter((u) => u.status === 'maintenance')
 
@@ -316,7 +338,8 @@ export default function InventoryDetail() {
               </div>
             ) : (
               sortedUnits.map((u) => {
-                const st = statusStyle[u.status]
+                const effectiveStatus = u.status === 'available' && occupiedTodaySet.has(u.unit_number) ? 'occupied' : u.status
+                const st = statusStyle[effectiveStatus]
                 return (
                   <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                     <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: st.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
