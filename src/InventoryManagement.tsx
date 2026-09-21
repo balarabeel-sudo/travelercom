@@ -49,6 +49,14 @@ export default function InventoryManagement() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [items, setItems] = useState<InventoryItem[]>([])
   const [statusCounts, setStatusCounts] = useState<Record<string, { available: number; occupied: number; reserved: number; maintenance: number }>>({})
+  // Real occupancy computed live from confirmed bookings for "today" — the
+  // static inventory_units.status column is only ever set to 'available' at
+  // creation or 'maintenance'/'reserved' by the company manually. The actual
+  // booking claim functions (claim_inventory_unit_for_dates / claim_specific_unit_for_dates,
+  // used by hotel + vehicle_rental) deliberately never touch status, since a unit's
+  // occupancy is date-range-dependent, not a permanent flag — so this was always
+  // showing every unit as "available" forever, no matter how many real bookings existed.
+  const [occupiedTodayCounts, setOccupiedTodayCounts] = useState<Record<string, number>>({})
   const [services, setServices] = useState<ServiceOption[]>([])
   const [serviceId, setServiceId] = useState('')
   const [saving, setSaving] = useState(false)
@@ -116,8 +124,36 @@ export default function InventoryManagement() {
         counts[u.inventory_item_id][s] = (counts[u.inventory_item_id][s] || 0) + 1
       })
       setStatusCounts(counts)
+
+      // Real occupancy for "today": a unit counts as occupied if a confirmed
+      // booking's date range covers today (hotel/vehicle_rental, check_out_date
+      // set) or its single travel date is today (bus/train/flight/tour/event_center,
+      // check_out_date null). Distinct by assigned_unit_number since one unit
+      // shouldn't be double-counted across bookings.
+      const today = new Date().toISOString().split('T')[0]
+      const { data: bookingRows } = await supabase
+        .from('bookings')
+        .select('inventory_item_id, assigned_unit_number, check_in_date, check_out_date')
+        .eq('company_id', company.id)
+        .eq('booking_status', 'confirmed')
+        .in('inventory_item_id', itemIds)
+        .not('assigned_unit_number', 'is', null)
+
+      const occupiedSets: Record<string, Set<string>> = {}
+      ;(bookingRows || []).forEach((b: any) => {
+        const occupiedToday = b.check_out_date
+          ? b.check_in_date <= today && b.check_out_date > today
+          : b.check_in_date === today
+        if (!occupiedToday) return
+        if (!occupiedSets[b.inventory_item_id]) occupiedSets[b.inventory_item_id] = new Set()
+        occupiedSets[b.inventory_item_id].add(b.assigned_unit_number)
+      })
+      const occupiedCounts: Record<string, number> = {}
+      Object.keys(occupiedSets).forEach((k) => { occupiedCounts[k] = occupiedSets[k].size })
+      setOccupiedTodayCounts(occupiedCounts)
     } else {
       setStatusCounts({})
+      setOccupiedTodayCounts({})
     }
 
     setLoading(false)
@@ -206,7 +242,11 @@ export default function InventoryManagement() {
     loadHolidays(companyId)
   }
 
-  const available = (item: InventoryItem) => Math.max(0, statusCounts[item.id]?.available ?? 0)
+  const occupiedToday = (item: InventoryItem) => occupiedTodayCounts[item.id] || 0
+  const available = (item: InventoryItem) => {
+    const s = statusCounts[item.id] || { available: 0, occupied: 0, reserved: 0, maintenance: 0 }
+    return Math.max(0, item.total_quantity - occupiedToday(item) - s.reserved - s.maintenance)
+  }
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -245,10 +285,11 @@ export default function InventoryManagement() {
   const totals = items.reduce(
     (acc, item) => {
       const s = statusCounts[item.id] || { available: 0, occupied: 0, reserved: 0, maintenance: 0 }
+      const occ = occupiedTodayCounts[item.id] || 0
       return {
         total: acc.total + item.total_quantity,
-        available: acc.available + Math.max(0, s.available),
-        booked: acc.booked + s.occupied + s.reserved,
+        available: acc.available + Math.max(0, item.total_quantity - occ - s.reserved - s.maintenance),
+        booked: acc.booked + occ + s.reserved,
         maintenance: acc.maintenance + s.maintenance,
       }
     },
@@ -424,6 +465,7 @@ export default function InventoryManagement() {
                     <p style={{ fontSize: '11px', color: COLORS.textMuted }}>
                       Total <span style={{ fontWeight: 700, color: COLORS.text }}>{item.total_quantity}</span>
                       {'  '}· Available <span style={{ fontWeight: 700, color: avail === 0 ? COLORS.red : COLORS.green }}>{avail}</span>
+                      {occupiedToday(item) > 0 && <>{'  '}· Occupied <span style={{ fontWeight: 700, color: COLORS.primary }}>{occupiedToday(item)}</span></>}
                     </p>
                     <div onClick={() => navigate(`/inventory/${item.id}`)} style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#F5F3FF', color: COLORS.purple, fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px', cursor: 'pointer' }}>
                       Manage <Icon name="chevronRight" size={12} color={COLORS.purple} />
