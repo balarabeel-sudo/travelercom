@@ -40,6 +40,7 @@ import PrivacyPolicy from './PrivacyPolicy'
 import Terms from './Terms'
 import CustomerPrivacyPolicy from './CustomerPrivacyPolicy'
 import CustomerTerms from './CustomerTerms'
+import CompanyTerms from './CompanyTerms'
 import About from './About'
 import Notifications from './Notifications'
 import Support from './Support'
@@ -162,6 +163,7 @@ function App() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/customer-privacy" element={<CustomerPrivacyPolicy />} />
         <Route path="/customer-terms" element={<CustomerTerms />} />
+        <Route path="/company-terms" element={<CompanyTerms />} />
         <Route path="/about" element={<About />} />
        <Route path="/notifications" element={<Notifications />} />
        <Route path="/support" element={<Support />} />
