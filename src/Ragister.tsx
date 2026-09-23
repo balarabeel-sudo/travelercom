@@ -146,6 +146,14 @@ function Register() {
             <span onClick={(e) => { e.stopPropagation(); navigate('/terms') }} style={{ color, fontWeight: 700, cursor: 'pointer' }}>
               Terms &amp; Conditions
             </span>
+            {!isPersonal && (
+              <>
+                {' '}and the{' '}
+                <span onClick={(e) => { e.stopPropagation(); navigate('/company-terms') }} style={{ color, fontWeight: 700, cursor: 'pointer' }}>
+                  Company Terms &amp; Conditions
+                </span>
+              </>
+            )}
           </span>
         </label>
 
