@@ -23,6 +23,7 @@ type Item = {
   price: number
   weekend_price: number | null
   holiday_price: number | null
+  company_id: string
 }
 
 type Unit = {
@@ -66,11 +67,12 @@ export default function InventoryDetail() {
   // InventoryManagement.tsx for why the static status column alone can't
   // show this (booking claim functions never touch it, by design).
   const [occupiedTodaySet, setOccupiedTodaySet] = useState<Set<string>>(new Set())
+  const [deletingItem, setDeletingItem] = useState(false)
 
   const load = async () => {
     const { data } = await supabase
       .from('inventory_items')
-      .select('id, name, total_quantity, price, weekend_price, holiday_price, service_id, services(category)')
+      .select('id, name, total_quantity, price, weekend_price, holiday_price, service_id, company_id, services(category)')
       .eq('id', id)
       .maybeSingle()
 
@@ -222,6 +224,47 @@ export default function InventoryDetail() {
     return sortDesc ? nb - na : na - nb
   })
 
+  const handleDeleteItem = async () => {
+    if (!item) return
+    const today = new Date().toISOString().split('T')[0]
+    const { data: activeBookings } = await supabase
+      .from('bookings')
+      .select('id, check_in_date, check_out_date')
+      .eq('inventory_item_id', item.id)
+      .eq('booking_status', 'confirmed')
+
+    const hasActive = (activeBookings || []).some((b: any) =>
+      b.check_out_date ? b.check_out_date > today : b.check_in_date >= today
+    )
+    if (hasActive) {
+      alert(`"${item.name}" has active or upcoming bookings and can't be deleted. Wait until they're completed, or mark rooms as maintenance instead.`)
+      return
+    }
+
+    if (!window.confirm(`Delete "${item.name}" and all its ${item.total_quantity} units? This cannot be undone.`)) return
+    setDeletingItem(true)
+
+    await supabase.from('inventory_units').delete().eq('inventory_item_id', item.id)
+    const { error } = await supabase.from('inventory_items').delete().eq('id', item.id)
+    if (error) {
+      alert('Could not delete: ' + error.message)
+      setDeletingItem(false)
+      return
+    }
+
+    await supabase.rpc('log_audit', {
+      p_action: 'deleted_inventory_item',
+      p_module: 'inventory',
+      p_target_type: 'inventory_item',
+      p_target_id: item.id,
+      p_previous: { name: item.name, total_quantity: item.total_quantity },
+      p_new: null,
+      p_company_id: item.company_id,
+    }).catch(() => {})
+
+    navigate('/inventory')
+  }
+
   const statusStyle: Record<string, { bg: string; color: string; label: string }> = {
     available: { bg: '#DCFCE7', color: COLORS.green, label: 'Available' },
     occupied: { bg: '#DBEAFE', color: COLORS.primary, label: 'Occupied' },
@@ -239,9 +282,12 @@ export default function InventoryDetail() {
         <div onClick={() => navigate('/inventory')} style={{ cursor: 'pointer', display: 'flex' }}>
           <Icon name="arrowLeft" size={22} color={COLORS.text} />
         </div>
-        <div>
+        <div style={{ flex: 1 }}>
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>{item.name}</h1>
           <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Manage your {unitLabel.toLowerCase()} inventory</p>
+        </div>
+        <div onClick={deletingItem ? undefined : handleDeleteItem} style={{ cursor: deletingItem ? 'default' : 'pointer', padding: '6px', opacity: deletingItem ? 0.4 : 1 }}>
+          <Icon name="trash" size={19} color={COLORS.red} />
         </div>
       </div>
 
