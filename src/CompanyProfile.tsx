@@ -282,6 +282,26 @@ export default function CompanyProfile() {
           </div>
         )}
 
+        <div
+          onClick={() => navigate('/company-terms')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
+            background: COLORS.card, borderRadius: '14px',
+            padding: '14px 16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
+          }}>
+          <div style={{
+            width: '38px', height: '38px', borderRadius: '10px', background: '#F5F3FF',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <Icon name="fileText" size={18} color={COLORS.purple} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: '13.5px', fontWeight: 800, color: COLORS.text }}>Company Terms & Conditions</p>
+            <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Review the terms you agreed to</p>
+          </div>
+          <Icon name="chevronRight" size={18} color={COLORS.textMuted} />
+        </div>
+
         {editing ? (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>About / Description</p>
