@@ -67,6 +67,8 @@ export default function InventoryManagement() {
   const [holidayLabel, setHolidayLabel] = useState('')
   const [savingHoliday, setSavingHoliday] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('')
   const [price, setPrice] = useState('')
@@ -170,12 +172,13 @@ export default function InventoryManagement() {
 
   useEffect(() => { load() }, [])
 
-  const handleAdd = async () => {
-    if (!companyId || !name.trim() || !quantity) return
+  const handleSave = async () => {
+    if (!companyId || !name.trim()) return
+    if (!editingId && !quantity) return
     setAddError('')
 
     const duplicate = items.some((it) =>
-      it.service_id === (serviceId || null) && it.name.trim().toLowerCase() === name.trim().toLowerCase()
+      it.id !== editingId && it.service_id === (serviceId || null) && it.name.trim().toLowerCase() === name.trim().toLowerCase()
     )
     if (duplicate) {
       setAddError(`"${name.trim()}" already exists in your inventory. Please use a different name.`)
@@ -183,9 +186,8 @@ export default function InventoryManagement() {
     }
 
     setSaving(true)
-    const qty = parseInt(quantity, 10)
 
-    let imageUrl: string | null = null
+    let imageUrl: string | null = editingId ? (items.find((it) => it.id === editingId)?.image_url ?? null) : null
     if (photoFile) {
       const fileExt = photoFile.name.split('.').pop()
       const fileName = `${companyId}/${Date.now()}.${fileExt}`
@@ -196,22 +198,35 @@ export default function InventoryManagement() {
       }
     }
 
-    const { data: newItem } = await supabase.from('inventory_items').insert({
-      company_id: companyId,
-      service_id: serviceId || null,
-      name: name.trim(),
-      total_quantity: qty,
-      price: price ? parseFloat(price) : 0,
-      image_url: imageUrl,
-    }).select('id').single()
+    if (editingId) {
+      // Renaming/repricing only — total_quantity is deliberately left alone here;
+      // it's changed one unit at a time from the InventoryDetail stock tab so it
+      // always stays in sync with the actual inventory_units rows.
+      await supabase.from('inventory_items').update({
+        service_id: serviceId || null,
+        name: name.trim(),
+        price: price ? parseFloat(price) : 0,
+        image_url: imageUrl,
+      }).eq('id', editingId)
+    } else {
+      const qty = parseInt(quantity, 10)
+      const { data: newItem } = await supabase.from('inventory_items').insert({
+        company_id: companyId,
+        service_id: serviceId || null,
+        name: name.trim(),
+        total_quantity: qty,
+        price: price ? parseFloat(price) : 0,
+        image_url: imageUrl,
+      }).select('id').single()
 
-    if (newItem) {
-      const unitRows = Array.from({ length: qty }, (_, i) => ({
-        inventory_item_id: newItem.id,
-        unit_number: (i + 1).toString(),
-        status: 'available',
-      }))
-      await supabase.from('inventory_units').insert(unitRows)
+      if (newItem) {
+        const unitRows = Array.from({ length: qty }, (_, i) => ({
+          inventory_item_id: newItem.id,
+          unit_number: (i + 1).toString(),
+          status: 'available',
+        }))
+        await supabase.from('inventory_units').insert(unitRows)
+      }
     }
 
     setName('')
@@ -220,8 +235,74 @@ export default function InventoryManagement() {
     setPhotoFile(null)
     setPhotoPreview('')
     setShowForm(false)
+    setEditingId(null)
     setSaving(false)
     setAddError('')
+    load()
+  }
+
+  const handleEditClick = (item: InventoryItem) => {
+    setEditingId(item.id)
+    setName(item.name)
+    setQuantity(String(item.total_quantity))
+    setPrice(String(item.price))
+    setServiceId(item.service_id || '')
+    setPhotoPreview(item.image_url || '')
+    setPhotoFile(null)
+    setAddError('')
+    setShowForm(true)
+  }
+
+  const cancelForm = () => {
+    setShowForm(false)
+    setEditingId(null)
+    setName('')
+    setQuantity('')
+    setPrice('')
+    setPhotoFile(null)
+    setPhotoPreview('')
+    setAddError('')
+  }
+
+  const handleDelete = async (item: InventoryItem) => {
+    if (!companyId) return
+    const today = new Date().toISOString().split('T')[0]
+    const { data: activeBookings } = await supabase
+      .from('bookings')
+      .select('id, check_in_date, check_out_date')
+      .eq('inventory_item_id', item.id)
+      .eq('booking_status', 'confirmed')
+
+    const hasActive = (activeBookings || []).some((b: any) =>
+      b.check_out_date ? b.check_out_date > today : b.check_in_date >= today
+    )
+    if (hasActive) {
+      alert(`"${item.name}" has active or upcoming bookings and can't be deleted. Wait until they're completed, or mark rooms as maintenance instead.`)
+      return
+    }
+
+    if (!window.confirm(`Delete "${item.name}" and all its ${item.total_quantity} units? This cannot be undone.`)) return
+    setDeletingId(item.id)
+
+    await supabase.from('inventory_units').delete().eq('inventory_item_id', item.id)
+    const { error } = await supabase.from('inventory_items').delete().eq('id', item.id)
+    if (error) {
+      alert('Could not delete: ' + error.message)
+      setDeletingId(null)
+      return
+    }
+
+    await supabase.rpc('log_audit', {
+      p_action: 'deleted_inventory_item',
+      p_module: 'inventory',
+      p_target_type: 'inventory_item',
+      p_target_id: item.id,
+      p_previous: { name: item.name, total_quantity: item.total_quantity },
+      p_new: null,
+      p_company_id: companyId,
+    }).catch(() => {})
+
+    setDeletingId(null)
     load()
   }
 
@@ -310,7 +391,7 @@ export default function InventoryManagement() {
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Inventory</h1>
         </div>
         <div
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => (showForm ? cancelForm() : setShowForm(true))}
           style={{ width: '38px', height: '38px', borderRadius: '12px', background: COLORS.purple, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           <Icon name="plus" size={19} color="white" />
         </div>
@@ -381,7 +462,7 @@ export default function InventoryManagement() {
 
         {showForm && (
           <div style={{ background: COLORS.card, borderRadius: '16px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-            <p style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', color: COLORS.text }}>Add {formLabels.singular}</p>
+            <p style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', color: COLORS.text }}>{editingId ? 'Edit' : 'Add'} {formLabels.singular}</p>
 
             {services.length > 0 && (
               <select value={serviceId} onChange={(e) => { setServiceId(e.target.value); setAddError('') }} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px' }}>
@@ -390,7 +471,7 @@ export default function InventoryManagement() {
               </select>
             )}
 
-            {(() => {
+            {!editingId && (() => {
               const linkedService = services.find((s) => s.id === serviceId)
               const hasNoItemsYet = linkedService && !items.some((it) => it.service_id === linkedService.id)
               if (!hasNoItemsYet) return null
@@ -431,10 +512,21 @@ export default function InventoryManagement() {
             </label>
 
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder={formLabels.placeholder} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
-            <input value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ''))} placeholder={`Total ${formLabels.unitPlural.toLowerCase()}, e.g. 10`} inputMode="numeric" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
+            {editingId ? (
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '10px' }}>
+                {quantity} {formLabels.unitPlural.toLowerCase()} total — add or remove individual {formLabels.unitPlural.toLowerCase()} from the Manage page.
+              </p>
+            ) : (
+              <input value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ''))} placeholder={`Total ${formLabels.unitPlural.toLowerCase()}, e.g. 10`} inputMode="numeric" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box' }} />
+            )}
             <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="Price (₦)" inputMode="decimal" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '12px', fontSize: '13px', boxSizing: 'border-box' }} />
-            <div onClick={saving ? undefined : handleAdd} style={{ background: COLORS.purple, color: 'white', textAlign: 'center', padding: '11px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
-              {saving ? 'Saving...' : `Save ${formLabels.singular}`}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <div onClick={saving ? undefined : handleSave} style={{ flex: 1, background: COLORS.purple, color: 'white', textAlign: 'center', padding: '11px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
+                {saving ? 'Saving...' : editingId ? 'Save Changes' : `Save ${formLabels.singular}`}
+              </div>
+              <div onClick={cancelForm} style={{ padding: '11px 16px', textAlign: 'center', color: COLORS.textMuted, fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>
+                Cancel
+              </div>
             </div>
           </div>
         )}
@@ -467,6 +559,16 @@ export default function InventoryManagement() {
                       {'  '}· Available <span style={{ fontWeight: 700, color: avail === 0 ? COLORS.red : COLORS.green }}>{avail}</span>
                       {occupiedToday(item) > 0 && <>{'  '}· Occupied <span style={{ fontWeight: 700, color: COLORS.primary }}>{occupiedToday(item)}</span></>}
                     </p>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <div onClick={() => handleEditClick(item)} style={{ cursor: 'pointer', padding: '2px' }}>
+                        <Icon name="edit" size={14} color={COLORS.textMuted} />
+                      </div>
+                      <div onClick={() => (deletingId === item.id ? undefined : handleDelete(item))} style={{ cursor: deletingId === item.id ? 'default' : 'pointer', padding: '2px', opacity: deletingId === item.id ? 0.4 : 1 }}>
+                        <Icon name="trash" size={14} color={COLORS.red} />
+                      </div>
+                    </div>
                     <div onClick={() => navigate(`/inventory/${item.id}`)} style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#F5F3FF', color: COLORS.purple, fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px', cursor: 'pointer' }}>
                       Manage <Icon name="chevronRight" size={12} color={COLORS.purple} />
                     </div>
