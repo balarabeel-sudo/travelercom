@@ -36,6 +36,18 @@ function SplashScreen() {
         }
       `}</style>
 
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        width: '260px',
+        height: '260px',
+        transform: 'translate(-50%, -50%)',
+        background: 'radial-gradient(circle, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0) 72%)',
+        borderRadius: '50%',
+        pointerEvents: 'none',
+      }} />
+
       <div className="splash-logo">
         <Logo size={130} />
       </div>
