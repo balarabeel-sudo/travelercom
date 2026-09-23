@@ -487,9 +487,9 @@ function Bus() {
                     </div>
 
                     {h.amenities && h.amenities.length > 0 && (
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '10px', rowGap: '6px', marginTop: '8px' }}>
                         {h.amenities.slice(0, 4).map((a) => (
-                          <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px', color: COLORS.textMuted, fontWeight: 600 }}>
+                          <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: COLORS.textMuted, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             <Icon name={TRAVEL_AMENITY_ICON[a] || 'check'} size={11} color={COLORS.textMuted} /> {a}
                           </span>
                         ))}
@@ -499,7 +499,7 @@ function Bus() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '10px' }}>
                       <div>
                         <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()}</p>
-                        <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!h.seats_available || h.seats_available === 0) ? '#DC2626' : COLORS.green }}>
+                        <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!h.seats_available || h.seats_available === 0) ? '#DC2626' : COLORS.primary }}>
                           {(!h.seats_available || h.seats_available === 0) ? 'Not available' : `${h.seats_available} seats left`}
                         </p>
                       </div>
