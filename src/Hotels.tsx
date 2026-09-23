@@ -379,6 +379,9 @@ function Hotels() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                     <p style={{ fontSize: '14.5px', fontWeight: 800, color: COLORS.text, flex: 1, minWidth: 0 }}>{h.title}</p>
                   </div>
+                  {h.description && (
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: COLORS.textMuted, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.description}</p>
+                  )}
                   <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}><Icon name="mapPin" size={11} color={COLORS.textMuted} /> {h.destination}</p>
 
                   {h.avgRating !== null && (
@@ -390,14 +393,14 @@ function Hotels() {
                   )}
 
                   {h.amenities && h.amenities.length > 0 && (
-                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '8px' }}>
-                      {h.amenities.slice(0, 4).map((a) => (
-                        <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9.5px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '3px 7px', borderRadius: '20px' }}>
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'nowrap', overflow: 'hidden', marginTop: '8px' }}>
+                      {h.amenities.slice(0, 2).map((a) => (
+                        <span key={a} style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, fontSize: '9.5px', fontWeight: 700, background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: '3px 7px', borderRadius: '20px' }}>
                           <Icon name={AMENITY_ICON[a] || 'check'} size={10} color={COLORS.textMuted} /> {a}
                         </span>
                       ))}
-                      {h.amenities.length > 4 && (
-                        <span style={{ fontSize: '9.5px', color: COLORS.textMuted, alignSelf: 'center' }}>+{h.amenities.length - 4} more</span>
+                      {h.amenities.length > 2 && (
+                        <span style={{ fontSize: '9.5px', color: COLORS.textMuted, alignSelf: 'center', flexShrink: 0 }}>+{h.amenities.length - 2} more</span>
                       )}
                     </div>
                   )}
