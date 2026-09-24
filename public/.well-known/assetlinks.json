@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.travelercom.app",
+        "sha256_cert_fingerprints": ["E7:A6:D1:DD:85:7A:90:3A:A9:E6:4A:49:70:38:2D:E4:E1:01:BE:8D:62:D1:BF:0D:27:BA:1D:4A:63:2F:20:0A"]
+      }
+    }]
