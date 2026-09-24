@@ -32,6 +32,14 @@ export default function Settings() {
   const [savingPassword, setSavingPassword] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  const [pinEnabled, setPinEnabled] = useState(false)
+  const [pinLoaded, setPinLoaded] = useState(false)
+  const [showPinSetup, setShowPinSetup] = useState(false)
+  const [newPin, setNewPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [pinError, setPinError] = useState('')
+  const [pinSaving, setPinSaving] = useState(false)
+
   useEffect(() => {
     const load = async () => {
       const { data: userData } = await supabase.auth.getUser()
@@ -50,6 +58,11 @@ export default function Settings() {
         setClosingTime(company.closing_time || '')
         setAllowUnitSelection(company.allow_unit_selection ?? true)
       }
+
+      const { data: pinExists } = await supabase.rpc('has_user_pin')
+      setPinEnabled(!!pinExists)
+      setPinLoaded(true)
+
       setLoading(false)
     }
     load()
@@ -96,6 +109,41 @@ export default function Settings() {
         p_company_id: companyId,
       })
     }
+  }
+
+  const handlePinToggle = async () => {
+    if (pinEnabled) {
+      setPinEnabled(false)
+      await supabase.rpc('clear_user_pin')
+      return
+    }
+    setPinError('')
+    setNewPin('')
+    setConfirmPin('')
+    setShowPinSetup(true)
+  }
+
+  const handleSavePin = async () => {
+    setPinError('')
+    if (!/^[0-9]{6}$/.test(newPin)) {
+      setPinError('PIN must be exactly 6 digits.')
+      return
+    }
+    if (newPin !== confirmPin) {
+      setPinError('PINs do not match.')
+      return
+    }
+    setPinSaving(true)
+    const { error } = await supabase.rpc('set_user_pin', { p_pin: newPin })
+    setPinSaving(false)
+    if (error) {
+      setPinError(error.message || 'Could not save PIN. Please try again.')
+      return
+    }
+    setPinEnabled(true)
+    setShowPinSetup(false)
+    setNewPin('')
+    setConfirmPin('')
   }
 
   const handleChangePassword = async () => {
@@ -174,6 +222,61 @@ export default function Settings() {
             style={{ background: COLORS.purple, color: 'white', textAlign: 'center', padding: '11px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: savingPassword ? 0.6 : 1 }}>
             {savingPassword ? 'Updating...' : 'Update Password'}
           </div>
+        </div>
+
+        <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.textMuted, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Security</p>
+        <div style={{ background: COLORS.card, borderRadius: '16px', padding: '18px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ flex: 1, marginRight: '12px' }}>
+              <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>App Lock (PIN)</p>
+              <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '3px' }}>
+                {pinEnabled ? 'On — asked for when the app opens or before withdrawals' : 'Ask for a PIN when the app opens and before withdrawals.'}
+              </p>
+            </div>
+            <div
+              onClick={pinLoaded && !pinSaving ? handlePinToggle : undefined}
+              style={{
+                width: '46px', height: '26px', borderRadius: '13px', flexShrink: 0, cursor: pinLoaded ? 'pointer' : 'not-allowed',
+                background: pinEnabled ? COLORS.purple : '#E2E8F0', position: 'relative', transition: 'background 0.2s'
+              }}>
+              <div style={{
+                width: '20px', height: '20px', borderRadius: '50%', background: 'white', position: 'absolute',
+                top: '3px', left: pinEnabled ? '23px' : '3px', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+              }} />
+            </div>
+          </div>
+
+          {showPinSetup && (
+            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: `1px solid ${COLORS.border}` }}>
+              <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, marginBottom: '4px' }}>Set a 6-digit PIN</p>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '10px' }}>You'll use this to unlock the app and confirm withdrawals.</p>
+              <input
+                type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+                value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="New PIN"
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box', letterSpacing: '4px' }}
+              />
+              <input
+                type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+                value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Confirm PIN"
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px', boxSizing: 'border-box', letterSpacing: '4px' }}
+              />
+              {pinError && <p style={{ fontSize: '12px', color: COLORS.red, marginBottom: '10px' }}>{pinError}</p>}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <div
+                  onClick={pinSaving ? undefined : () => { setShowPinSetup(false); setNewPin(''); setConfirmPin(''); setPinError('') }}
+                  style={{ flex: 1, textAlign: 'center', padding: '11px', border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: COLORS.textMuted }}>
+                  Cancel
+                </div>
+                <div
+                  onClick={pinSaving ? undefined : handleSavePin}
+                  style={{ flex: 1, background: COLORS.purple, color: 'white', textAlign: 'center', padding: '11px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: pinSaving ? 0.6 : 1 }}>
+                  {pinSaving ? 'Saving...' : 'Save PIN'}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.textMuted, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Business</p>
