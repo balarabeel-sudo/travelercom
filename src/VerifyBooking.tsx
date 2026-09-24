@@ -38,6 +38,9 @@ function VerifyBooking() {
   const [result, setResult] = useState<BookingResult>(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [confirming, setConfirming] = useState(false)
+  const [rejecting, setRejecting] = useState(false)
+  const [showRejectForm, setShowRejectForm] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
 
   const handleSearch = async () => {
     if (!code.trim()) return
@@ -45,6 +48,8 @@ function VerifyBooking() {
     setSearched(false)
     setErrorMsg('')
     setResult(null)
+    setShowRejectForm(false)
+    setRejectReason('')
 
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) {
@@ -224,6 +229,45 @@ function VerifyBooking() {
     setResult({ ...result, checked_in: true })
   }
 
+  const handleReject = async () => {
+    if (!result) return
+    if (!rejectReason.trim()) {
+      setErrorMsg('Please enter a reason for rejecting this ticket.')
+      return
+    }
+
+    setRejecting(true)
+    setErrorMsg('')
+
+    const { error: bookingErr } = await supabase
+      .from('bookings')
+      .update({ booking_status: 'cancelled', rejection_reason: rejectReason.trim() })
+      .eq('id', result.id)
+
+    if (bookingErr) {
+      setRejecting(false)
+      setErrorMsg('DEBUG reject error: ' + bookingErr.message)
+      return
+    }
+
+    const { data: currentUserData } = await supabase.auth.getUser()
+    if (currentUserData.user) {
+      await supabase.from('audit_logs').insert({
+        actor_id: currentUserData.user.id,
+        action: 'rejected_ticket',
+        module: 'tickets',
+        target_type: 'booking',
+        target_id: result.id,
+        company_id: result.company_id,
+        new_value: { rejection_reason: rejectReason.trim() },
+      })
+    }
+
+    setRejecting(false)
+    setShowRejectForm(false)
+    setResult({ ...result, booking_status: 'cancelled' })
+  }
+
   const isValid = result && result.booking_status === 'confirmed' && !result.checked_in
 
   return (
@@ -319,7 +363,13 @@ function VerifyBooking() {
                     : <Icon name="alertCircle" size={30} color={COLORS.red} />}
               </div>
               <p style={{ fontSize: '15px', fontWeight: 800, color: isValid ? COLORS.green : COLORS.red }}>
-                {result.checked_in ? 'Already Checked In' : result.booking_status !== 'confirmed' ? `Booking ${result.booking_status}` : 'Valid Ticket'}
+                {result.checked_in
+                  ? 'Already Checked In'
+                  : result.booking_status === 'cancelled'
+                    ? 'Ticket Rejected'
+                    : result.booking_status !== 'confirmed'
+                      ? `Booking ${result.booking_status}`
+                      : 'Valid Ticket'}
               </p>
             </div>
 
@@ -339,24 +389,100 @@ function VerifyBooking() {
               </p>
             )}
 
-            {isValid && (
-              <button
-                onClick={handleConfirmCheckIn}
-                disabled={confirming}
-                style={{
-                  width: '100%',
-                  marginTop: '16px',
-                  padding: '12px',
-                  background: COLORS.green,
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  fontSize: '14px',
-                  cursor: confirming ? 'not-allowed' : 'pointer'
-                }}>
-                {confirming ? 'Confirming...' : (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="checkCircle" size={14} color="#fff" /> Confirm Check-In</span>)}
-              </button>
+            {isValid && !showRejectForm && (
+              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                <button
+                  onClick={() => { setShowRejectForm(true); setErrorMsg('') }}
+                  disabled={confirming}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: COLORS.redBg,
+                    color: COLORS.red,
+                    border: `1px solid #fca5a5`,
+                    borderRadius: '10px',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                    cursor: 'pointer'
+                  }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="x" size={14} color={COLORS.red} /> Reject</span>
+                </button>
+                <button
+                  onClick={handleConfirmCheckIn}
+                  disabled={confirming}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: COLORS.green,
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                    cursor: confirming ? 'not-allowed' : 'pointer'
+                  }}>
+                  {confirming ? 'Confirming...' : (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="checkCircle" size={14} color="#fff" /> Accept</span>)}
+                </button>
+              </div>
+            )}
+
+            {isValid && showRejectForm && (
+              <div style={{ marginTop: '16px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '6px', display: 'block' }}>
+                  Reason for rejecting this ticket
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="e.g. Ticket details don't match ID presented"
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: `1px solid ${COLORS.border}`,
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    boxSizing: 'border-box',
+                    resize: 'vertical' as const,
+                    marginBottom: '10px',
+                    fontFamily: 'inherit'
+                  }}
+                />
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => { setShowRejectForm(false); setRejectReason(''); setErrorMsg('') }}
+                    disabled={rejecting}
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      background: COLORS.bg,
+                      color: COLORS.textMuted,
+                      border: `1px solid ${COLORS.border}`,
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleReject}
+                    disabled={rejecting || !rejectReason.trim()}
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      background: rejecting || !rejectReason.trim() ? '#94a3b8' : COLORS.red,
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      cursor: rejecting || !rejectReason.trim() ? 'not-allowed' : 'pointer'
+                    }}>
+                    {rejecting ? 'Rejecting...' : (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="x" size={14} color="#fff" /> Confirm Reject</span>)}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}
