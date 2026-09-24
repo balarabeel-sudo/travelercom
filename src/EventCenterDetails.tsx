@@ -24,8 +24,6 @@ type ServiceDetail = {
   photo_url: string | null
   title: string
   description: string | null
-  departure_time: string | null
-  arrival_time: string | null
   destination: string
   price: number
   seats_available: number | null
@@ -78,6 +76,7 @@ function EventCenterDetails() {
   const [walletBalance, setWalletBalance] = useState(0)
 
   const [hallTypes, setHallTypes] = useState<HallType[]>([])
+  const [hallAvailCounts, setHallAvailCounts] = useState<Record<string, number>>({})
   const [selectedHallTypeId, setSelectedHallTypeId] = useState<string | null>(null)
   const [unitOptions, setUnitOptions] = useState<{ id: string; unit_number: string }[]>([])
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
@@ -86,7 +85,6 @@ function EventCenterDetails() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
-  const [reviews, setReviews] = useState<{ id: string; rating: number; comment: string | null; created_at: string; full_name: string | null }[]>([])
 
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -128,7 +126,7 @@ function EventCenterDetails() {
 
       const { data: svc, error: svcErr } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, capacity, departure_time, arrival_time, companies(business_name, allow_unit_selection)')
+        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, capacity, companies(business_name, allow_unit_selection)')
         .eq('id', id)
         .maybeSingle()
 
@@ -139,23 +137,6 @@ function EventCenterDetails() {
       }
 
       setService(svc as any)
-
-      const { data: reviewRows } = await supabase
-        .from('reviews')
-        .select('id, rating, comment, created_at, user_id')
-        .eq('service_id', id)
-        .order('created_at', { ascending: false })
-
-      if (reviewRows && reviewRows.length > 0) {
-        const userIds = reviewRows.map((r: any) => r.user_id)
-        const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', userIds)
-        const nameMap: Record<string, string | null> = {}
-        for (const p of profs || []) nameMap[p.id] = p.full_name
-        setReviews(reviewRows.map((r: any) => ({
-          id: r.id, rating: r.rating, comment: r.comment, created_at: r.created_at,
-          full_name: nameMap[r.user_id] || null,
-        })))
-      }
 
       const today = new Date().toISOString().split('T')[0]
       const { data: promoRows } = await supabase
@@ -228,22 +209,47 @@ function EventCenterDetails() {
   const usingHallTypes = hallTypes.length > 0
   const selectedHall = hallTypes.find((r) => r.id === selectedHallTypeId)
 
+  const days0 = (() => {
+    if (!startDate || !endDate) return 0
+    const inD = new Date(startDate)
+    const outD = new Date(endDate)
+    const diff = Math.round((outD.getTime() - inD.getTime()) / 86400000)
+    return diff > 0 ? diff : (startDate === endDate && startDate ? 1 : 0)
+  })()
+
   useEffect(() => {
+    // Date-aware: checks real confirmed bookings for overlap on these exact
+    // event dates, instead of a static inventory_units.status flag — this is
+    // what actually stops two customers double-booking the same hall.
     const fetchUnits = async () => {
-      if (!selectedHallTypeId) { setUnitOptions([]); setSelectedUnitId(null); return }
+      if (!selectedHallTypeId || days0 <= 0) { setUnitOptions([]); setSelectedUnitId(null); return }
       setLoadingUnits(true)
-      const { data } = await supabase
-        .from('inventory_units')
-        .select('id, unit_number')
-        .eq('inventory_item_id', selectedHallTypeId)
-        .eq('status', 'available')
-        .order('unit_number', { ascending: true })
+      const { data } = await supabase.rpc('list_available_units_for_dates', {
+        p_item_id: selectedHallTypeId, p_check_in: startDate, p_check_out: endDate,
+      })
       setUnitOptions(data || [])
       setSelectedUnitId(data && data.length > 0 ? data[0].id : null)
       setLoadingUnits(false)
     }
     fetchUnits()
-  }, [selectedHallTypeId])
+  }, [selectedHallTypeId, startDate, endDate, days0])
+
+  useEffect(() => {
+    // Real per-date-range "how many halls of this type are actually free"
+    // counts for the hall-type cards, so a hall doesn't show "Available"
+    // just because its static status flag was never reset.
+    const fetchCounts = async () => {
+      if (hallTypes.length === 0 || days0 <= 0) { setHallAvailCounts({}); return }
+      const entries = await Promise.all(hallTypes.map(async (h) => {
+        const { data } = await supabase.rpc('list_available_units_for_dates', {
+          p_item_id: h.id, p_check_in: startDate, p_check_out: endDate,
+        })
+        return [h.id, data ? data.length : 0] as const
+      }))
+      setHallAvailCounts(Object.fromEntries(entries))
+    }
+    fetchCounts()
+  }, [hallTypes, startDate, endDate, days0])
 
   const days = (() => {
     if (!startDate || !endDate) return 0
@@ -298,9 +304,9 @@ function EventCenterDetails() {
     else setStep(STEP_ORDER[idx - 1])
   }
 
-  const canContinueFromDetails = usingHallTypes
-    ? !!selectedHallTypeId && (service?.companies?.allow_unit_selection === false || !!selectedUnitId)
-    : true
+  const canContinueFromDetails = true
+
+  const canContinueFromDates = days > 0 && (!usingHallTypes || (!!selectedHallTypeId && !!selectedUnitId))
 
   // Branded receipt image — built only from real confirmed booking data.
   const downloadReceipt = () => {
@@ -353,21 +359,19 @@ function EventCenterDetails() {
     let assignedNumber = ''
 
     if (selectedHall && selectedUnitId) {
-      const chosen = unitOptions.find((u) => u.id === selectedUnitId)
-      const { data: claimedRows } = await supabase.rpc('claim_inventory_unit', { p_unit_id: selectedUnitId })
+      const { data: claimedRows } = await supabase.rpc('claim_specific_unit_for_dates', {
+        p_unit_id: selectedUnitId, p_check_in: startDate, p_check_out: endDate,
+      })
       const claimed = claimedRows && claimedRows.length > 0 ? claimedRows[0] : null
 
       if (!claimed) {
         setBooking(false)
-        const { data: refreshed } = await supabase
-          .from('inventory_units')
-          .select('id, unit_number')
-          .eq('inventory_item_id', selectedHall.id)
-          .eq('status', 'available')
-          .order('unit_number', { ascending: true })
+        const { data: refreshed } = await supabase.rpc('list_available_units_for_dates', {
+          p_item_id: selectedHall.id, p_check_in: startDate, p_check_out: endDate,
+        })
         setUnitOptions(refreshed || [])
         setSelectedUnitId(refreshed && refreshed.length > 0 ? refreshed[0].id : null)
-        setMessage({ type: 'error', text: `Hall ${chosen?.unit_number || ''} was just taken. Please pick another available option below.` })
+        setMessage({ type: 'error', text: 'This hall is not available for these dates — please try another date or hall.' })
         return
       }
       assignedUnitId = claimed.id
@@ -392,9 +396,6 @@ function EventCenterDetails() {
     }).select('id').single()
 
     if (bookingErr) {
-      if (assignedUnitId) {
-        await supabase.from('inventory_units').update({ status: 'available' }).eq('id', assignedUnitId)
-      }
       setBooking(false)
       setMessage({ type: 'error', text: 'Booking failed: ' + bookingErr.message })
       return
@@ -580,21 +581,6 @@ function EventCenterDetails() {
           {service.companies?.business_name || 'Traveler.com Partner'} <Icon name="chevronRight" size={12} color={COLORS.primary} />
         </p>
 
-        {service.departure_time && (
-          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Icon name="calendar" size={14} color={COLORS.primary} />
-              <span style={{ fontSize: '12.5px', color: COLORS.text, fontWeight: 700 }}>
-                {new Date(service.departure_time).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-              </span>
-              <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>
-                {new Date(service.departure_time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                {service.arrival_time && ` – ${new Date(service.arrival_time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`}
-              </span>
-            </div>
-          </div>
-        )}
-
         {service.description && (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '6px' }}>About this venue</p>
@@ -616,117 +602,15 @@ function EventCenterDetails() {
           </div>
         )}
 
-        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: reviews.length ? '12px' : 0 }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>Reviews</p>
-            {reviews.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Icon name="star" size={14} color="#D4A017" filled />
-                <span style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>
-                  {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
-                </span>
-                <span style={{ fontSize: '11.5px', color: COLORS.textMuted }}>({reviews.length.toLocaleString()})</span>
-              </div>
-            )}
-          </div>
-          {reviews.length === 0 ? (
-            <p style={{ fontSize: '12px', color: COLORS.textMuted }}>No reviews yet.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-              {reviews.slice(0, 5).map((r) => (
-                <div key={r.id} style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{r.full_name || 'Traveler.com user'}</span>
-                    <span style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{new Date(r.created_at).toLocaleDateString()}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '2px', marginBottom: r.comment ? '4px' : 0 }}>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <Icon key={n} name="star" size={12} color={n <= r.rating ? '#D4A017' : COLORS.border} filled={n <= r.rating} />
-                    ))}
-                  </div>
-                  {r.comment && <p style={{ fontSize: '12px', color: COLORS.textMuted, lineHeight: 1.4 }}>{r.comment}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
         {usingHallTypes ? (
-          <div style={{ marginBottom: '16px' }}>
-            <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Select a Hall / Package</p>
-            {hallTypes.map((hall) => {
-              const isAvailable = hall.available > 0
-              const isSelected = selectedHallTypeId === hall.id
-              return (
-                <div
-                  key={hall.id}
-                  onClick={() => isAvailable && setSelectedHallTypeId(hall.id)}
-                  style={{
-                    background: COLORS.card,
-                    borderRadius: '14px',
-                    padding: '14px',
-                    marginBottom: '10px',
-                    border: isSelected ? `2px solid ${COLORS.primary}` : '2px solid transparent',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-                    cursor: isAvailable ? 'pointer' : 'not-allowed',
-                    opacity: isAvailable ? 1 : 0.5,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                  <div>
-                    <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>{hall.name}</p>
-                    <p style={{ fontSize: '13px', color: COLORS.primary, fontWeight: 700, marginTop: '2px' }}>₦{hall.price.toLocaleString()}</p>
-                  </div>
-                  <span style={{
-                    fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px',
-                    background: isAvailable ? '#f0fdf4' : '#fef2f2',
-                    color: isAvailable ? COLORS.green : COLORS.red
-                  }}>
-                    {isAvailable ? 'Available' : 'Not Available'}
-                  </span>
-                </div>
-              )
-            })}
-
-            {selectedHall && (() => {
-              const allowPicking = service.companies?.allow_unit_selection ?? true
-              return (
-              <div style={{ marginTop: '4px' }}>
-                {allowPicking ? (
-                  <>
-                    <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, marginBottom: '8px' }}>Pick a Hall Number</p>
-                    {loadingUnits ? (
-                      <p style={{ fontSize: '12px', color: COLORS.textMuted }}>Loading available halls...</p>
-                    ) : unitOptions.length === 0 ? (
-                      <p style={{ fontSize: '12px', color: COLORS.red }}>No halls available for this type right now.</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {unitOptions.map((u) => (
-                          <div
-                            key={u.id}
-                            onClick={() => setSelectedUnitId(u.id)}
-                            style={{
-                              minWidth: '44px', padding: '9px 6px', textAlign: 'center', borderRadius: '9px', cursor: 'pointer',
-                              background: selectedUnitId === u.id ? COLORS.primary : COLORS.card,
-                              color: selectedUnitId === u.id ? 'white' : COLORS.text,
-                              border: `1.5px solid ${selectedUnitId === u.id ? COLORS.primary : COLORS.border}`,
-                              fontWeight: 700, fontSize: '13px'
-                            }}>
-                            {u.unit_number}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p style={{ fontSize: '12px', color: COLORS.textMuted, fontStyle: 'italic' as const }}>
-                    {loadingUnits ? 'Checking availability...' : unitOptions.length === 0 ? 'No halls available for this type right now.' : 'A hall will be assigned automatically at booking.'}
-                  </p>
-                )}
-              </div>
-              )
-            })()}
+          <div style={{
+            background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', padding: '10px 12px', marginBottom: '16px',
+            display: 'flex', alignItems: 'center', gap: '8px',
+          }}>
+            <Icon name="info" size={14} color={COLORS.primary} />
+            <p style={{ fontSize: '11.5px', color: COLORS.primary, fontWeight: 600 }}>
+              You'll pick a hall after choosing your event date, so we can show what's really free.
+            </p>
           </div>
         ) : (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
@@ -824,10 +708,90 @@ function EventCenterDetails() {
           )}
         </div>
 
+        {usingHallTypes && days > 0 && (
+          <div style={{ marginBottom: '16px' }}>
+            <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Select a Hall / Package</p>
+            {hallTypes.map((hall) => {
+              const realAvailable = hallAvailCounts[hall.id] ?? 0
+              const isAvailable = realAvailable > 0
+              const isSelected = selectedHallTypeId === hall.id
+              return (
+                <div
+                  key={hall.id}
+                  onClick={() => isAvailable && setSelectedHallTypeId(hall.id)}
+                  style={{
+                    background: COLORS.card,
+                    borderRadius: '14px',
+                    padding: '14px',
+                    marginBottom: '10px',
+                    border: isSelected ? `2px solid ${COLORS.primary}` : '2px solid transparent',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+                    cursor: isAvailable ? 'pointer' : 'not-allowed',
+                    opacity: isAvailable ? 1 : 0.5,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>{hall.name}</p>
+                    <p style={{ fontSize: '13px', color: COLORS.primary, fontWeight: 700, marginTop: '2px' }}>₦{hall.price.toLocaleString()}</p>
+                  </div>
+                  <span style={{
+                    fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px',
+                    background: isAvailable ? '#f0fdf4' : '#fef2f2',
+                    color: isAvailable ? COLORS.green : COLORS.red
+                  }}>
+                    {isAvailable ? `${realAvailable} available` : 'Not available for these dates'}
+                  </span>
+                </div>
+              )
+            })}
+
+            {selectedHall && (() => {
+              const allowPicking = service.companies?.allow_unit_selection ?? true
+              return (
+              <div style={{ marginTop: '4px' }}>
+                {allowPicking ? (
+                  <>
+                    <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, marginBottom: '8px' }}>Pick a Hall Number</p>
+                    {loadingUnits ? (
+                      <p style={{ fontSize: '12px', color: COLORS.textMuted }}>Checking availability for these dates...</p>
+                    ) : unitOptions.length === 0 ? (
+                      <p style={{ fontSize: '12px', color: COLORS.red }}>This hall is not available for the selected dates — try another date.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {unitOptions.map((u) => (
+                          <div
+                            key={u.id}
+                            onClick={() => setSelectedUnitId(u.id)}
+                            style={{
+                              minWidth: '44px', padding: '9px 6px', textAlign: 'center', borderRadius: '9px', cursor: 'pointer',
+                              background: selectedUnitId === u.id ? COLORS.primary : COLORS.card,
+                              color: selectedUnitId === u.id ? 'white' : COLORS.text,
+                              border: `1.5px solid ${selectedUnitId === u.id ? COLORS.primary : COLORS.border}`,
+                              fontWeight: 700, fontSize: '13px'
+                            }}>
+                            {u.unit_number}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p style={{ fontSize: '12px', color: COLORS.textMuted, fontStyle: 'italic' as const }}>
+                    {loadingUnits ? 'Checking availability for these dates...' : unitOptions.length === 0 ? 'This hall is not available for the selected dates — try another date.' : 'A hall will be assigned automatically at booking.'}
+                  </p>
+                )}
+              </div>
+              )
+            })()}
+          </div>
+        )}
+
         <button
           onClick={() => setStep('payment')}
-          disabled={days <= 0}
-          style={{ width: '100%', padding: '15px', background: days > 0 ? COLORS.secondary : '#94a3b8', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: days > 0 ? 'pointer' : 'not-allowed' }}>
+          disabled={!canContinueFromDates}
+          style={{ width: '100%', padding: '15px', background: canContinueFromDates ? COLORS.secondary : '#94a3b8', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: canContinueFromDates ? 'pointer' : 'not-allowed' }}>
           Continue
         </button>
       </>)}
@@ -930,12 +894,7 @@ function EventCenterDetails() {
 
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '14px', cursor: 'pointer' }}>
           <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} style={{ marginTop: '3px' }} />
-          <span style={{ fontSize: '12px', color: COLORS.textMuted }}>
-            I agree to the{' '}
-            <span onClick={(e) => { e.stopPropagation(); window.open('#/payment-terms', '_blank') }} style={{ color: COLORS.primary, textDecoration: 'underline', fontWeight: 700 }}>
-              Terms &amp; Conditions
-            </span>.
-          </span>
+          <span style={{ fontSize: '12px', color: COLORS.textMuted }}>I agree to the Terms &amp; Conditions.</span>
         </label>
 
         {message && (
