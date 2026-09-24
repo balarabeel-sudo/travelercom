@@ -5,6 +5,7 @@ import Icon from './Icons'
 import { DetailsSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
 import { downloadReceiptImage } from './receiptGenerator'
+import ConfirmPinModal from './ConfirmPinModal'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -87,6 +88,7 @@ function EventCenterDetails() {
   const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
 
   const [booking, setBooking] = useState(false)
+  const [confirmingPin, setConfirmingPin] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [ticketCode, setTicketCode] = useState('')
   const [transactionId, setTransactionId] = useState('')
@@ -915,7 +917,7 @@ function EventCenterDetails() {
         )}
 
         <button
-          onClick={handleBookNow}
+          onClick={() => setConfirmingPin(true)}
           disabled={booking || !agreedTerms}
           style={{
             width: '100%',
@@ -930,6 +932,14 @@ function EventCenterDetails() {
           }}>
           {booking ? 'Processing...' : `Confirm & Pay — ₦${activePrice.toLocaleString()}`}
         </button>
+
+        <ConfirmPinModal
+          open={confirmingPin}
+          onCancel={() => setConfirmingPin(false)}
+          onSuccess={() => { setConfirmingPin(false); handleBookNow() }}
+          title="Confirm Payment"
+          subtitle={`Enter your PIN to pay ₦${activePrice.toLocaleString()}.`}
+        />
       </>)}
       </div>
     </div>
