@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { HashRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import PushNotificationSetup from './PushNotificationSetup'
+import AppLockScreen from './AppLockScreen'
 import SplashScreen from './splashScreen'
 import AccountType from './AccountType'
 import Login from './Login'
@@ -120,6 +121,7 @@ function App() {
         <div className="tc-app-frame">
           <InviteRedirectListener />
           <PushNotificationSetup />
+          <AppLockScreen />
           <Routes>
             <Route path="/" element={<SplashScreen />} />
         <Route path="/account-type" element={<AccountType />} />
