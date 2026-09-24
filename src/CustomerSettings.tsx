@@ -138,6 +138,14 @@ function Settings() {
   const [deleteRequested, setDeleteRequested] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  const [pinEnabled, setPinEnabled] = useState(false)
+  const [pinLoaded, setPinLoaded] = useState(false)
+  const [showPinSetup, setShowPinSetup] = useState(false)
+  const [newPin, setNewPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [pinError, setPinError] = useState('')
+  const [pinSaving, setPinSaving] = useState(false)
+
   useEffect(() => {
     const load = async () => {
       const { data, error } = await supabase.auth.getUser()
@@ -160,6 +168,10 @@ function Settings() {
         setPrefs({ ...DEFAULT_PREFS, ...prefRow })
       }
       setPrefsLoaded(true)
+
+      const { data: pinExists } = await supabase.rpc('has_user_pin')
+      setPinEnabled(!!pinExists)
+      setPinLoaded(true)
     }
     load()
   }, [navigate])
@@ -169,6 +181,41 @@ function Settings() {
     setPrefs(updated)
     if (!userId) return
     await supabase.from('notification_preferences').upsert({ user_id: userId, ...updated })
+  }
+
+  const handlePinToggle = async () => {
+    if (pinEnabled) {
+      setPinEnabled(false)
+      await supabase.rpc('clear_user_pin')
+      return
+    }
+    setPinError('')
+    setNewPin('')
+    setConfirmPin('')
+    setShowPinSetup(true)
+  }
+
+  const handleSavePin = async () => {
+    setPinError('')
+    if (!/^[0-9]{6}$/.test(newPin)) {
+      setPinError('PIN must be exactly 6 digits.')
+      return
+    }
+    if (newPin !== confirmPin) {
+      setPinError('PINs do not match.')
+      return
+    }
+    setPinSaving(true)
+    const { error } = await supabase.rpc('set_user_pin', { p_pin: newPin })
+    setPinSaving(false)
+    if (error) {
+      setPinError(error.message || 'Could not save PIN. Please try again.')
+      return
+    }
+    setPinEnabled(true)
+    setShowPinSetup(false)
+    setNewPin('')
+    setConfirmPin('')
   }
 
   const handleChangePassword = async () => {
@@ -335,11 +382,51 @@ function Settings() {
 
         {/* SECURITY */}
         <SettingsSection title="Security">
+          <SettingsRow
+            icon="lock"
+            label="App Lock (PIN)"
+            desc={pinEnabled ? 'On — asked for when the app opens or before payments' : 'Off'}
+            right={<Toggle on={pinEnabled} onChange={handlePinToggle} disabled={!pinLoaded || pinSaving} />}
+          />
           <SettingsRow icon="lock" label="Two-factor authentication" right={<ComingSoonBadge />} />
           <SettingsRow icon="clock" label="Login activity" right={<ComingSoonBadge />} />
           <SettingsRow icon="shield" label="Trusted devices" right={<ComingSoonBadge />} />
           <SettingsRow icon="alertCircle" label="Security alerts" right={<ComingSoonBadge />} isLast />
         </SettingsSection>
+
+        {showPinSetup && (
+          <div style={{ margin: '-12px 16px 22px 16px', background: COLORS.card, borderRadius: '14px', border: `1px solid ${COLORS.border}`, padding: '14px' }}>
+            <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, marginBottom: '4px' }}>Set a 6-digit PIN</p>
+            <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '10px' }}>You'll use this to unlock the app and confirm payments/withdrawals.</p>
+            <input
+              type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+              value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="New PIN"
+              style={{ width: '100%', padding: '10px 11px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', boxSizing: 'border-box', letterSpacing: '4px' }}
+            />
+            <input
+              type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+              value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="Confirm PIN"
+              style={{ width: '100%', padding: '10px 11px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', boxSizing: 'border-box', letterSpacing: '4px' }}
+            />
+            {pinError && <p style={{ fontSize: '12px', color: COLORS.red, marginBottom: '10px' }}>{pinError}</p>}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => { setShowPinSetup(false); setNewPin(''); setConfirmPin(''); setPinError('') }}
+                disabled={pinSaving}
+                style={{ flex: 1, padding: '11px', background: 'transparent', color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleSavePin}
+                disabled={pinSaving}
+                style={{ flex: 1, padding: '11px', background: pinSaving ? '#94a3b8' : COLORS.primary, color: 'white', border: 'none', borderRadius: '9px', fontWeight: 'bold', fontSize: '13px', cursor: pinSaving ? 'not-allowed' : 'pointer' }}>
+                {pinSaving ? 'Saving...' : 'Save PIN'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* SUPPORT */}
         <SettingsSection title="Support">
