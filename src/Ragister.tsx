@@ -143,16 +143,14 @@ function Register() {
           <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} style={{ marginTop: '3px' }} />
           <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>
             I agree to the{' '}
-            <span onClick={(e) => { e.stopPropagation(); navigate('/terms') }} style={{ color, fontWeight: 700, cursor: 'pointer' }}>
-              Terms &amp; Conditions
-            </span>
-            {!isPersonal && (
-              <>
-                {' '}and the{' '}
-                <span onClick={(e) => { e.stopPropagation(); navigate('/company-terms') }} style={{ color, fontWeight: 700, cursor: 'pointer' }}>
-                  Company Terms &amp; Conditions
-                </span>
-              </>
+            {isPersonal ? (
+              <span onClick={(e) => { e.stopPropagation(); navigate('/terms') }} style={{ color, fontWeight: 700, cursor: 'pointer' }}>
+                Terms &amp; Conditions
+              </span>
+            ) : (
+              <span onClick={(e) => { e.stopPropagation(); navigate('/company-terms') }} style={{ color, fontWeight: 700, cursor: 'pointer' }}>
+                Company Terms &amp; Conditions
+              </span>
             )}
           </span>
         </label>
