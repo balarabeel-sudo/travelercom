@@ -72,10 +72,13 @@ function AppLockScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Re-check whenever the route changes (covers navigating away from a
-  // skipped onboarding route into the real app for the first time).
+  // Re-check whenever the route changes, but only if nothing has been
+  // established yet (e.g. finishing onboarding into the real app for the
+  // first time). Once the screen is 'locked' or 'unlocked', navigating
+  // around must NOT re-trigger this — that was locking the app on every
+  // single navigation/back-button tap, not just on background/foreground.
   useEffect(() => {
-    if (checkedOnce.current) checkPinState()
+    if (checkedOnce.current && status === 'inactive') checkPinState()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname])
 
