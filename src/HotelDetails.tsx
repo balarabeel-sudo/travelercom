@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import { downloadReceiptImage } from './receiptGenerator'
+import ConfirmPinModal from './ConfirmPinModal'
 import { DetailsSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
 
@@ -92,6 +93,7 @@ function HotelDetails() {
   const [photoIndex, setPhotoIndex] = useState(0)
 
   const [booking, setBooking] = useState(false)
+  const [confirmingPin, setConfirmingPin] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [ticketCode, setTicketCode] = useState('')
   const [transactionId, setTransactionId] = useState('')
@@ -1004,7 +1006,7 @@ function HotelDetails() {
         )}
 
         <button
-          onClick={handleBookNow}
+          onClick={() => setConfirmingPin(true)}
           disabled={booking || !agreedTerms}
           style={{
             width: '100%',
@@ -1019,6 +1021,14 @@ function HotelDetails() {
           }}>
           {booking ? 'Processing...' : `Confirm & Pay — ₦${activePrice.toLocaleString()}`}
         </button>
+
+        <ConfirmPinModal
+          open={confirmingPin}
+          onCancel={() => setConfirmingPin(false)}
+          onSuccess={() => { setConfirmingPin(false); handleBookNow() }}
+          title="Confirm Payment"
+          subtitle={`Enter your PIN to pay ₦${activePrice.toLocaleString()}.`}
+        />
       </>)}
       </div>
     </div>
