@@ -5,6 +5,7 @@ import Icon from './Icons'
 import { DetailsSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
 import { downloadReceiptImage } from './receiptGenerator'
+import ConfirmPinModal from './ConfirmPinModal'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -76,6 +77,7 @@ function FlightDetails() {
   const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
   const [booking, setBooking] = useState(false)
+  const [confirmingPin, setConfirmingPin] = useState(false)
 
   const [seatTypes, setSeatTypes] = useState<SeatType[]>([])
   const [selectedSeatTypeId, setSelectedSeatTypeId] = useState<string | null>(null)
@@ -639,7 +641,7 @@ function FlightDetails() {
             {step === 5 && (
               <button
                 disabled={booking || !agreedTerms}
-                onClick={handleConfirmBooking}
+                onClick={() => setConfirmingPin(true)}
                 style={{ flex: 2, padding: '14px', borderRadius: '12px', border: 'none', background: booking || !agreedTerms ? '#94a3b8' : COLORS.secondary, color: 'white', fontWeight: 700, fontSize: '14px' }}>
                 {booking ? 'Processing...' : 'Confirm Booking'}
               </button>
@@ -647,6 +649,14 @@ function FlightDetails() {
           </div>
         </div>
       )}
+
+      <ConfirmPinModal
+        open={confirmingPin}
+        onCancel={() => setConfirmingPin(false)}
+        onSuccess={() => { setConfirmingPin(false); handleConfirmBooking() }}
+        title="Confirm Payment"
+        subtitle={`Enter your PIN to pay ₦${total.toLocaleString()}.`}
+      />
     </div>
   )
 }
