@@ -64,6 +64,42 @@ type SeatType = { id: string; name: string; price: number; available: number }
 
 const STEPS = ['Flight', 'Passenger', 'Extras', 'Payment', 'Review']
 
+type PassengerType = 'adult' | 'child' | 'infant'
+type PassengerForm = {
+  type: PassengerType
+  title: string
+  firstName: string
+  middleName: string
+  lastName: string
+  dob: string
+  gender: string
+  nationality: string
+  idType: string
+  idNumber: string
+  passportCountry: string
+  passportExpiry: string
+}
+const emptyPassenger = (type: PassengerType): PassengerForm => ({
+  type, title: type === 'adult' ? 'Mr' : '', firstName: '', middleName: '', lastName: '', dob: '',
+  gender: 'Male', nationality: 'Nigerian', idType: ID_TYPES[0], idNumber: '', passportCountry: 'Nigeria', passportExpiry: '',
+})
+
+function CountStepper({ label, hint, value, onChange, min, max }: { label: string; hint?: string; value: number; onChange: (v: number) => void; min: number; max: number }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
+      <div>
+        <p style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.text }}>{label}</p>
+        {hint && <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{hint}</p>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span onClick={() => value > min && onChange(value - 1)} style={{ width: '30px', height: '30px', borderRadius: '50%', border: `1.5px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: value > min ? 'pointer' : 'not-allowed', opacity: value > min ? 1 : 0.4, fontSize: '17px', fontWeight: 700, color: COLORS.text }}>−</span>
+        <span style={{ fontSize: '15px', fontWeight: 800, minWidth: '18px', textAlign: 'center' as const }}>{value}</span>
+        <span onClick={() => value < max && onChange(value + 1)} style={{ width: '30px', height: '30px', borderRadius: '50%', border: `1.5px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: value < max ? 'pointer' : 'not-allowed', opacity: value < max ? 1 : 0.4, fontSize: '15px', fontWeight: 700, color: COLORS.text }}>+</span>
+      </div>
+    </div>
+  )
+}
+
 function FlightDetails() {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -84,14 +120,32 @@ function FlightDetails() {
   const [unitOptions, setUnitOptions] = useState<{ id: string; unit_number: string }[]>([])
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
 
-  const [fullName, setFullName] = useState('')
-  const [dob, setDob] = useState('')
-  const [gender, setGender] = useState('Male')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
-  const [nationality, setNationality] = useState('Nigerian')
-  const [idType, setIdType] = useState<string>(ID_TYPES[0])
-  const [idNumber, setIdNumber] = useState('')
+  const [adultCount, setAdultCount] = useState(1)
+  const [childCount, setChildCount] = useState(0)
+  const [infantCount, setInfantCount] = useState(0)
+  const [passengers, setPassengers] = useState<PassengerForm[]>([emptyPassenger('adult')])
+
+  const updatePassenger = (idx: number, patch: Partial<PassengerForm>) => {
+    setPassengers((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)))
+  }
+
+  useEffect(() => {
+    setPassengers((prev) => {
+      const byType = (t: PassengerType) => prev.filter((p) => p.type === t)
+      const prevAdults = byType('adult')
+      const prevChildren = byType('child')
+      const prevInfants = byType('infant')
+      const next: PassengerForm[] = []
+      for (let i = 0; i < adultCount; i++) next.push(prevAdults[i] || emptyPassenger('adult'))
+      for (let i = 0; i < childCount; i++) next.push(prevChildren[i] || emptyPassenger('child'))
+      for (let i = 0; i < infantCount; i++) next.push(prevInfants[i] || emptyPassenger('infant'))
+      return next
+    })
+  }, [adultCount, childCount, infantCount])
+
+  const [contactName, setContactName] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
+  const [contactEmail, setContactEmail] = useState('')
 
   const [extraBaggage, setExtraBaggage] = useState(false)
   const [travelInsurance, setTravelInsurance] = useState(false)
@@ -110,8 +164,8 @@ function FlightDetails() {
       const { data: userData, error } = await supabase.auth.getUser()
       if (error || !userData.user) { navigate('/login'); return }
       setUserId(userData.user.id)
-      setFullName(userData.user.user_metadata?.full_name || '')
-      setEmail(userData.user.email || '')
+      setContactName(userData.user.user_metadata?.full_name || '')
+      setContactEmail(userData.user.email || '')
 
       const { data: wallet } = await supabase
         .from('wallets')
@@ -201,10 +255,18 @@ function FlightDetails() {
     return Math.max(0, baseFare - activePromo.discount_value)
   })()
   const discountAmount = baseFare - fareAfterDiscount
+  const payingPaxCount = adultCount + childCount
+  const farePortion = fareAfterDiscount * payingPaxCount
   const addonsTotal = (extraBaggage ? ADDON_PRICES.baggage : 0) + (travelInsurance ? ADDON_PRICES.insurance : 0) + (airportPickup ? ADDON_PRICES.pickup : 0)
-  const total = fareAfterDiscount + addonsTotal + SERVICE_FEE
+  const total = farePortion + addonsTotal + SERVICE_FEE
 
-  const passengerValid = fullName.trim() && dob && phone.trim() && email.trim() && nationality.trim() && isIdFormatValid(idType, idNumber)
+  const passengerValid = passengers.length > 0 && passengers.every((p) => {
+    const basicOk = p.firstName.trim() && p.lastName.trim() && p.dob
+    if (p.type !== 'adult') return !!basicOk
+    const idOk = isIdFormatValid(p.idType, p.idNumber)
+    const passportOk = p.idType !== 'International Passport' || (p.passportCountry.trim() && p.passportExpiry && new Date(p.passportExpiry) > new Date())
+    return !!(basicOk && idOk && passportOk)
+  }) && contactName.trim() && contactPhone.trim() && contactEmail.trim()
 
   const handleConfirmBooking = async () => {
     if (!service || !agreedTerms) return
@@ -238,27 +300,57 @@ function FlightDetails() {
       assignedNumber = claimed.unit_number
     }
 
+    const leadAdult = passengers.find((p) => p.type === 'adult')
     const { data: newBooking, error: bookingErr } = await supabase.from('bookings').insert({
       user_id: userId,
       service_id: service.id,
       company_id: service.company_id,
       inventory_item_id: selectedSeat?.id || null,
-      quantity: 1,
+      quantity: passengers.length,
       amount_paid: total,
       commission_amount: 0,
       booking_status: 'confirmed',
       ticket_code: code,
-      customer_name: fullName || null,
+      customer_name: contactName || null,
+      customer_phone: contactPhone || null,
+      customer_email: contactEmail || null,
       assigned_unit_number: assignedNumber || null,
       promotion_id: activePromo?.id || null,
-      id_type: idType,
-      id_number: idNumber.trim(),
+      id_type: leadAdult?.idType || null,
+      id_number: leadAdult?.idNumber.trim() || null,
     }).select('id').single()
 
     if (bookingErr) {
       if (assignedUnitId) await supabase.from('inventory_units').update({ status: 'available' }).eq('id', assignedUnitId)
       setBooking(false)
       setMessage({ type: 'error', text: 'Booking failed: ' + bookingErr.message })
+      return
+    }
+
+    const { error: paxErr } = await supabase.from('booking_passengers').insert(
+      passengers.map((p) => ({
+        booking_id: newBooking.id,
+        passenger_type: p.type,
+        title: p.title || null,
+        first_name: p.firstName.trim(),
+        middle_name: p.middleName.trim() || null,
+        last_name: p.lastName.trim(),
+        dob: p.dob || null,
+        gender: p.gender || null,
+        nationality: p.nationality.trim() || null,
+        id_type: p.type === 'adult' ? p.idType : null,
+        id_number: p.type === 'adult' ? p.idNumber.trim() : null,
+        passport_country: p.type === 'adult' && p.idType === 'International Passport' ? p.passportCountry.trim() : null,
+        passport_expiry: p.type === 'adult' && p.idType === 'International Passport' ? p.passportExpiry : null,
+      }))
+    )
+
+    if (paxErr) {
+      // No payment taken yet at this point — safe to fully undo.
+      await supabase.from('bookings').delete().eq('id', newBooking.id)
+      if (assignedUnitId) await supabase.from('inventory_units').update({ status: 'available' }).eq('id', assignedUnitId)
+      setBooking(false)
+      setMessage({ type: 'error', text: 'Booking failed: ' + paxErr.message })
       return
     }
 
@@ -306,9 +398,10 @@ function FlightDetails() {
       transactionId: transactionId || undefined,
       filenamePrefix: 'Flight',
       rows: [
-        { label: 'Passenger Name', value: fullName },
-        { label: 'Email', value: email },
-        { label: 'Phone', value: phone },
+        { label: 'Contact', value: contactName },
+        { label: 'Email', value: contactEmail },
+        { label: 'Phone', value: contactPhone },
+        { label: 'Passengers', value: passengers.map((p) => `${p.firstName} ${p.lastName} (${p.type})`).join(', ') },
         { label: 'Route', value: `${service.origin || '—'} \u2192 ${service.destination}` },
         { label: 'Departure', value: service.departure_time ? new Date(service.departure_time).toLocaleString() : 'TBA' },
         { label: 'Airline', value: service.companies?.business_name || 'Traveler.com Partner' },
@@ -411,40 +504,88 @@ function FlightDetails() {
           </>
         )}
 
-        {/* STEP 2 — PASSENGER INFORMATION */}
+        {/* STEP 2 — PASSENGERS */}
         {step === 2 && (
-          <div style={cardStyle}>
-            <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '14px' }}>Passenger Information</p>
-            <label style={labelStyle}>Full Name</label>
-            <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="As it appears on your ID" />
-            <label style={labelStyle}>Date of Birth</label>
-            <input style={inputStyle} type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
-            <label style={labelStyle}>Gender</label>
-            <select style={inputStyle} value={gender} onChange={(e) => setGender(e.target.value)}>
-              <option>Male</option><option>Female</option>
-            </select>
-            <label style={labelStyle}>Phone Number</label>
-            <input style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="080..." />
-            <label style={labelStyle}>Email</label>
-            <input style={inputStyle} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <label style={labelStyle}>Nationality</label>
-            <input style={inputStyle} value={nationality} onChange={(e) => setNationality(e.target.value)} />
+          <>
+            <div style={cardStyle}>
+              <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>Passengers</p>
+              <CountStepper label="Adults" hint="Age 12+" value={adultCount} onChange={setAdultCount} min={1} max={9} />
+              <div style={{ height: '1px', background: COLORS.border }} />
+              <CountStepper label="Children" hint="Age 2–11" value={childCount} onChange={setChildCount} min={0} max={8} />
+              <div style={{ height: '1px', background: COLORS.border }} />
+              <CountStepper label="Infants" hint="Under 2, on lap — max 1 per adult" value={infantCount} onChange={(v) => setInfantCount(Math.min(v, adultCount))} min={0} max={adultCount} />
+            </div>
 
-            <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text, marginTop: '6px', marginBottom: '10px' }}>Identity Verification</p>
-            <select style={inputStyle} value={idType} onChange={(e) => { setIdType(e.target.value); setIdNumber('') }}>
-              {ID_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <input style={{ ...inputStyle, marginBottom: '4px' }} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder={`Enter your ${idType} number`} />
-            {idNumber.trim().length > 0 && (
-              <p style={{ fontSize: '11px', fontWeight: 700, marginBottom: '10px', color: isIdFormatValid(idType, idNumber) ? COLORS.green : COLORS.red, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Icon name={isIdFormatValid(idType, idNumber) ? 'check' : 'x'} size={13} color={isIdFormatValid(idType, idNumber) ? COLORS.green : COLORS.red} strokeWidth={2.5} />
-                {isIdFormatValid(idType, idNumber) ? 'Format valid' : 'Format invalid — check the number'}
-              </p>
-            )}
-            <p style={{ fontSize: '10.5px', color: COLORS.textMuted, fontStyle: 'italic' as const }}>
-              Identity information is required by airlines for passenger verification.
-            </p>
-          </div>
+            {passengers.map((p, idx) => {
+              const typeLabel = p.type === 'adult' ? 'Adult' : p.type === 'child' ? 'Child' : 'Infant'
+              const countOfType = passengers.filter((x) => x.type === p.type).length
+              const indexOfType = passengers.slice(0, idx).filter((x) => x.type === p.type).length + 1
+              return (
+                <div key={idx} style={cardStyle}>
+                  <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>{typeLabel} {indexOfType} of {countOfType}</p>
+
+                  {p.type === 'adult' && (
+                    <>
+                      <label style={labelStyle}>Title</label>
+                      <select style={inputStyle} value={p.title} onChange={(e) => updatePassenger(idx, { title: e.target.value })}>
+                        <option>Mr</option><option>Mrs</option><option>Ms</option><option>Dr</option>
+                      </select>
+                    </>
+                  )}
+                  <label style={labelStyle}>First Name</label>
+                  <input style={inputStyle} value={p.firstName} onChange={(e) => updatePassenger(idx, { firstName: e.target.value })} placeholder="As it appears on your ID" />
+                  <label style={labelStyle}>Middle Name (optional)</label>
+                  <input style={inputStyle} value={p.middleName} onChange={(e) => updatePassenger(idx, { middleName: e.target.value })} />
+                  <label style={labelStyle}>Last Name</label>
+                  <input style={inputStyle} value={p.lastName} onChange={(e) => updatePassenger(idx, { lastName: e.target.value })} />
+                  <label style={labelStyle}>Date of Birth</label>
+                  <input style={inputStyle} type="date" value={p.dob} onChange={(e) => updatePassenger(idx, { dob: e.target.value })} />
+                  <label style={labelStyle}>Gender</label>
+                  <select style={inputStyle} value={p.gender} onChange={(e) => updatePassenger(idx, { gender: e.target.value })}>
+                    <option>Male</option><option>Female</option>
+                  </select>
+                  <label style={labelStyle}>Nationality</label>
+                  <input style={inputStyle} value={p.nationality} onChange={(e) => updatePassenger(idx, { nationality: e.target.value })} />
+
+                  {p.type === 'adult' && (
+                    <>
+                      <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginTop: '6px', marginBottom: '8px' }}>Identity Verification</p>
+                      <select style={inputStyle} value={p.idType} onChange={(e) => updatePassenger(idx, { idType: e.target.value, idNumber: '' })}>
+                        {ID_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <input style={{ ...inputStyle, marginBottom: '4px' }} value={p.idNumber} onChange={(e) => updatePassenger(idx, { idNumber: e.target.value })} placeholder={`Enter ${p.idType} number`} />
+                      {p.idNumber.trim().length > 0 && (
+                        <p style={{ fontSize: '11px', fontWeight: 700, color: isIdFormatValid(p.idType, p.idNumber) ? COLORS.green : COLORS.red, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Icon name={isIdFormatValid(p.idType, p.idNumber) ? 'check' : 'x'} size={13} color={isIdFormatValid(p.idType, p.idNumber) ? COLORS.green : COLORS.red} strokeWidth={2.5} />
+                          {isIdFormatValid(p.idType, p.idNumber) ? 'Format valid' : 'Format invalid — check the number'}
+                        </p>
+                      )}
+
+                      {p.idType === 'International Passport' && (
+                        <>
+                          <label style={labelStyle}>Passport Issuing Country</label>
+                          <input style={inputStyle} value={p.passportCountry} onChange={(e) => updatePassenger(idx, { passportCountry: e.target.value })} />
+                          <label style={labelStyle}>Passport Expiry Date</label>
+                          <input style={inputStyle} type="date" value={p.passportExpiry} onChange={(e) => updatePassenger(idx, { passportExpiry: e.target.value })} />
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+              )
+            })}
+
+            <div style={cardStyle}>
+              <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>Contact Information</p>
+              <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginBottom: '12px' }}>This contact will receive booking updates and important travel notifications.</p>
+              <label style={labelStyle}>Full Name</label>
+              <input style={inputStyle} value={contactName} onChange={(e) => setContactName(e.target.value)} />
+              <label style={labelStyle}>Phone Number</label>
+              <input style={inputStyle} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="080..." />
+              <label style={labelStyle}>Email</label>
+              <input style={inputStyle} type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+            </div>
+          </>
         )}
 
         {/* STEP 3 — OPTIONAL SERVICES */}
@@ -516,10 +657,10 @@ function FlightDetails() {
           <div style={cardStyle}>
             <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '14px' }}>Payment Summary</p>
             {[
-              ['Flight Fare', baseFare],
+              [`Flight Fare × ${payingPaxCount} (infants ride free)`, farePortion],
               ['Taxes', 0],
               ['Service Fee', SERVICE_FEE],
-              ['Discount', -discountAmount],
+              ['Discount', -(discountAmount * payingPaxCount)],
               ['Add-ons', addonsTotal],
             ].map(([label, val]) => (
               <div key={label as string} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0' }}>
@@ -560,7 +701,8 @@ function FlightDetails() {
           <div style={cardStyle}>
             <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '14px' }}>Review & Confirm</p>
             {[
-              ['Passenger', fullName],
+              ['Contact', contactName],
+              ['Passengers', passengers.map((p) => `${p.firstName} ${p.lastName}`.trim() || `(${p.type})`).join(', ')],
               ['Flight', service.title],
               ['Route', `${service.origin || '—'} → ${service.destination}`],
               ['Date', service.departure_time ? new Date(service.departure_time).toLocaleString() : 'TBA'],
@@ -601,8 +743,8 @@ function FlightDetails() {
                 <span style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.gold }}>{pnr}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-                <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>Passenger</span>
-                <span style={{ fontSize: '12.5px', fontWeight: 700 }}>{fullName}</span>
+                <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>Passengers</span>
+                <span style={{ fontSize: '12.5px', fontWeight: 700, textAlign: 'right' as const }}>{passengers.map((p) => `${p.firstName} ${p.lastName}`.trim() || p.type).join(', ')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
                 <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>Route</span>
