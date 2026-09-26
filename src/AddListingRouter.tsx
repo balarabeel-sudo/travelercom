@@ -5,14 +5,15 @@ import { supabase } from './supabaseClient'
 const COLORS = { bg: '#F8FAFC', textMuted: '#64748B' }
 
 // Dedicated Add Listing pages, one per category. Categories not listed here
-// (train, flight) still fall back to the older shared AddListing.tsx until
-// their own dedicated pages are built.
+// (train) still fall back to the older shared AddListing.tsx until their
+// own dedicated pages are built.
 const DEDICATED_PATH: Record<string, string> = {
   hotel: '/add-hotel-listing',
   bus: '/add-bus-listing',
   tour: '/add-tour-listing',
   event_center: '/add-event-center-listing',
   vehicle_rental: '/add-vehicle-rental-listing',
+  flight: '/add-flight-listing',
 }
 
 function AddListingRouter() {
