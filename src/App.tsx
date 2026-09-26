@@ -71,6 +71,7 @@ import Profile from './Profile'
 import AddListingRouter from './AddListingRouter'
 import AddBusListing from './AddBusListing'
 import AddVehicleRentalListing from './AddVehicleRentalListing'
+import AddFlightListing from './AddFlightListing'
 import VehicleRentals from './VehicleRentals'
 import VehicleRentalDetails from './VehicleRentalDetails'
 
@@ -141,6 +142,7 @@ function App() {
         <Route path="/add-tour-listing" element={<AddTourListing />} />
         <Route path="/add-event-center-listing" element={<AddEventCenterListing />} />
         <Route path="/add-vehicle-rental-listing" element={<AddVehicleRentalListing />} />
+        <Route path="/add-flight-listing" element={<AddFlightListing />} />
         <Route path="/my-listings" element={<MyListings />} />
         <Route path="/hotels" element={<Hotels />} />
         <Route path="/wallet" element={<Wallet />} />
