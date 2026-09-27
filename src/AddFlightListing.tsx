@@ -22,6 +22,9 @@ type CabinClass = {
 
 const emptyCabinClass = (name = ''): CabinClass => ({ id: null, name, price: '', quantity: '', originalQuantity: 0 })
 
+type Addon = { id: string | null; name: string; price: string }
+const emptyAddon = (): Addon => ({ id: null, name: '', price: '' })
+
 function AddFlightListing() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -43,6 +46,7 @@ function AddFlightListing() {
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
 
   const [cabinClasses, setCabinClasses] = useState<CabinClass[]>([emptyCabinClass('Economy')])
+  const [addons, setAddons] = useState<Addon[]>([])
 
   const [submitting, setSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -93,6 +97,11 @@ function AddFlightListing() {
             // Older/simple listing with no cabin-class inventory yet — seed one row from its own price/count
             setCabinClasses([{ id: null, name: 'Economy', price: listing.price ? String(listing.price) : '', quantity: listing.seats_available ? String(listing.seats_available) : '', originalQuantity: 0 }])
           }
+
+          const { data: addonRows, error: addonErr } = await supabase
+            .from('service_addons').select('id, name, price').eq('service_id', editId).order('price', { ascending: true })
+          if (addonErr) { setNetError(true); setLoading(false); return }
+          if (addonRows) setAddons(addonRows.map((a) => ({ id: a.id, name: a.name, price: String(a.price) })))
         }
       }
     }
@@ -106,6 +115,10 @@ function AddFlightListing() {
   }
   const addCabinClass = () => setCabinClasses((prev) => [...prev, emptyCabinClass()])
   const removeCabinClass = (idx: number) => setCabinClasses((prev) => prev.filter((_, i) => i !== idx))
+
+  const updateAddon = (idx: number, patch: Partial<Addon>) => setAddons((prev) => prev.map((a, i) => (i === idx ? { ...a, ...patch } : a)))
+  const addAddon = () => setAddons((prev) => [...prev, emptyAddon()])
+  const removeAddon = (idx: number) => setAddons((prev) => prev.filter((_, i) => i !== idx))
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -142,6 +155,13 @@ function AddFlightListing() {
       const priceVal = parseFloat(c.price)
       if (!c.name.trim() || !qty || qty < 1 || !priceVal || priceVal <= 0) {
         setErrorMsg('Every cabin class needs a name, a seat count, and a price.')
+        return
+      }
+    }
+    const validAddons = addons.filter((a) => a.name.trim() || a.price.trim())
+    for (const a of validAddons) {
+      if (!a.name.trim() || !a.price.trim() || parseFloat(a.price) < 0) {
+        setErrorMsg('Every extra needs a name and a price.')
         return
       }
     }
@@ -241,6 +261,13 @@ function AddFlightListing() {
           }
         }
       }
+    }
+
+    await supabase.from('service_addons').delete().eq('service_id', serviceId)
+    if (validAddons.length > 0) {
+      await supabase.from('service_addons').insert(
+        validAddons.map((a) => ({ service_id: serviceId, name: a.name.trim(), price: parseFloat(a.price) }))
+      )
     }
 
     const { data: userData } = await supabase.auth.getUser()
@@ -425,10 +452,31 @@ function AddFlightListing() {
             </div>
           ))}
 
-          <span onClick={addCabinClass} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: COLORS.primary, fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '14px' }}>
+          <span onClick={addCabinClass} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: COLORS.primary, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
             <Icon name="plus" size={14} color={COLORS.primary} /> Add another cabin class
           </span>
+        </div>
 
+        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', marginTop: '14px' }}>
+          <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>Extras (optional)</p>
+          <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '14px' }}>
+            Optional add-ons customers can choose at checkout — e.g. extra baggage, travel insurance, airport pickup. Leave empty if you don't offer any.
+          </p>
+
+          {addons.map((a, idx) => (
+            <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
+              <input type="text" placeholder="Extra name (e.g. Extra Baggage)" value={a.name} onChange={(e) => updateAddon(idx, { name: e.target.value })} style={{ ...inputStyle, flex: 2 }} />
+              <input type="number" placeholder="Price (₦)" value={a.price} onChange={(e) => updateAddon(idx, { price: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
+              <span onClick={() => removeAddon(idx)} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={16} color={COLORS.textMuted} /></span>
+            </div>
+          ))}
+
+          <span onClick={addAddon} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: COLORS.primary, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <Icon name="plus" size={14} color={COLORS.primary} /> Add an extra
+          </span>
+        </div>
+
+        <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', marginTop: '14px' }}>
           <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '14px' }}>
             Commission: {COMMISSION_RATE}% will be deducted after each verified booking.
           </p>
