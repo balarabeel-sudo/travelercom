@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import AdminFlightForm from './AdminFlightForm'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -69,6 +70,8 @@ const STATUS_FILTERS = [
   { key: 'inactive', label: 'Inactive' },
 ]
 
+type Mode = 'list' | 'form'
+
 export default function AdminFlights() {
   const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
@@ -78,6 +81,9 @@ export default function AdminFlights() {
   const [viewing, setViewing] = useState<Listing | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState('')
+
+  const [mode, setMode] = useState<Mode>('list')
+  const [formEditId, setFormEditId] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -112,7 +118,7 @@ export default function AdminFlights() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [statusFilter])
+  useEffect(() => { if (mode === 'list') load() }, [statusFilter, mode])
 
   const total = listings.length
   const activeCount = listings.filter((l) => l.status === 'active').length
@@ -143,6 +149,56 @@ export default function AdminFlights() {
     setActionLoading(false)
     setViewing((v) => (v ? { ...v, status: newStatus } : v))
     load()
+  }
+
+  async function handleDelete(listing: Listing) {
+    setActionLoading(true)
+    setActionError('')
+
+    // Cabin classes (inventory_items) cascade-delete their seat units, but the
+    // DB will refuse this if any real booking is linked to one of them.
+    const { error: invErr } = await supabase.from('inventory_items').delete().eq('service_id', listing.id)
+    if (invErr) {
+      setActionError('Cannot delete: this flight still has bookings linked to it. Deactivate it instead.')
+      setActionLoading(false)
+      return
+    }
+
+    const { error: svcErr } = await supabase.from('services').delete().eq('id', listing.id)
+    if (svcErr) {
+      setActionError('Cannot delete: this flight still has bookings linked to it. Deactivate it instead.')
+      setActionLoading(false)
+      return
+    }
+
+    const { data: userData } = await supabase.auth.getUser()
+    if (userData?.user) {
+      await supabase.rpc('log_audit', {
+        p_action: 'admin_deleted_listing',
+        p_module: 'listings',
+        p_target_type: 'service',
+        p_target_id: listing.id,
+        p_previous: { title: listing.title, category: 'flight' },
+        p_new: null,
+        p_company_id: listing.company_id,
+      })
+    }
+
+    setActionLoading(false)
+    setViewing(null)
+    load()
+  }
+
+  if (mode === 'form') {
+    return (
+      <div style={{ padding: isDesktop ? '24px 28px' : '16px' }}>
+        <AdminFlightForm
+          editId={formEditId}
+          onCancel={() => setMode('list')}
+          onSaved={() => { setMode('list'); setViewing(null); setFormEditId(null) }}
+        />
+      </div>
+    )
   }
 
   if (viewing) {
@@ -204,19 +260,40 @@ export default function AdminFlights() {
 
             {actionError && <p style={{ fontSize: '12px', color: COLORS.red, marginTop: '10px' }}>{actionError}</p>}
 
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <button
+                onClick={() => { setFormEditId(viewing.id); setMode('form') }}
+                style={{ flex: 1, padding: '12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontWeight: 700, fontSize: '13.5px', cursor: 'pointer', background: COLORS.card, color: COLORS.text }}>
+                Edit Listing
+              </button>
+              <button
+                disabled={actionLoading}
+                onClick={() => {
+                  const verb = viewing.status === 'active' ? 'deactivate' : 'activate'
+                  if (window.confirm(`Are you sure you want to ${verb} "${viewing.title}"? ${verb === 'deactivate' ? 'It will no longer be bookable by customers.' : ''}`)) {
+                    toggleStatus(viewing)
+                  }
+                }}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: '10px', border: 'none', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer',
+                  background: viewing.status === 'active' ? COLORS.red : COLORS.green, color: 'white', opacity: actionLoading ? 0.6 : 1,
+                }}>
+                {actionLoading ? 'Please wait…' : viewing.status === 'active' ? 'Deactivate' : 'Activate'}
+              </button>
+            </div>
+
             <button
               disabled={actionLoading}
               onClick={() => {
-                const verb = viewing.status === 'active' ? 'deactivate' : 'activate'
-                if (window.confirm(`Are you sure you want to ${verb} "${viewing.title}"? ${verb === 'deactivate' ? 'It will no longer be bookable by customers.' : ''}`)) {
-                  toggleStatus(viewing)
+                if (window.confirm(`Permanently delete "${viewing.title}"? This cannot be undone. If it has any bookings, deletion will be blocked automatically — deactivate it instead in that case.`)) {
+                  handleDelete(viewing)
                 }
               }}
               style={{
-                width: '100%', marginTop: '16px', padding: '12px', borderRadius: '10px', border: 'none', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer',
-                background: viewing.status === 'active' ? COLORS.red : COLORS.green, color: 'white', opacity: actionLoading ? 0.6 : 1,
+                width: '100%', marginTop: '8px', padding: '12px', borderRadius: '10px', border: `1px solid ${COLORS.red}`, fontWeight: 700, fontSize: '13.5px', cursor: 'pointer',
+                background: 'transparent', color: COLORS.red, opacity: actionLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
               }}>
-              {actionLoading ? 'Please wait…' : viewing.status === 'active' ? 'Deactivate Listing' : 'Activate Listing'}
+              <Icon name="trash" size={14} color={COLORS.red} /> Delete Listing
             </button>
           </div>
         </div>
@@ -226,9 +303,16 @@ export default function AdminFlights() {
 
   return (
     <div style={{ padding: isDesktop ? '24px 28px' : '16px', maxWidth: '1400px', margin: '0 auto', overflowY: 'auto' as const, height: '100%' }}>
-      <div style={{ marginBottom: '4px' }}>
-        <h2 style={{ fontSize: isDesktop ? '20px' : '17px', fontWeight: 800, color: COLORS.text }}>Flights</h2>
-        <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>All flight listings across the platform.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '4px' }}>
+        <div>
+          <h2 style={{ fontSize: isDesktop ? '20px' : '17px', fontWeight: 800, color: COLORS.text }}>Flights</h2>
+          <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>All flight listings across the platform.</p>
+        </div>
+        <button
+          onClick={() => { setFormEditId(null); setMode('form') }}
+          style={{ padding: '10px 14px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: '9px', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' as const }}>
+          <Icon name="plus" size={13} color="white" /> Add Listing
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: '8px', margin: '14px 0' }}>
