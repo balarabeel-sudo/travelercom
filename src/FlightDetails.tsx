@@ -26,6 +26,95 @@ const SERVICE_FEE = 500
 
 const ID_TYPES = ['NIN', 'International Passport', "Driver's License"] as const
 
+// Same pattern/position logic used when the cabin class's seat map was built
+// (AddFlightListing.tsx / AdminFlightForm.tsx) — kept in sync so the seat grid
+// shown here always matches how the layout was actually generated.
+const SEAT_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+type SeatPos = 'window' | 'middle' | 'aisle'
+
+function parsePattern(pattern: string): number[] {
+  return pattern.split('-').map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isFinite(n) && n > 0)
+}
+
+function buildRowLayout(groupSizes: number[]): { label: string; position: SeatPos; gapBefore: boolean }[] {
+  const seats: { label: string; position: SeatPos; gapBefore: boolean }[] = []
+  let li = 0
+  groupSizes.forEach((size, gi) => {
+    for (let s = 0; s < size; s++) {
+      const isFirstOfGroup = s === 0
+      const isLastOfGroup = s === size - 1
+      const isVeryFirstGroup = gi === 0
+      const isVeryLastGroup = gi === groupSizes.length - 1
+      let position: SeatPos = 'middle'
+      if (size === 1) {
+        position = (isVeryFirstGroup || isVeryLastGroup) ? 'window' : 'aisle'
+      } else if (isFirstOfGroup && isVeryFirstGroup) position = 'window'
+      else if (isLastOfGroup && isVeryLastGroup) position = 'window'
+      else if (isFirstOfGroup || isLastOfGroup) position = 'aisle'
+      seats.push({ label: SEAT_LETTERS[li] || '?', position, gapBefore: gi > 0 && s === 0 })
+      li++
+    }
+  })
+  return seats
+}
+
+function SeatMapGrid({ units, groupSizes, selectedUnitId, onSelect }: {
+  units: { id: string; unit_number: string; status: string; seat_row: number | null; seat_col: string | null }[]
+  groupSizes: number[]
+  selectedUnitId: string | null
+  onSelect: (id: string) => void
+}) {
+  const rowLayout = buildRowLayout(groupSizes)
+  const rows = Array.from(new Set(units.map((u) => u.seat_row))).filter((r): r is number => r != null).sort((a, b) => a - b)
+  const byRowCol: Record<string, typeof units[number]> = {}
+  units.forEach((u) => { if (u.seat_row != null && u.seat_col) byRowCol[`${u.seat_row}-${u.seat_col}`] = u })
+  const posColor: Record<SeatPos, string> = { window: COLORS.primary, aisle: COLORS.secondary, middle: '#94a3b8' }
+
+  return (
+    <div>
+      <div style={{ overflowX: 'auto' as const, paddingBottom: '6px' }}>
+        <div style={{ display: 'inline-flex', flexDirection: 'column' as const, gap: '5px' }}>
+          {rows.map((r) => (
+            <div key={r} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '9.5px', color: COLORS.textMuted, width: '14px', textAlign: 'right' as const, flexShrink: 0 }}>{r}</span>
+              {rowLayout.map((seat, gi) => {
+                const unit = byRowCol[`${r}-${seat.label}`]
+                const isSelected = !!unit && unit.id === selectedUnitId
+                const isAvailable = !!unit && unit.status === 'available'
+                return (
+                  <span key={gi} style={{ display: 'flex', alignItems: 'center' }}>
+                    {seat.gapBefore && <span style={{ width: '10px', flexShrink: 0 }} />}
+                    <span
+                      onClick={() => isAvailable && onSelect(unit!.id)}
+                      style={{
+                        width: '26px', height: '26px', borderRadius: '6px', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '9.5px', fontWeight: 700,
+                        cursor: isAvailable ? 'pointer' : 'not-allowed',
+                        background: !unit ? 'transparent' : isSelected ? COLORS.secondary : isAvailable ? '#F1F5F9' : '#E2E8F0',
+                        color: !unit ? 'transparent' : isSelected ? 'white' : isAvailable ? posColor[seat.position] : '#94a3b8',
+                        border: unit && isAvailable && !isSelected ? `1.5px solid ${posColor[seat.position]}` : 'none',
+                        opacity: unit && !isAvailable ? 0.55 : 1,
+                      }}>
+                      {seat.label}
+                    </span>
+                  </span>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      <p style={{ fontSize: '10px', color: COLORS.textMuted, marginTop: '8px' }}>
+        <span style={{ color: posColor.window, fontWeight: 700 }}>■</span> Window &nbsp;
+        <span style={{ color: posColor.aisle, fontWeight: 700 }}>■</span> Aisle &nbsp;
+        <span style={{ color: '#94a3b8', fontWeight: 700 }}>■</span> Middle &nbsp;
+        <span style={{ color: '#cbd5e1', fontWeight: 700 }}>■</span> Taken
+      </p>
+    </div>
+  )
+}
+
 function isIdFormatValid(idType: string, idNumber: string): boolean {
   const v = idNumber.trim()
   if (!v) return false
@@ -54,7 +143,7 @@ type FlightService = {
   companies: { business_name: string; allow_unit_selection: boolean | null } | null
 }
 
-type SeatType = { id: string; name: string; price: number; available: number }
+type SeatType = { id: string; name: string; price: number; available: number; pattern?: string }
 
 const STEPS = ['Flight', 'Passenger', 'Extras', 'Payment', 'Review']
 
@@ -112,7 +201,7 @@ function FlightDetails() {
 
   const [seatTypes, setSeatTypes] = useState<SeatType[]>([])
   const [selectedSeatTypeId, setSelectedSeatTypeId] = useState<string | null>(null)
-  const [unitOptions, setUnitOptions] = useState<{ id: string; unit_number: string }[]>([])
+  const [unitOptions, setUnitOptions] = useState<{ id: string; unit_number: string; status: string; seat_row: number | null; seat_col: string | null }[]>([])
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
 
   const [adultCount, setAdultCount] = useState(1)
@@ -210,7 +299,7 @@ function FlightDetails() {
 
       const { data: items } = await supabase
         .from('inventory_items')
-        .select('id, name, price')
+        .select('id, name, price, seat_layout_config')
         .eq('service_id', id)
 
       if (items && items.length > 0) {
@@ -223,7 +312,10 @@ function FlightDetails() {
         ;(unitRows || []).forEach((u: any) => {
           if (u.status === 'available') availCounts[u.inventory_item_id] = (availCounts[u.inventory_item_id] || 0) + 1
         })
-        setSeatTypes(items.map((i: any) => ({ id: i.id, name: i.name, price: Number(i.price) || 0, available: availCounts[i.id] || 0 })))
+        setSeatTypes(items.map((i: any) => ({
+          id: i.id, name: i.name, price: Number(i.price) || 0, available: availCounts[i.id] || 0,
+          pattern: i.seat_layout_config?.pattern || undefined,
+        })))
       }
       setLoading(false)
   }
@@ -237,12 +329,13 @@ function FlightDetails() {
       if (!selectedSeatTypeId) { setUnitOptions([]); setSelectedUnitId(null); return }
       const { data } = await supabase
         .from('inventory_units')
-        .select('id, unit_number')
+        .select('id, unit_number, status, seat_row, seat_col')
         .eq('inventory_item_id', selectedSeatTypeId)
-        .eq('status', 'available')
         .order('unit_number', { ascending: true })
-      setUnitOptions(data || [])
-      setSelectedUnitId(data && data.length > 0 ? data[0].id : null)
+      const all = data || []
+      setUnitOptions(all)
+      const firstAvailable = all.find((u) => u.status === 'available')
+      setSelectedUnitId(firstAvailable ? firstAvailable.id : null)
     }
     fetchUnits()
   }, [selectedSeatTypeId])
@@ -696,16 +789,32 @@ function FlightDetails() {
                 </div>
                 {selectedSeatTypeId && (() => {
                   const allowPicking = service.companies?.allow_unit_selection ?? true
+                  const availableUnits = unitOptions.filter((u) => u.status === 'available')
                   if (!allowPicking) {
                     return (
                       <p style={{ fontSize: '12px', color: COLORS.textMuted, fontStyle: 'italic' as const }}>
-                        {unitOptions.length === 0 ? 'No seats available in this class.' : 'A seat will be assigned automatically at booking.'}
+                        {availableUnits.length === 0 ? 'No seats available in this class.' : 'A seat will be assigned automatically at booking.'}
                       </p>
+                    )
+                  }
+                  if (unitOptions.length === 0) {
+                    return <p style={{ fontSize: '12px', color: COLORS.textMuted }}>No seats available in this class.</p>
+                  }
+                  const hasRealSeatMap = unitOptions.every((u) => u.seat_row != null && u.seat_col != null)
+                  const groupSizes = parsePattern(selectedSeat?.pattern || '')
+                  if (hasRealSeatMap && groupSizes.length > 0) {
+                    return (
+                      <SeatMapGrid
+                        units={unitOptions}
+                        groupSizes={groupSizes}
+                        selectedUnitId={selectedUnitId}
+                        onSelect={setSelectedUnitId}
+                      />
                     )
                   }
                   return (
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                    {unitOptions.map((u) => (
+                    {availableUnits.map((u) => (
                       <span key={u.id} onClick={() => setSelectedUnitId(u.id)}
                         style={{ padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', minWidth: '38px', textAlign: 'center' as const,
                           border: `1.5px solid ${selectedUnitId === u.id ? COLORS.secondary : COLORS.border}`,
@@ -714,7 +823,7 @@ function FlightDetails() {
                         {u.unit_number}
                       </span>
                     ))}
-                    {unitOptions.length === 0 && <p style={{ fontSize: '12px', color: COLORS.textMuted }}>No seats available in this class.</p>}
+                    {availableUnits.length === 0 && <p style={{ fontSize: '12px', color: COLORS.textMuted }}>No seats available in this class.</p>}
                   </div>
                   )
                 })()}
