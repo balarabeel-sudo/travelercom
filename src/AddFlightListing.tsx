@@ -12,15 +12,81 @@ const COLORS = {
 
 const COMMISSION_RATE = 3
 
+// Seat lettering skips I and O (standard airline convention — avoids confusion with 1/0).
+const SEAT_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+const PATTERN_PRESETS = ['2-2', '3-3', '2-3-2', '2-4-2', '3-4-3']
+
+function parsePattern(pattern: string): number[] {
+  return pattern.split('-').map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isFinite(n) && n > 0)
+}
+
+function seatsPerRowOf(pattern: string): number {
+  return parsePattern(pattern).reduce((a, b) => a + b, 0)
+}
+
+type SeatPos = 'window' | 'middle' | 'aisle'
+
+function buildRowSeats(groupSizes: number[]): { label: string; position: SeatPos }[] {
+  const seats: { label: string; position: SeatPos }[] = []
+  let li = 0
+  groupSizes.forEach((size, gi) => {
+    for (let s = 0; s < size; s++) {
+      const isFirstOfGroup = s === 0
+      const isLastOfGroup = s === size - 1
+      const isVeryFirstGroup = gi === 0
+      const isVeryLastGroup = gi === groupSizes.length - 1
+      let position: SeatPos = 'middle'
+      if (size === 1) {
+        position = (isVeryFirstGroup || isVeryLastGroup) ? 'window' : 'aisle'
+      } else if (isFirstOfGroup && isVeryFirstGroup) position = 'window'
+      else if (isLastOfGroup && isVeryLastGroup) position = 'window'
+      else if (isFirstOfGroup || isLastOfGroup) position = 'aisle'
+      seats.push({ label: SEAT_LETTERS[li] || '?', position })
+      li++
+    }
+  })
+  return seats
+}
+
+function SeatRowPreview({ pattern }: { pattern: string }) {
+  const groupSizes = parsePattern(pattern)
+  if (groupSizes.length === 0) return null
+  const seats = buildRowSeats(groupSizes)
+  const posColor: Record<SeatPos, string> = { window: '#0EA5E9', aisle: '#F97316', middle: '#94a3b8' }
+  return (
+    <div style={{ marginTop: '8px' }}>
+      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const }}>
+        {seats.map((s, i) => (
+          <span key={i} style={{
+            width: '22px', height: '22px', borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '9px', fontWeight: 700, color: 'white', background: posColor[s.position],
+          }}>{s.label}</span>
+        ))}
+      </div>
+      <p style={{ fontSize: '9.5px', color: COLORS.textMuted, marginTop: '4px' }}>
+        <span style={{ color: posColor.window, fontWeight: 700 }}>■</span> Window &nbsp;
+        <span style={{ color: posColor.aisle, fontWeight: 700 }}>■</span> Aisle &nbsp;
+        <span style={{ color: posColor.middle, fontWeight: 700 }}>■</span> Middle
+      </p>
+    </div>
+  )
+}
+
 type CabinClass = {
   id: string | null // existing inventory_item id, or null for a new (not-yet-saved) row
   name: string
   price: string
-  quantity: string
+  hasSeatMap: boolean
+  pattern: string        // e.g. "3-3" — only meaningful when hasSeatMap is true
+  rows: string            // numeric string — only meaningful when hasSeatMap is true
+  originalRows: number    // rows already saved in the DB (0 for a brand-new class)
+  legacyQuantity: string  // only meaningful when hasSeatMap is false (pre-seat-map cabin classes)
   originalQuantity: number
 }
 
-const emptyCabinClass = (name = ''): CabinClass => ({ id: null, name, price: '', quantity: '', originalQuantity: 0 })
+const emptyCabinClass = (name = ''): CabinClass => ({
+  id: null, name, price: '', hasSeatMap: true, pattern: '3-3', rows: '1', originalRows: 0, legacyQuantity: '', originalQuantity: 0,
+})
 
 type Addon = { id: string | null; name: string; price: string }
 const emptyAddon = (): Addon => ({ id: null, name: '', price: '' })
@@ -83,19 +149,31 @@ function AddFlightListing() {
 
           const { data: invItems, error: invErr } = await supabase
             .from('inventory_items')
-            .select('id, name, total_quantity, price')
+            .select('id, name, total_quantity, price, seat_layout_config')
             .eq('service_id', editId)
             .order('price', { ascending: true })
 
           if (invErr) { setNetError(true); setLoading(false); return }
 
           if (invItems && invItems.length > 0) {
-            setCabinClasses(invItems.map((it) => ({
-              id: it.id, name: it.name, price: String(it.price), quantity: String(it.total_quantity), originalQuantity: it.total_quantity,
-            })))
+            setCabinClasses(invItems.map((it: any) => {
+              const cfg = it.seat_layout_config
+              if (cfg && cfg.rows && cfg.pattern) {
+                return {
+                  id: it.id, name: it.name, price: String(it.price),
+                  hasSeatMap: true, pattern: cfg.pattern, rows: String(cfg.rows), originalRows: cfg.rows,
+                  legacyQuantity: '', originalQuantity: it.total_quantity,
+                }
+              }
+              return {
+                id: it.id, name: it.name, price: String(it.price),
+                hasSeatMap: false, pattern: '', rows: '', originalRows: 0,
+                legacyQuantity: String(it.total_quantity), originalQuantity: it.total_quantity,
+              }
+            }))
           } else {
-            // Older/simple listing with no cabin-class inventory yet — seed one row from its own price/count
-            setCabinClasses([{ id: null, name: 'Economy', price: listing.price ? String(listing.price) : '', quantity: listing.seats_available ? String(listing.seats_available) : '', originalQuantity: 0 }])
+            // Older/simple listing with no cabin-class inventory yet — seed one fresh seat-map row
+            setCabinClasses([emptyCabinClass('Economy')])
           }
 
           const { data: addonRows, error: addonErr } = await supabase
@@ -151,11 +229,28 @@ function AddFlightListing() {
       return
     }
     for (const c of cabinClasses) {
-      const qty = parseInt(c.quantity, 10)
       const priceVal = parseFloat(c.price)
-      if (!c.name.trim() || !qty || qty < 1 || !priceVal || priceVal <= 0) {
-        setErrorMsg('Every cabin class needs a name, a seat count, and a price.')
+      if (!c.name.trim() || !priceVal || priceVal <= 0) {
+        setErrorMsg('Every cabin class needs a name and a price.')
         return
+      }
+      if (c.hasSeatMap) {
+        const rows = parseInt(c.rows, 10)
+        const perRow = seatsPerRowOf(c.pattern)
+        if (!rows || rows < 1 || perRow < 1) {
+          setErrorMsg(`"${c.name}" needs a valid seat layout pattern and at least 1 row.`)
+          return
+        }
+        if (c.id && rows < c.originalRows) {
+          setErrorMsg(`"${c.name}" already has ${c.originalRows} rows — rows can only be added, not removed, for an existing seat map.`)
+          return
+        }
+      } else {
+        const qty = parseInt(c.legacyQuantity, 10)
+        if (!qty || qty < 1) {
+          setErrorMsg(`"${c.name}" needs a valid seat count.`)
+          return
+        }
       }
     }
     const validAddons = addons.filter((a) => a.name.trim() || a.price.trim())
@@ -185,7 +280,10 @@ function AddFlightListing() {
     const finalPhotoUrls = [...existingPhotoUrls, ...uploadedUrls].slice(0, 5)
 
     const lowestPrice = Math.min(...cabinClasses.map((c) => parseFloat(c.price)))
-    const totalSeats = cabinClasses.reduce((sum, c) => sum + parseInt(c.quantity, 10), 0)
+    const totalSeats = cabinClasses.reduce((sum, c) => {
+      if (c.hasSeatMap) return sum + parseInt(c.rows, 10) * seatsPerRowOf(c.pattern)
+      return sum + parseInt(c.legacyQuantity, 10)
+    }, 0)
 
     const payload = {
       company_id: companyId,
@@ -218,21 +316,53 @@ function AddFlightListing() {
     const notes: string[] = []
 
     for (const c of cabinClasses) {
-      const qty = parseInt(c.quantity, 10)
       const priceVal = parseFloat(c.price)
 
-      if (!c.id) {
-        const { data: newItem, error: itemErr } = await supabase.from('inventory_items').insert({
-          company_id: companyId, service_id: serviceId, name: c.name.trim(), total_quantity: qty, price: priceVal,
-        }).select('id').single()
+      if (c.hasSeatMap) {
+        const rows = parseInt(c.rows, 10)
+        const groupSizes = parsePattern(c.pattern)
+        const perRow = groupSizes.reduce((a, b) => a + b, 0)
+        const totalQty = rows * perRow
+        const rowSeats = buildRowSeats(groupSizes)
 
-        if (!itemErr && newItem) {
-          const unitRows = Array.from({ length: qty }, (_, i) => ({
-            inventory_item_id: newItem.id, unit_number: (i + 1).toString(), status: 'available',
-          }))
-          await supabase.from('inventory_units').insert(unitRows)
+        if (!c.id) {
+          const { data: newItem, error: itemErr } = await supabase.from('inventory_items').insert({
+            company_id: companyId, service_id: serviceId, name: c.name.trim(), total_quantity: totalQty, price: priceVal,
+            seat_layout_config: { rows, pattern: c.pattern },
+          }).select('id').single()
+
+          if (!itemErr && newItem) {
+            const unitRows: any[] = []
+            for (let r = 1; r <= rows; r++) {
+              for (const seat of rowSeats) {
+                unitRows.push({
+                  inventory_item_id: newItem.id, unit_number: `${r}${seat.label}`, status: 'available',
+                  seat_row: r, seat_col: seat.label, seat_position: seat.position,
+                })
+              }
+            }
+            await supabase.from('inventory_units').insert(unitRows)
+          }
+        } else {
+          await supabase.from('inventory_items').update({ name: c.name.trim(), price: priceVal }).eq('id', c.id)
+
+          const addedRows = rows - c.originalRows
+          if (addedRows > 0) {
+            const unitRows: any[] = []
+            for (let r = c.originalRows + 1; r <= rows; r++) {
+              for (const seat of rowSeats) {
+                unitRows.push({
+                  inventory_item_id: c.id, unit_number: `${r}${seat.label}`, status: 'available',
+                  seat_row: r, seat_col: seat.label, seat_position: seat.position,
+                })
+              }
+            }
+            await supabase.from('inventory_units').insert(unitRows)
+            await supabase.from('inventory_items').update({ total_quantity: totalQty, seat_layout_config: { rows, pattern: c.pattern } }).eq('id', c.id)
+          }
         }
-      } else {
+      } else if (c.id) {
+        const qty = parseInt(c.legacyQuantity, 10)
         await supabase.from('inventory_items').update({ name: c.name.trim(), price: priceVal }).eq('id', c.id)
 
         const delta = qty - c.originalQuantity
@@ -408,7 +538,7 @@ function AddFlightListing() {
             </div>
           </div>
 
-          <Field label="Seat Layout (optional)">
+          <Field label="Seat Layout Note (optional, shown to customers as text)">
             <input type="text" placeholder="e.g. 3-3 configuration" value={seatLayout} onChange={(e) => setSeatLayout(e.target.value)} style={inputStyle} />
           </Field>
 
@@ -420,7 +550,7 @@ function AddFlightListing() {
         <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
           <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginBottom: '4px' }}>Cabin Classes</p>
           <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '14px' }}>
-            Add each cabin class you're selling (e.g. Economy, Business), with how many seats and the price per seat. Seat numbers are assigned automatically.
+            Add each cabin class you're selling (e.g. Economy, Business) with a real seat map — rows × layout pattern — and a price per seat. Seat numbers (e.g. 12A) and window/middle/aisle are assigned automatically.
           </p>
 
           {cabinClasses.map((c, idx) => (
@@ -437,18 +567,72 @@ function AddFlightListing() {
                   </span>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="number" placeholder="No. of seats" value={c.quantity}
-                  onChange={(e) => updateCabinClass(idx, { quantity: e.target.value })}
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-                <input
-                  type="number" placeholder="Price/seat (₦)" value={c.price}
-                  onChange={(e) => updateCabinClass(idx, { price: e.target.value })}
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-              </div>
+
+              <input
+                type="number" placeholder="Price/seat (₦)" value={c.price}
+                onChange={(e) => updateCabinClass(idx, { price: e.target.value })}
+                style={{ ...inputStyle, marginBottom: '10px' }}
+              />
+
+              {c.hasSeatMap ? (
+                <>
+                  {c.id ? (
+                    <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '8px' }}>
+                      Layout: <strong style={{ color: COLORS.text }}>{c.pattern}</strong> · {c.originalRows} rows saved — you can only add more rows below, not change the layout.
+                    </p>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '6px' }}>Seat Layout Pattern</p>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
+                        {PATTERN_PRESETS.map((p) => (
+                          <span key={p} onClick={() => updateCabinClass(idx, { pattern: p })}
+                            style={{
+                              padding: '6px 11px', borderRadius: '8px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer',
+                              border: `1.5px solid ${c.pattern === p ? COLORS.primary : COLORS.border}`,
+                              background: c.pattern === p ? COLORS.primary : COLORS.bg,
+                              color: c.pattern === p ? 'white' : COLORS.text,
+                            }}>{p}</span>
+                        ))}
+                      </div>
+                      <input
+                        type="text" placeholder="Custom pattern, e.g. 2-4-2" value={c.pattern}
+                        onChange={(e) => updateCabinClass(idx, { pattern: e.target.value })}
+                        style={{ ...inputStyle, marginBottom: '8px' }}
+                      />
+                    </>
+                  )}
+
+                  <input
+                    type="number" placeholder="Number of rows" value={c.rows}
+                    min={c.id ? c.originalRows : 1}
+                    onChange={(e) => {
+                      let v = parseInt(e.target.value, 10)
+                      if (!Number.isFinite(v)) v = 0
+                      if (c.id && v < c.originalRows) v = c.originalRows
+                      updateCabinClass(idx, { rows: String(v) })
+                    }}
+                    style={inputStyle}
+                  />
+
+                  {seatsPerRowOf(c.pattern) > 0 && (
+                    <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '6px' }}>
+                      {seatsPerRowOf(c.pattern)} seats/row × {parseInt(c.rows, 10) || 0} rows = <strong style={{ color: COLORS.text }}>{seatsPerRowOf(c.pattern) * (parseInt(c.rows, 10) || 0)} total seats</strong>
+                    </p>
+                  )}
+                  <SeatRowPreview pattern={c.pattern} />
+                </>
+              ) : (
+                <>
+                  <input
+                    type="number" placeholder="No. of seats" value={c.legacyQuantity}
+                    onChange={(e) => updateCabinClass(idx, { legacyQuantity: e.target.value })}
+                    style={inputStyle}
+                  />
+                  <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '6px' }}>
+                    This cabin class was created before seat maps existed — it still uses a plain seat count, not a visual map.
+                  </p>
+                </>
+              )}
             </div>
           ))}
 
