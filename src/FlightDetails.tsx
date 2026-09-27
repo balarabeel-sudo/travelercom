@@ -22,7 +22,6 @@ const COLORS = {
 }
 
 // Flat platform fees — no per-listing pricing exists for these yet, adjust here if needed.
-const ADDON_PRICES = { baggage: 5000, insurance: 2000, pickup: 3500 }
 const SERVICE_FEE = 500
 
 const ID_TYPES = ['NIN', 'International Passport', "Driver's License"] as const
@@ -40,11 +39,6 @@ function isIdFormatValid(idType: string, idNumber: string): boolean {
     default:
       return false
   }
-}
-
-function generateTicketCode() {
-  const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
-  return `ALN-${new Date().getFullYear()}-${rand}`
 }
 
 type FlightService = {
@@ -114,6 +108,7 @@ function FlightDetails() {
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
   const [booking, setBooking] = useState(false)
   const [confirmingPin, setConfirmingPin] = useState(false)
+  const [revalidating, setRevalidating] = useState(false)
 
   const [seatTypes, setSeatTypes] = useState<SeatType[]>([])
   const [selectedSeatTypeId, setSelectedSeatTypeId] = useState<string | null>(null)
@@ -147,9 +142,8 @@ function FlightDetails() {
   const [contactPhone, setContactPhone] = useState('')
   const [contactEmail, setContactEmail] = useState('')
 
-  const [extraBaggage, setExtraBaggage] = useState(false)
-  const [travelInsurance, setTravelInsurance] = useState(false)
-  const [airportPickup, setAirportPickup] = useState(false)
+  const [addonList, setAddonList] = useState<{ id: string; name: string; price: number }[]>([])
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([])
 
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'card' | 'bank'>('wallet')
   const [agreedTerms, setAgreedTerms] = useState(false)
@@ -185,6 +179,13 @@ function FlightDetails() {
         return
       }
       setService(svc as any)
+
+      const { data: addonRows } = await supabase
+        .from('service_addons')
+        .select('id, name, price')
+        .eq('service_id', id)
+        .order('price', { ascending: true })
+      setAddonList(addonRows || [])
 
       const today = new Date().toISOString().split('T')[0]
       const { data: promoRows } = await supabase
@@ -257,7 +258,7 @@ function FlightDetails() {
   const discountAmount = baseFare - fareAfterDiscount
   const payingPaxCount = adultCount + childCount
   const farePortion = fareAfterDiscount * payingPaxCount
-  const addonsTotal = (extraBaggage ? ADDON_PRICES.baggage : 0) + (travelInsurance ? ADDON_PRICES.insurance : 0) + (airportPickup ? ADDON_PRICES.pickup : 0)
+  const addonsTotal = addonList.filter((a) => selectedAddonIds.includes(a.id)).reduce((sum, a) => sum + a.price, 0)
   const total = farePortion + addonsTotal + SERVICE_FEE
 
   const passengerValid = passengers.length > 0 && passengers.every((p) => {
@@ -267,6 +268,87 @@ function FlightDetails() {
     const passportOk = p.idType !== 'International Passport' || (p.passportCountry.trim() && p.passportExpiry && new Date(p.passportExpiry) > new Date())
     return !!(basicOk && idOk && passportOk)
   }) && contactName.trim() && contactPhone.trim() && contactEmail.trim()
+
+  // Fare revalidation — runs when the customer taps "Confirm Booking", before the
+  // PIN modal even opens. Re-checks the cabin-class price (or base fare) and every
+  // selected extra against the DB, since minutes may have passed since Step 1/3
+  // where these were first loaded, and a company/admin could have edited the
+  // listing in the meantime. If anything changed, we update the on-screen totals
+  // and ask the customer to review before letting them proceed — we never silently
+  // charge a different amount than what they last saw.
+  const revalidateFareAndProceed = async () => {
+    if (!service || !agreedTerms) return
+    setMessage(null)
+    setRevalidating(true)
+
+    const changeNotes: string[] = []
+    let changed = false
+
+    if (usingSeatTypes && selectedSeatTypeId) {
+      const { data: itemRow, error: itemErr } = await supabase
+        .from('inventory_items').select('price').eq('id', selectedSeatTypeId).maybeSingle()
+      if (itemErr || !itemRow) {
+        setRevalidating(false)
+        setMessage({ type: 'error', text: 'That cabin class is no longer available. Please go back and choose another.' })
+        return
+      }
+      const freshPrice = Number(itemRow.price)
+      if (selectedSeat && freshPrice !== selectedSeat.price) {
+        changed = true
+        changeNotes.push(`Fare changed from ₦${selectedSeat.price.toLocaleString()} to ₦${freshPrice.toLocaleString()} per passenger.`)
+        setSeatTypes((prev) => prev.map((s) => (s.id === selectedSeatTypeId ? { ...s, price: freshPrice } : s)))
+      }
+    } else {
+      const { data: svcRow, error: svcErr } = await supabase
+        .from('services').select('price').eq('id', service.id).maybeSingle()
+      if (svcErr || !svcRow) {
+        setRevalidating(false)
+        setMessage({ type: 'error', text: 'This flight is no longer available.' })
+        return
+      }
+      const freshPrice = Number(svcRow.price)
+      if (freshPrice !== service.price) {
+        changed = true
+        changeNotes.push(`Fare changed from ₦${service.price.toLocaleString()} to ₦${freshPrice.toLocaleString()} per passenger.`)
+        setService({ ...service, price: freshPrice })
+      }
+    }
+
+    const selectedAddons = addonList.filter((a) => selectedAddonIds.includes(a.id))
+    if (selectedAddons.length > 0) {
+      const { data: freshAddonRows, error: addonErr } = await supabase
+        .from('service_addons').select('id, name, price').in('id', selectedAddons.map((a) => a.id))
+      if (!addonErr) {
+        const stillOffered = new Set((freshAddonRows || []).map((a) => a.id))
+        const droppedAny = selectedAddons.some((a) => !stillOffered.has(a.id))
+        if (droppedAny) {
+          changed = true
+          changeNotes.push('One or more selected extras are no longer offered and were removed from your total.')
+          setSelectedAddonIds((prev) => prev.filter((aid) => stillOffered.has(aid)))
+        }
+        for (const fresh of freshAddonRows || []) {
+          const cached = selectedAddons.find((a) => a.id === fresh.id)
+          if (cached && Number(fresh.price) !== cached.price) {
+            changed = true
+            changeNotes.push(`"${fresh.name}" price changed from ₦${cached.price.toLocaleString()} to ₦${Number(fresh.price).toLocaleString()}.`)
+          }
+        }
+        setAddonList((prev) => prev.map((a) => {
+          const fresh = (freshAddonRows || []).find((f) => f.id === a.id)
+          return fresh ? { ...a, price: Number(fresh.price) } : a
+        }))
+      }
+    }
+
+    setRevalidating(false)
+
+    if (changed) {
+      setMessage({ type: 'error', text: `Prices have changed since you started: ${changeNotes.join(' ')} Please review the updated total below and confirm again.` })
+      return
+    }
+
+    setConfirmingPin(true)
+  }
 
   const handleConfirmBooking = async () => {
     if (!service || !agreedTerms) return
@@ -282,7 +364,6 @@ function FlightDetails() {
     }
 
     setBooking(true)
-    const code = generateTicketCode()
     let assignedUnitId: string | null = null
     let assignedNumber = ''
 
@@ -310,7 +391,6 @@ function FlightDetails() {
       amount_paid: total,
       commission_amount: 0,
       booking_status: 'confirmed',
-      ticket_code: code,
       customer_name: contactName || null,
       customer_phone: contactPhone || null,
       customer_email: contactEmail || null,
@@ -318,7 +398,7 @@ function FlightDetails() {
       promotion_id: activePromo?.id || null,
       id_type: leadAdult?.idType || null,
       id_number: leadAdult?.idNumber.trim() || null,
-    }).select('id').single()
+    }).select('id, ticket_code').single()
 
     if (bookingErr) {
       if (assignedUnitId) await supabase.from('inventory_units').update({ status: 'available' }).eq('id', assignedUnitId)
@@ -354,6 +434,13 @@ function FlightDetails() {
       return
     }
 
+    const selectedAddons = addonList.filter((a) => selectedAddonIds.includes(a.id))
+    if (selectedAddons.length > 0) {
+      await supabase.from('booking_addons').insert(
+        selectedAddons.map((a) => ({ booking_id: newBooking.id, service_addon_id: a.id, name: a.name, price: a.price }))
+      )
+    }
+
     if (assignedUnitId) {
       await supabase.from('inventory_units').update({ booking_id: newBooking?.id || null }).eq('id', assignedUnitId)
     } else if (!usingSeatTypes && service.seats_available !== null && service.seats_available > 0) {
@@ -379,7 +466,7 @@ function FlightDetails() {
     setBooking(false)
     setWalletBalance(newBalance)
     setReservationId(newBooking?.id || '')
-    setPnr(code)
+    setPnr(newBooking.ticket_code)
     setTransactionId(txnRow?.id || '')
     setStep(6)
   }
@@ -634,21 +721,22 @@ function FlightDetails() {
               </div>
             )}
 
-            {[
-              { key: 'baggage', label: 'Extra Baggage', price: ADDON_PRICES.baggage, val: extraBaggage, set: setExtraBaggage },
-              { key: 'insurance', label: 'Travel Insurance', price: ADDON_PRICES.insurance, val: travelInsurance, set: setTravelInsurance },
-              { key: 'pickup', label: 'Airport Pickup', price: ADDON_PRICES.pickup, val: airportPickup, set: setAirportPickup },
-            ].map((a) => (
-              <div key={a.key} onClick={() => a.set(!a.val)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px', borderRadius: '10px', border: `1.5px solid ${a.val ? COLORS.primary : COLORS.border}`, background: a.val ? '#EFF9FF' : COLORS.bg, marginBottom: '10px', cursor: 'pointer' }}>
-                <div>
-                  <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{a.label}</p>
-                  <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>+₦{a.price.toLocaleString()}</p>
+            {addonList.length === 0 ? (
+              <p style={{ fontSize: '12.5px', color: COLORS.textMuted, textAlign: 'center' as const, padding: '10px 0' }}>No extras offered on this flight.</p>
+            ) : addonList.map((a) => {
+              const isSelected = selectedAddonIds.includes(a.id)
+              return (
+                <div key={a.id} onClick={() => setSelectedAddonIds((prev) => isSelected ? prev.filter((id) => id !== a.id) : [...prev, a.id])} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px', borderRadius: '10px', border: `1.5px solid ${isSelected ? COLORS.primary : COLORS.border}`, background: isSelected ? '#EFF9FF' : COLORS.bg, marginBottom: '10px', cursor: 'pointer' }}>
+                  <div>
+                    <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{a.name}</p>
+                    <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>+₦{a.price.toLocaleString()}</p>
+                  </div>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${isSelected ? COLORS.primary : COLORS.border}`, background: isSelected ? COLORS.primary : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                    {isSelected ? <Icon name="check" size={13} color="white" strokeWidth={3} /> : ''}
+                  </div>
                 </div>
-                <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${a.val ? COLORS.primary : COLORS.border}`, background: a.val ? COLORS.primary : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                  {a.val ? <Icon name="check" size={13} color="white" strokeWidth={3} /> : ''}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -782,10 +870,10 @@ function FlightDetails() {
             )}
             {step === 5 && (
               <button
-                disabled={booking || !agreedTerms}
-                onClick={() => setConfirmingPin(true)}
-                style={{ flex: 2, padding: '14px', borderRadius: '12px', border: 'none', background: booking || !agreedTerms ? '#94a3b8' : COLORS.secondary, color: 'white', fontWeight: 700, fontSize: '14px' }}>
-                {booking ? 'Processing...' : 'Confirm Booking'}
+                disabled={booking || revalidating || !agreedTerms}
+                onClick={revalidateFareAndProceed}
+                style={{ flex: 2, padding: '14px', borderRadius: '12px', border: 'none', background: booking || revalidating || !agreedTerms ? '#94a3b8' : COLORS.secondary, color: 'white', fontWeight: 700, fontSize: '14px' }}>
+                {revalidating ? 'Checking latest price...' : booking ? 'Processing...' : 'Confirm Booking'}
               </button>
             )}
           </div>
