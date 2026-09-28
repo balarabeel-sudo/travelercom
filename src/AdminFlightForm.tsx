@@ -13,6 +13,10 @@ const COMMISSION_RATE = 3
 const SEAT_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
 const PATTERN_PRESETS = ['2-2', '3-3', '2-3-2', '2-4-2', '3-4-3']
 
+// The 5 amenities most relevant to a domestic flight. These exact strings are what
+// Flights.tsx already knows how to show with an icon on the customer flight cards.
+const FLIGHT_AMENITIES = ['Baggage Allowance', 'Meals', 'Refundable', 'WiFi', 'Charging Port']
+
 function parsePattern(pattern: string): number[] {
   return pattern.split('-').map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isFinite(n) && n > 0)
 }
@@ -123,6 +127,7 @@ function AdminFlightForm({ editId, onSaved, onCancel }: Props) {
   const [arrivalTime, setArrivalTime] = useState('')
   const [seatLayout, setSeatLayout] = useState('')
   const [boardingInfo, setBoardingInfo] = useState('')
+  const [amenities, setAmenities] = useState<string[]>([])
   const [photoFiles, setPhotoFiles] = useState<(File | null)[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
 
@@ -161,6 +166,7 @@ function AdminFlightForm({ editId, onSaved, onCancel }: Props) {
         setArrivalTime(listing.arrival_time ? listing.arrival_time.slice(0, 16) : '')
         setSeatLayout(listing.seat_layout || '')
         setBoardingInfo(listing.boarding_info || '')
+        setAmenities(Array.isArray(listing.amenities) ? listing.amenities : [])
         setExistingPhotoUrls(listing.photo_urls && listing.photo_urls.length > 0 ? listing.photo_urls : (listing.photo_url ? [listing.photo_url] : []))
 
         const { data: invItems, error: invErr } = await supabase
@@ -214,6 +220,8 @@ function AdminFlightForm({ editId, onSaved, onCancel }: Props) {
   const updateAddon = (idx: number, patch: Partial<Addon>) => setAddons((prev) => prev.map((a, i) => (i === idx ? { ...a, ...patch } : a)))
   const addAddon = () => setAddons((prev) => [...prev, emptyAddon()])
   const removeAddon = (idx: number) => setAddons((prev) => prev.filter((_, i) => i !== idx))
+
+  const toggleAmenity = (a: string) => setAmenities((prev) => (prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]))
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -312,6 +320,7 @@ function AdminFlightForm({ editId, onSaved, onCancel }: Props) {
       arrival_time: arrivalTime ? new Date(arrivalTime).toISOString() : null,
       seat_layout: seatLayout.trim() || null,
       boarding_info: boardingInfo.trim() || null,
+      amenities: amenities.length > 0 ? amenities : null,
       price: lowestPrice,
       commission_rate: COMMISSION_RATE,
       seats_available: totalSeats,
@@ -542,6 +551,23 @@ function AdminFlightForm({ editId, onSaved, onCancel }: Props) {
 
         <Field label="Boarding Information (optional)">
           <input type="text" placeholder="e.g. Gate closes 45 minutes before departure" value={boardingInfo} onChange={(e) => setBoardingInfo(e.target.value)} style={inputStyle} />
+        </Field>
+
+        <Field label="Amenities (shown on the flight card)">
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+            {FLIGHT_AMENITIES.map((a) => {
+              const on = amenities.includes(a)
+              return (
+                <span key={a} onClick={() => toggleAmenity(a)}
+                  style={{
+                    padding: '8px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                    border: `1.5px solid ${on ? COLORS.primary : COLORS.border}`,
+                    background: on ? COLORS.primary : COLORS.bg,
+                    color: on ? 'white' : COLORS.text,
+                  }}>{a}</span>
+              )
+            })}
+          </div>
         </Field>
       </div>
 
