@@ -443,6 +443,7 @@ if (accountType === 'company') {
     ]
     const companyCurrentSlide = companyHeroSlides[heroSlide] || companyHeroSlides[0]
     const companyHeroHref = companyCurrentSlide.type === 'banner' ? getBannerHref(companyCurrentSlide.banner, listingMeta) : null
+    const companyHeroIsImage = companyCurrentSlide.type === 'banner' && !!companyCurrentSlide.banner.image_url
     const companyHeroDiscountPct = companyCurrentSlide.type === 'banner' && companyCurrentSlide.banner.banner_type === 'discount' && companyCurrentSlide.banner.promotion_id
       ? promoPercents[companyCurrentSlide.banner.promotion_id] ?? null
       : null
@@ -524,8 +525,9 @@ if (accountType === 'company') {
             }}
             style={{
               borderRadius: '20px',
-              padding: '24px 20px',
-              height: '140px',
+              padding: companyHeroIsImage ? 0 : '24px 20px',
+              aspectRatio: '7 / 3',
+              width: '100%',
               position: 'relative',
               overflow: 'hidden',
               background: companyCurrentSlide.type === 'default' ? bannerGradient() : bannerGradient(companyCurrentSlide.banner.banner_type),
@@ -535,11 +537,10 @@ if (accountType === 'company') {
             }}>
             {companyCurrentSlide.type === 'banner' && companyCurrentSlide.banner.image_url && (
               <>
-                <img src={companyCurrentSlide.banner.image_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.55))' }} />
+                <img src={companyCurrentSlide.banner.image_url} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </>
             )}
-            {companyHeroDiscountPct != null && (
+            {!companyHeroIsImage && companyHeroDiscountPct != null && (
               <div style={{
                 position: 'absolute', top: '14px', right: '14px', width: '58px', height: '58px', borderRadius: '50%',
                 background: 'rgba(255,255,255,0.96)', display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -550,6 +551,7 @@ if (accountType === 'company') {
                 <span style={{ fontSize: '8.5px', fontWeight: 700, color: '#c2410c', lineHeight: 1 }}>OFF</span>
               </div>
             )}
+            {!companyHeroIsImage && (
             <div style={{ position: 'relative' }}>
               {companyCurrentSlide.type === 'default' ? (
                 <>
@@ -580,6 +582,7 @@ if (accountType === 'company') {
                 </>
               )}
             </div>
+          )}
           </div>
           {companyHeroSlides.length > 1 && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '10px' }}>
@@ -765,6 +768,8 @@ const services = [
   ]
   const currentSlide = heroSlides[heroSlide] || heroSlides[0]
   const heroHref = currentSlide.type === 'banner' ? getBannerHref(currentSlide.banner, listingMeta) : null
+  // A banner with a photo is shown as the photo only (it carries its own message); tapping it opens its link.
+  const heroIsImage = currentSlide.type === 'banner' && !!currentSlide.banner.image_url
   const heroDiscountPct = currentSlide.type === 'banner' && currentSlide.banner.banner_type === 'discount' && currentSlide.banner.promotion_id
     ? promoPercents[currentSlide.banner.promotion_id] ?? null
     : null
@@ -820,8 +825,9 @@ const services = [
           }}
           style={{
             borderRadius: '20px',
-            padding: '24px 20px',
-            height: '140px',
+            padding: heroIsImage ? 0 : '24px 20px',
+            aspectRatio: '7 / 3',
+            width: '100%',
             position: 'relative',
             overflow: 'hidden',
             background: currentSlide.type === 'default' ? bannerGradient() : bannerGradient(currentSlide.banner.banner_type),
@@ -831,11 +837,10 @@ const services = [
           }}>
           {currentSlide.type === 'banner' && currentSlide.banner.image_url && (
             <>
-              <img src={currentSlide.banner.image_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.55))' }} />
+              <img src={currentSlide.banner.image_url} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             </>
           )}
-          {heroDiscountPct != null && (
+          {!heroIsImage && heroDiscountPct != null && (
             <div style={{
               position: 'absolute', top: '14px', right: '14px', width: '58px', height: '58px', borderRadius: '50%',
               background: 'rgba(255,255,255,0.96)', display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -846,6 +851,7 @@ const services = [
               <span style={{ fontSize: '8.5px', fontWeight: 700, color: '#c2410c', lineHeight: 1 }}>OFF</span>
             </div>
           )}
+          {!heroIsImage && (
           <div style={{ position: 'relative' }}>
             {currentSlide.type === 'default' ? (
               <>
@@ -876,6 +882,7 @@ const services = [
               </>
             )}
           </div>
+        )}
         </div>
         {heroSlides.length > 1 && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '10px' }}>
