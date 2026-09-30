@@ -59,6 +59,7 @@ const COMPANY_CATEGORIES = ['Account & Company', 'Verification', 'Bookings', 'Pa
 
 type Ticket = {
   id: string
+  ticket_code: string | null
   subject: string
   message: string
   category: string | null
@@ -73,6 +74,62 @@ type Msg = {
   message: string
   created_at: string
   attachment_url?: string | null
+}
+
+type Activity = { id: string; action: string; detail: string | null; created_at: string }
+
+function statusMeta(status: string) {
+  switch (status) {
+    case 'in_progress': return { label: 'In Progress', color: COLORS.primary, bg: '#EFF6FF' }
+    case 'waiting': return { label: 'Waiting for You', color: COLORS.purple, bg: '#F5F3FF' }
+    case 'resolved': return { label: 'Resolved', color: COLORS.green, bg: '#F0FDF4' }
+    default: return { label: 'Open', color: COLORS.amber, bg: '#FFF7ED' }
+  }
+}
+
+// "Open" tab shows tickets that are open or being worked on.
+function matchesTab(status: string, tab: string) {
+  if (tab === 'all') return true
+  if (tab === 'open') return status === 'open' || status === 'in_progress'
+  return status === tab
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const m = statusMeta(status)
+  return (
+    <span style={{ fontSize: '10.5px', fontWeight: 700, color: m.color, background: m.bg, padding: '3px 8px', borderRadius: '6px', whiteSpace: 'nowrap' as const }}>
+      {m.label.toUpperCase()}
+    </span>
+  )
+}
+
+function ActivityCard({ items }: { items: Activity[] }) {
+  const visible = items.filter((a) => a.action !== 'submitted')
+  if (visible.length === 0) return null
+  return (
+    <div style={{ background: '#F1F5F9', borderRadius: '12px', padding: '10px 12px' }}>
+      <p style={{ fontSize: '10.5px', fontWeight: 800, color: COLORS.textMuted, letterSpacing: '0.4px', marginBottom: '6px' }}>TICKET ACTIVITY</p>
+      {visible.map((a) => (
+        <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', padding: '3px 0' }}>
+          <span style={{ fontSize: '11.5px', color: COLORS.text }}>
+            {a.action === 'status_changed' && a.detail?.includes('Waiting') ? 'Waiting for your reply' : a.detail}
+          </span>
+          <span style={{ fontSize: '10.5px', color: COLORS.textMuted, whiteSpace: 'nowrap' as const }}>
+            {new Date(a.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+async function fetchActivity(ticketId: string): Promise<Activity[]> {
+  const { data } = await supabase
+    .from('support_ticket_activity')
+    .select('id, action, detail, created_at')
+    .eq('ticket_id', ticketId)
+    .order('created_at', { ascending: true })
+  return (data as Activity[]) || []
 }
 
 async function uploadSupportAttachment(ticketId: string, file: File): Promise<string | null> {
@@ -110,6 +167,7 @@ function CustomerSupport({ userId }: { userId: string }) {
 
   const [selected, setSelected] = useState<Ticket | null>(null)
   const [msgs, setMsgs] = useState<Msg[]>([])
+  const [activity, setActivity] = useState<Activity[]>([])
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
   const [reply, setReply] = useState('')
   const [replyFile, setReplyFile] = useState<File | null>(null)
@@ -119,7 +177,7 @@ function CustomerSupport({ userId }: { userId: string }) {
     setLoading(true)
     const { data } = await supabase
       .from('support_tickets')
-      .select('id, subject, message, category, priority, status, created_at')
+      .select('id, ticket_code, subject, message, category, priority, status, created_at')
       .eq('requester_type', 'customer')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
@@ -132,7 +190,9 @@ function CustomerSupport({ userId }: { userId: string }) {
   const openTicket = async (t: Ticket) => {
     setSelected(t)
     setMsgs([])
+    setActivity([])
     setSignedUrls({})
+    fetchActivity(t.id).then(setActivity)
     const { data } = await supabase
       .from('support_messages')
       .select('id, sender_type, message, created_at, attachment_url')
@@ -210,14 +270,20 @@ function CustomerSupport({ userId }: { userId: string }) {
       const { data } = await supabase.storage.from('support-attachments').createSignedUrl(attachPath, 3600)
       if (data?.signedUrl) setSignedUrls((prev) => ({ ...prev, [localId]: data.signedUrl }))
     }
+    // The database may move the ticket back to Open / In Progress when the requester replies.
+    const { data: fresh } = await supabase.from('support_tickets').select('status').eq('id', selected.id).maybeSingle()
+    if (fresh) {
+      setSelected({ ...selected, status: fresh.status })
+      setTickets((prev) => prev.map((x) => x.id === selected.id ? { ...x, status: fresh.status } : x))
+    }
+    fetchActivity(selected.id).then(setActivity)
     setReply('')
     setReplyFile(null)
   }
 
   const filtered = tickets.filter((t) => {
     if (search && !t.subject.toLowerCase().includes(search.toLowerCase())) return false
-    if (tab === 'all') return true
-    return t.status === tab
+    return matchesTab(t.status, tab)
   })
 
   if (selected) {
@@ -227,11 +293,12 @@ function CustomerSupport({ userId }: { userId: string }) {
           <div onClick={() => setSelected(null)} style={{ cursor: 'pointer' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></div>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: '14.5px', fontWeight: 800, color: COLORS.text }}>{selected.subject}</p>
-            <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{selected.category} · {selected.status}</p>
+            <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{selected.ticket_code ? `${selected.ticket_code} · ` : ''}{selected.category} · {statusMeta(selected.status).label}</p>
           </div>
         </div>
 
         <div style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' as const, gap: '10px', overflowY: 'auto' as const }}>
+          <ActivityCard items={activity} />
           <div style={{ alignSelf: 'flex-start', maxWidth: '85%', background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '12px 14px' }}>
             <p style={{ fontSize: '12.5px', color: COLORS.text, lineHeight: 1.5 }}>{selected.message}</p>
             <p style={{ fontSize: '10px', color: COLORS.textMuted, marginTop: '6px' }}>{new Date(selected.created_at).toLocaleString()}</p>
@@ -335,14 +402,9 @@ function CustomerSupport({ userId }: { userId: string }) {
               <div key={t.id} onClick={() => openTicket(t)} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '14px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text }}>{t.subject}</p>
-                  <span style={{
-                    fontSize: '10.5px', fontWeight: 700,
-                    color: t.status === 'open' ? COLORS.amber : t.status === 'resolved' ? COLORS.green : COLORS.textMuted,
-                    background: t.status === 'open' ? '#FFF7ED' : t.status === 'resolved' ? '#F0FDF4' : '#F1F5F9',
-                    padding: '3px 8px', borderRadius: '6px',
-                  }}>{t.status.toUpperCase()}</span>
+                  <StatusBadge status={t.status} />
                 </div>
-                <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '5px' }}>{t.category || 'General'}</p>
+                <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '5px' }}>{t.ticket_code ? `${t.ticket_code} · ` : ''}{t.category || 'General'}</p>
                 <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '6px' }}>{new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
               </div>
             ))}
@@ -407,6 +469,7 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
 
   const [selected, setSelected] = useState<Ticket | null>(null)
   const [msgs, setMsgs] = useState<Msg[]>([])
+  const [activity, setActivity] = useState<Activity[]>([])
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
   const [reply, setReply] = useState('')
   const [replyFile, setReplyFile] = useState<File | null>(null)
@@ -416,7 +479,7 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
     setLoading(true)
     const { data } = await supabase
       .from('support_tickets')
-      .select('id, subject, message, category, priority, status, created_at')
+      .select('id, ticket_code, subject, message, category, priority, status, created_at')
       .eq('requester_type', 'company')
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
@@ -429,7 +492,9 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
   const openTicket = async (t: Ticket) => {
     setSelected(t)
     setMsgs([])
+    setActivity([])
     setSignedUrls({})
+    fetchActivity(t.id).then(setActivity)
     const { data } = await supabase
       .from('support_messages')
       .select('id, sender_type, message, created_at, attachment_url')
@@ -534,18 +599,24 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
         p_company_id: companyId,
       })
     }
+    // The database may move the ticket back to Open / In Progress when the requester replies.
+    const { data: fresh } = await supabase.from('support_tickets').select('status').eq('id', selected.id).maybeSingle()
+    if (fresh) {
+      setSelected({ ...selected, status: fresh.status })
+      setTickets((prev) => prev.map((x) => x.id === selected.id ? { ...x, status: fresh.status } : x))
+    }
+    fetchActivity(selected.id).then(setActivity)
     setReply('')
     setReplyFile(null)
   }
 
   const counts = {
-    open: tickets.filter((t) => t.status === 'open').length,
+    open: tickets.filter((t) => t.status === 'open' || t.status === 'in_progress').length,
     waiting: tickets.filter((t) => t.status === 'waiting').length,
-    waiting_company: tickets.filter((t) => t.status === 'waiting_company').length,
     resolved: tickets.filter((t) => t.status === 'resolved').length,
   }
 
-  const filtered = tab === 'all' ? tickets : tickets.filter((t) => t.status === tab)
+  const filtered = tickets.filter((t) => matchesTab(t.status, tab))
 
   if (selected) {
     return (
@@ -554,11 +625,12 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
           <div onClick={() => setSelected(null)} style={{ cursor: 'pointer' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></div>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: '14.5px', fontWeight: 800, color: COLORS.text }}>{selected.subject}</p>
-            <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{selected.category} · {selected.status}</p>
+            <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{selected.ticket_code ? `${selected.ticket_code} · ` : ''}{selected.category} · {statusMeta(selected.status).label}</p>
           </div>
         </div>
 
         <div style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' as const, gap: '10px', overflowY: 'auto' as const }}>
+          <ActivityCard items={activity} />
           <div style={{ alignSelf: 'flex-start', maxWidth: '85%', background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '12px 14px' }}>
             <p style={{ fontSize: '12.5px', color: COLORS.text, lineHeight: 1.5 }}>{selected.message}</p>
             <p style={{ fontSize: '10px', color: COLORS.textMuted, marginTop: '6px' }}>{new Date(selected.created_at).toLocaleString()}</p>
@@ -617,11 +689,10 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
       </div>
 
       <div style={{ padding: '16px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '16px' }}>
           {[
             ['Open', counts.open, COLORS.amber, 'open'],
-            ['Waiting for TravelerCom', counts.waiting, COLORS.textMuted, 'waiting'],
-            ['Waiting for You', counts.waiting_company, COLORS.primary, 'waiting_company'],
+            ['Waiting for You', counts.waiting, COLORS.purple, 'waiting'],
             ['Resolved', counts.resolved, COLORS.green, 'resolved'],
           ].map(([label, count, color, key]) => (
             <div key={key as string} onClick={() => setTab(key as TabKey)} style={{
@@ -668,14 +739,9 @@ function CompanySupport({ userId, companyId }: { userId: string; companyId: stri
               <div key={t.id} onClick={() => openTicket(t)} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '14px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text }}>{t.subject}</p>
-                  <span style={{
-                    fontSize: '10.5px', fontWeight: 700,
-                    color: t.status === 'open' ? COLORS.amber : t.status === 'resolved' ? COLORS.green : COLORS.textMuted,
-                    background: t.status === 'open' ? '#FFF7ED' : t.status === 'resolved' ? '#F0FDF4' : '#F1F5F9',
-                    padding: '3px 8px', borderRadius: '6px',
-                  }}>{t.status.toUpperCase()}</span>
+                  <StatusBadge status={t.status} />
                 </div>
-                <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '5px' }}>{t.category || 'General'}</p>
+                <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '5px' }}>{t.ticket_code ? `${t.ticket_code} · ` : ''}{t.category || 'General'}</p>
                 <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '6px' }}>{new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
               </div>
             ))}
