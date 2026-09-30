@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
@@ -7,7 +7,7 @@ import NotificationBell from './NotificationBell'
 const COLORS = {
   primary: '#0EA5E9',
   secondary: '#F97316',
-  bg: '#F8FAFC',
+  bg: '#F1F5F9',
   card: '#FFFFFF',
   text: '#1A1A1A',
   textMuted: '#64748B',
@@ -16,58 +16,89 @@ const COLORS = {
   greenBg: '#DCFCE7',
   red: '#dc2626',
   redBg: '#FEF2F2',
+  amber: '#D97706',
+  amberBg: '#FFF7ED',
   navy: '#0F172A',
+  navySoft: '#1E293B',
   purple: '#7C3AED',
   purpleBg: '#F5F3FF',
 }
 
-// Maps a permission "module" (from company_permissions.module) to a real
-// destination in the app. A module with no entry here stays hidden from
-// Quick Actions even if the staff member has that permission — add it
-// here as soon as its page exists. As of 8/27/2026 "platform" has no
-// built page yet and is intentionally left out.
-type ActionConfig = { label: string; icon: string; type: 'route' | 'contact'; route?: string }
-const MODULE_ACTIONS: Record<string, ActionConfig> = {
-  bookings: { label: 'Bookings', icon: 'ticket', type: 'route', route: '/bookings-management' },
-  tickets: { label: 'Tickets', icon: 'clipboard', type: 'route', route: '/verify-booking' },
-  customers: { label: 'Guests', icon: 'users', type: 'route', route: '/guests' },
-  support: { label: 'Support', icon: 'headphones', type: 'route', route: '/support' },
-  finance: { label: 'Finance', icon: 'cash', type: 'route', route: '/analytics' },
-  refunds: { label: 'Refunds', icon: 'refresh', type: 'route', route: '/wallet' },
-  company_staff: { label: 'Staff', icon: 'users', type: 'route', route: '/staff' },
-  analytics: { label: 'Analytics', icon: 'barChart', type: 'route', route: '/analytics' },
-  marketing: { label: 'Marketing', icon: 'megaphone', type: 'route', route: '/promotions' },
+// ---------------------------------------------------------------------------
+// Navigation. Everything the sidebar shows is decided here, from the staff
+// member's real permissions:
+//   requires -> the page needs one of these exact permission keys
+//   modules  -> the item shows when the staff member has any permission in
+//               one of these modules (company_permissions.module)
+//   kind 'section' = page built into this dashboard
+//   kind 'route'   = an existing app page, opened via navigate()
+// A module with no page yet (operations, company, platform) is intentionally
+// not in the sidebar; it is still listed on "My Access".
+// ---------------------------------------------------------------------------
+type NavItem = {
+  key: string
+  label: string
+  icon: string
+  group: 'Workspace' | 'Company' | 'Account'
+  kind: 'section' | 'route'
+  route?: string
+  requires?: string[]
+  modules?: string[]
 }
 
-// Display-only labels/icons for grouping the full permission catalog in
-// "My Permissions" — every module shows here regardless of whether a
-// Quick Action page exists for it yet.
-const MODULE_LABELS: Record<string, { label: string; icon: string }> = {
-  bookings: { label: 'Bookings', icon: 'ticket' },
-  tickets: { label: 'Tickets', icon: 'clipboard' },
-  customers: { label: 'Guests', icon: 'users' },
-  finance: { label: 'Finance', icon: 'cash' },
-  refunds: { label: 'Refunds', icon: 'refresh' },
-  support: { label: 'Support', icon: 'headphones' },
-  platform: { label: 'Platform', icon: 'globe' },
-  company_staff: { label: 'Staff', icon: 'users' },
-  analytics: { label: 'Analytics', icon: 'barChart' },
-  marketing: { label: 'Marketing', icon: 'megaphone' },
+const NAV: NavItem[] = [
+  { key: 'overview', label: 'Overview', icon: 'home', group: 'Workspace', kind: 'section' },
+  { key: 'tasks', label: 'My Tasks', icon: 'checkCircle', group: 'Workspace', kind: 'section' },
+  { key: 'bookings', label: 'Bookings', icon: 'ticket', group: 'Workspace', kind: 'section', requires: ['bookings.view'] },
+  { key: 'tickets', label: 'Tickets & Check-in', icon: 'clipboard', group: 'Workspace', kind: 'route', route: '/verify-booking', modules: ['tickets', 'verification'] },
+  { key: 'guests', label: 'Guests', icon: 'users', group: 'Workspace', kind: 'route', route: '/guests', modules: ['customers'] },
+  { key: 'support', label: 'Support', icon: 'headphones', group: 'Workspace', kind: 'section', requires: ['support.view'] },
+
+  { key: 'finance', label: 'Finance', icon: 'cash', group: 'Company', kind: 'section', requires: ['finance.view', 'finance.transactions'] },
+  { key: 'refunds', label: 'Refunds', icon: 'refresh', group: 'Company', kind: 'section', requires: ['refunds.view'] },
+  { key: 'analytics', label: 'Analytics', icon: 'barChart', group: 'Company', kind: 'route', route: '/analytics', requires: ['finance.view'] },
+  { key: 'marketing', label: 'Marketing', icon: 'megaphone', group: 'Company', kind: 'route', route: '/promotions', modules: ['marketing'] },
+  { key: 'team', label: 'Team', icon: 'users', group: 'Company', kind: 'section', requires: ['staff.view'] },
+
+  { key: 'access', label: 'My Access', icon: 'shield', group: 'Account', kind: 'section' },
+  { key: 'profile', label: 'Profile', icon: 'user', group: 'Account', kind: 'section' },
+]
+
+const MODULE_LABELS: Record<string, string> = {
+  bookings: 'Bookings', tickets: 'Tickets', customers: 'Guests', finance: 'Finance', refunds: 'Refunds',
+  support: 'Support', platform: 'Platform', staff: 'Team', marketing: 'Marketing', operations: 'Operations',
+  verification: 'Verification', company: 'Company',
 }
-function moduleMeta(mod: string) {
-  return MODULE_LABELS[mod] || { label: mod.charAt(0).toUpperCase() + mod.slice(1), icon: 'box' }
+function moduleLabel(mod: string) {
+  return MODULE_LABELS[mod] || mod.charAt(0).toUpperCase() + mod.slice(1)
 }
+// Modules that have no page in the app yet.
+const MODULES_WITHOUT_PAGE = new Set(['operations', 'company', 'platform'])
 
 type PermRow = { key: string; module: string; description: string; risk_level: string }
-type SectionKey = 'home' | 'permissions' | 'profile'
-
 type StaffInfo = {
   id: string
   company_id: string
+  template_id: string | null
   role_label: string | null
   status: string
   joined_at: string | null
   last_active_at: string | null
+}
+type Task = { id: string; title: string; priority: string; status: string; created_at: string }
+type ActivityRow = { id: string; action: string; module: string; created_at: string }
+
+// ---------------------------------------------------------------------------
+// Small helpers
+// ---------------------------------------------------------------------------
+function useIsDesktop(breakpoint = 900) {
+  const [desktop, setDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= breakpoint : false)
+  useEffect(() => {
+    const onResize = () => setDesktop(window.innerWidth >= breakpoint)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [breakpoint])
+  return desktop
 }
 
 function greeting() {
@@ -76,6 +107,12 @@ function greeting() {
   if (h < 18) return 'Good afternoon'
   return 'Good evening'
 }
+
+const fmtDate = (d?: string | null) =>
+  d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+const fmtMoney = (n: number | string | null | undefined) =>
+  `₦${Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 })}`
+const prettify = (s: string) => s.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
 
 function Avatar({ label, size = 40 }: { label: string; size?: number }) {
   return (
@@ -89,47 +126,468 @@ function Avatar({ label, size = 40 }: { label: string; size?: number }) {
   )
 }
 
+function Pill({ status, label }: { status: string; label?: string }) {
+  const v = status.toLowerCase()
+  let color = COLORS.textMuted
+  let bg = '#F1F5F9'
+  if (['confirmed', 'completed', 'active', 'success', 'successful', 'approved', 'resolved', 'done', 'paid'].includes(v)) { color = COLORS.green; bg = COLORS.greenBg }
+  else if (['cancelled', 'rejected', 'failed', 'suspended', 'declined'].includes(v)) { color = COLORS.red; bg = COLORS.redBg }
+  else if (['pending', 'open', 'in_progress', 'waiting', 'processing'].includes(v)) { color = COLORS.amber; bg = COLORS.amberBg }
+  return (
+    <span style={{ fontSize: 11, fontWeight: 700, color, background: bg, padding: '3px 9px', borderRadius: 6, whiteSpace: 'nowrap' as const }}>
+      {label || prettify(status)}
+    </span>
+  )
+}
+
 function EmptyState({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {
   return (
-    <div style={{ padding: '32px 16px', textAlign: 'center' as const }}>
-      <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
+    <div style={{ padding: '36px 16px', textAlign: 'center' as const }}>
+      <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
         <Icon name={icon} size={20} color={COLORS.textMuted} />
       </div>
-      <p style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, marginBottom: 4 }}>{title}</p>
-      <p style={{ fontSize: 12, color: COLORS.textMuted }}>{subtitle}</p>
+      <p style={{ fontSize: 14, fontWeight: 700, color: COLORS.text, marginBottom: 4 }}>{title}</p>
+      <p style={{ fontSize: 12.5, color: COLORS.textMuted }}>{subtitle}</p>
     </div>
   )
 }
 
-function SectionCard({ title, children }: { title?: string; children: React.ReactNode }) {
+function Card({ title, action, children, pad = 20 }: { title?: string; action?: React.ReactNode; children: React.ReactNode; pad?: number }) {
   return (
-    <div style={{ background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}`, padding: 16, marginBottom: 14 }}>
-      {title && <p style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, marginBottom: 12 }}>{title}</p>}
+    <div style={{ background: COLORS.card, borderRadius: 14, border: `1px solid ${COLORS.border}`, padding: pad }}>
+      {(title || action) && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          {title && <p style={{ fontSize: 14, fontWeight: 800, color: COLORS.text }}>{title}</p>}
+          {action}
+        </div>
+      )}
       {children}
     </div>
   )
 }
 
+function Kpi({ label, value, icon, note }: { label: string; value: string; icon: string; note?: string }) {
+  return (
+    <div style={{ background: COLORS.card, borderRadius: 14, border: `1px solid ${COLORS.border}`, padding: 18, display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ width: 44, height: 44, borderRadius: 12, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon name={icon} size={20} color={COLORS.primary} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ fontSize: 22, fontWeight: 800, color: COLORS.text, lineHeight: 1.1 }}>{value}</p>
+        <p style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 3 }}>{label}</p>
+        {note && <p style={{ fontSize: 10.5, color: COLORS.textMuted, marginTop: 2 }}>{note}</p>}
+      </div>
+    </div>
+  )
+}
+
+type Col = { label: string; render: (r: any) => React.ReactNode; align?: 'left' | 'right' }
+function DataTable({ cols, rows, emptyIcon, emptyTitle, emptyText }: {
+  cols: Col[]; rows: any[]; emptyIcon: string; emptyTitle: string; emptyText: string
+}) {
+  if (rows.length === 0) return <EmptyState icon={emptyIcon} title={emptyTitle} subtitle={emptyText} />
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' as const, minWidth: 560 }}>
+        <thead>
+          <tr>
+            {cols.map((c) => (
+              <th key={c.label} style={{
+                textAlign: c.align || 'left', fontSize: 11, fontWeight: 800, color: COLORS.textMuted,
+                letterSpacing: 0.4, padding: '10px 12px', borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap' as const,
+              }}>{c.label.toUpperCase()}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.id || i}>
+              {cols.map((c) => (
+                <td key={c.label} style={{
+                  textAlign: c.align || 'left', fontSize: 13, color: COLORS.text, padding: '12px',
+                  borderBottom: `1px solid ${COLORS.border}`, verticalAlign: 'middle' as const,
+                }}>{c.render(r)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function LinkButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <span onClick={onClick} style={{
+      fontSize: 12.5, fontWeight: 700, color: COLORS.primary, cursor: 'pointer',
+      border: `1px solid ${COLORS.border}`, borderRadius: 9, padding: '7px 13px', background: '#fff', whiteSpace: 'nowrap' as const,
+    }}>{label}</span>
+  )
+}
+
+function FilterChips({ options, value, onChange }: { options: [string, string][]; value: string; onChange: (v: string) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+      {options.map(([k, label]) => (
+        <span key={k} onClick={() => onChange(k)} style={{
+          fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
+          color: value === k ? COLORS.primary : COLORS.textMuted,
+          background: value === k ? '#EFF6FF' : '#fff',
+          border: `1px solid ${value === k ? COLORS.primary : COLORS.border}`,
+        }}>{label}</span>
+      ))}
+    </div>
+  )
+}
+
+const searchInput: React.CSSProperties = {
+  padding: '9px 12px', borderRadius: 10, border: `1px solid ${COLORS.border}`, fontSize: 13,
+  background: '#fff', outline: 'none', minWidth: 220, color: COLORS.text,
+}
+
+// ---------------------------------------------------------------------------
+// Pages. Each one loads its own data when opened, so staff only ever request
+// what their permissions allow. Row-level security in the database is the real
+// gate; these pages simply never ask for data the role cannot see.
+// ---------------------------------------------------------------------------
+function BookingsPage({ companyId, canSeeAmounts, canManage, go }: {
+  companyId: string; canSeeAmounts: boolean; canManage: boolean; go: (route: string) => void
+}) {
+  const [rows, setRows] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [status, setStatus] = useState('all')
+  const [q, setQ] = useState('')
+
+  useEffect(() => {
+    (async () => {
+      const { data, error: err } = await supabase
+        .from('bookings')
+        .select('id, ticket_code, customer_name, booking_status, amount_paid, created_at, check_in_date, checked_in, services(title, category)')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (err) setError(err.message)
+      setRows(data || [])
+      setLoading(false)
+    })()
+  }, [companyId])
+
+  const filtered = rows.filter((r) => {
+    if (status !== 'all' && r.booking_status !== status) return false
+    if (q.trim()) {
+      const s = q.toLowerCase()
+      return (r.customer_name || '').toLowerCase().includes(s) || (r.ticket_code || '').toLowerCase().includes(s)
+    }
+    return true
+  })
+
+  const cols: Col[] = [
+    { label: 'Ticket', render: (r) => <span style={{ fontWeight: 700 }}>{r.ticket_code || '—'}</span> },
+    { label: 'Customer', render: (r) => r.customer_name || '—' },
+    { label: 'Service', render: (r) => (
+      <span>{r.services?.title || '—'}{r.services?.category && <span style={{ color: COLORS.textMuted }}> · {prettify(r.services.category)}</span>}</span>
+    ) },
+    { label: 'Date', render: (r) => fmtDate(r.check_in_date || r.created_at) },
+    { label: 'Status', render: (r) => <Pill status={r.booking_status || 'unknown'} /> },
+    { label: 'Checked in', render: (r) => r.checked_in ? <Icon name="check" size={15} color={COLORS.green} /> : <span style={{ color: COLORS.textMuted }}>—</span> },
+    ...(canSeeAmounts
+      ? [{ label: 'Amount', align: 'right' as const, render: (r: any) => <span style={{ fontWeight: 700 }}>{fmtMoney(r.amount_paid)}</span> }]
+      : []),
+  ]
+
+  return (
+    <Card pad={0}>
+      <div style={{ padding: 18, display: 'flex', gap: 12, flexWrap: 'wrap' as const, alignItems: 'center', justifyContent: 'space-between' }}>
+        <FilterChips
+          value={status} onChange={setStatus}
+          options={[['all', 'All'], ['confirmed', 'Confirmed'], ['completed', 'Completed'], ['cancelled', 'Cancelled']]}
+        />
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const }}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search customer or ticket" style={searchInput} />
+          {canManage && <LinkButton label="Open Bookings Management" onClick={() => go('/bookings-management')} />}
+        </div>
+      </div>
+      {loading ? (
+        <p style={{ padding: 24, fontSize: 13, color: COLORS.textMuted }}>Loading bookings...</p>
+      ) : error ? (
+        <p style={{ padding: 24, fontSize: 13, color: COLORS.red }}>{error}</p>
+      ) : (
+        <DataTable cols={cols} rows={filtered} emptyIcon="ticket" emptyTitle="No bookings found" emptyText="Bookings for your company will appear here." />
+      )}
+      {!loading && !error && rows.length >= 100 && (
+        <p style={{ padding: '10px 18px 16px', fontSize: 11.5, color: COLORS.textMuted }}>Showing the latest 100 bookings.</p>
+      )}
+    </Card>
+  )
+}
+
+function SupportPage({ companyId, go }: { companyId: string; go: (route: string) => void }) {
+  const [rows, setRows] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    (async () => {
+      const { data, error: err } = await supabase
+        .from('support_tickets')
+        .select('id, ticket_code, subject, category, status, created_at')
+        .eq('company_id', companyId)
+        .eq('requester_type', 'company')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (err) setError(err.message)
+      setRows(data || [])
+      setLoading(false)
+    })()
+  }, [companyId])
+
+  const statusLabel = (s: string) => s === 'waiting' ? 'Waiting for You' : prettify(s)
+
+  return (
+    <Card pad={0}>
+      <div style={{ padding: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' as const }}>
+        <p style={{ fontSize: 13, color: COLORS.textMuted }}>Your company's tickets with TravelerCom support.</p>
+        <LinkButton label="Open Support Centre" onClick={() => go('/support')} />
+      </div>
+      {loading ? (
+        <p style={{ padding: 24, fontSize: 13, color: COLORS.textMuted }}>Loading tickets...</p>
+      ) : error ? (
+        <p style={{ padding: 24, fontSize: 13, color: COLORS.red }}>{error}</p>
+      ) : (
+        <DataTable
+          cols={[
+            { label: 'Ticket', render: (r) => <span style={{ fontWeight: 700 }}>{r.ticket_code || '—'}</span> },
+            { label: 'Subject', render: (r) => r.subject },
+            { label: 'Category', render: (r) => r.category || 'General' },
+            { label: 'Status', render: (r) => <Pill status={r.status} label={statusLabel(r.status)} /> },
+            { label: 'Opened', render: (r) => fmtDate(r.created_at) },
+          ]}
+          rows={rows} emptyIcon="headphones" emptyTitle="No support tickets" emptyText="Tickets raised for your company will appear here."
+        />
+      )}
+    </Card>
+  )
+}
+
+function FinancePage({ companyId, canWallet, canTransactions }: { companyId: string; canWallet: boolean; canTransactions: boolean }) {
+  const [wallet, setWallet] = useState<{ id: string; balance: number } | null>(null)
+  const [tx, setTx] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [note, setNote] = useState('')
+
+  useEffect(() => {
+    (async () => {
+      // The company wallet belongs to the company owner.
+      const { data: company } = await supabase.from('companies').select('owner_id').eq('id', companyId).maybeSingle()
+      if (!company?.owner_id) {
+        setNote('Company wallet details are not available yet.')
+        setLoading(false)
+        return
+      }
+      const { data: w } = await supabase.from('wallets').select('id, balance').eq('user_id', company.owner_id).maybeSingle()
+      if (w && canWallet) setWallet(w as any)
+      if (w && canTransactions) {
+        const { data: t } = await supabase
+          .from('transactions')
+          .select('id, transaction_type, amount, status, payment_reference, created_at')
+          .eq('wallet_id', w.id)
+          .order('created_at', { ascending: false })
+          .limit(100)
+        setTx(t || [])
+      }
+      if (!w) setNote('No company wallet found yet.')
+      setLoading(false)
+    })()
+  }, [companyId, canWallet, canTransactions])
+
+  if (loading) return <p style={{ fontSize: 13, color: COLORS.textMuted }}>Loading finance...</p>
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 16 }}>
+      {note && <Card><p style={{ fontSize: 13, color: COLORS.textMuted }}>{note}</p></Card>}
+      {canWallet && wallet && (
+        <div style={{ maxWidth: 360 }}>
+          <Kpi label="Company wallet balance" value={fmtMoney(wallet.balance)} icon="cash" />
+        </div>
+      )}
+      {canTransactions && (
+        <Card title="Recent Transactions" pad={0}>
+          <DataTable
+            cols={[
+              { label: 'Type', render: (r) => prettify(r.transaction_type || 'transaction') },
+              { label: 'Reference', render: (r) => <span style={{ color: COLORS.textMuted }}>{r.payment_reference || '—'}</span> },
+              { label: 'Status', render: (r) => <Pill status={r.status || 'unknown'} /> },
+              { label: 'Date', render: (r) => fmtDate(r.created_at) },
+              { label: 'Amount', align: 'right', render: (r) => <span style={{ fontWeight: 700 }}>{fmtMoney(r.amount)}</span> },
+            ]}
+            rows={tx} emptyIcon="cash" emptyTitle="No transactions yet" emptyText="Wallet transactions will appear here."
+          />
+        </Card>
+      )}
+      {!canTransactions && canWallet && (
+        <p style={{ fontSize: 12, color: COLORS.textMuted }}>Your role does not include transaction history.</p>
+      )}
+    </div>
+  )
+}
+
+function RefundsPage() {
+  const [rows, setRows] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    (async () => {
+      // Row-level security limits this to refunds on this company's bookings.
+      const { data, error: err } = await supabase
+        .from('refund_requests')
+        .select('id, reason, amount, status, created_at, resolved_at, bookings(ticket_code, customer_name)')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (err) setError(err.message)
+      setRows(data || [])
+      setLoading(false)
+    })()
+  }, [])
+
+  return (
+    <Card pad={0}>
+      {loading ? (
+        <p style={{ padding: 24, fontSize: 13, color: COLORS.textMuted }}>Loading refunds...</p>
+      ) : error ? (
+        <p style={{ padding: 24, fontSize: 13, color: COLORS.red }}>{error}</p>
+      ) : (
+        <DataTable
+          cols={[
+            { label: 'Booking', render: (r) => <span style={{ fontWeight: 700 }}>{r.bookings?.ticket_code || '—'}</span> },
+            { label: 'Customer', render: (r) => r.bookings?.customer_name || '—' },
+            { label: 'Reason', render: (r) => <span style={{ color: COLORS.textMuted }}>{r.reason || '—'}</span> },
+            { label: 'Status', render: (r) => <Pill status={r.status || 'unknown'} /> },
+            { label: 'Requested', render: (r) => fmtDate(r.created_at) },
+            { label: 'Amount', align: 'right', render: (r) => <span style={{ fontWeight: 700 }}>{fmtMoney(r.amount)}</span> },
+          ]}
+          rows={rows} emptyIcon="refresh" emptyTitle="No refund requests" emptyText="Refund requests for your company will appear here."
+        />
+      )}
+    </Card>
+  )
+}
+
+function TeamPage({ companyId }: { companyId: string }) {
+  const [rows, setRows] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    (async () => {
+      const { data: staffRows, error: err } = await supabase
+        .from('company_staff')
+        .select('id, user_id, template_id, role_label, status, joined_at, last_active_at')
+        .eq('company_id', companyId)
+        .order('joined_at', { ascending: true })
+      if (err) { setError(err.message); setLoading(false); return }
+      const list = staffRows || []
+      const userIds = list.map((s: any) => s.user_id)
+      const [{ data: profs }, { data: templates }] = await Promise.all([
+        userIds.length ? supabase.from('profiles').select('id, full_name').in('id', userIds) : Promise.resolve({ data: [] } as any),
+        supabase.from('company_role_templates').select('id, name'),
+      ])
+      const nameById: Record<string, string> = {}
+      for (const p of (profs || []) as any[]) nameById[p.id] = p.full_name
+      const tplById: Record<string, string> = {}
+      for (const t of (templates || []) as any[]) tplById[t.id] = t.name
+      setRows(list.map((s: any) => ({
+        ...s,
+        name: nameById[s.user_id] || 'Team member',
+        role: (s.template_id && tplById[s.template_id]) || s.role_label || 'Staff',
+      })))
+      setLoading(false)
+    })()
+  }, [companyId])
+
+  return (
+    <Card pad={0}>
+      {loading ? (
+        <p style={{ padding: 24, fontSize: 13, color: COLORS.textMuted }}>Loading team...</p>
+      ) : error ? (
+        <p style={{ padding: 24, fontSize: 13, color: COLORS.red }}>{error}</p>
+      ) : (
+        <DataTable
+          cols={[
+            { label: 'Name', render: (r) => (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Avatar label={r.name} size={30} />
+                <span style={{ fontWeight: 700 }}>{r.name}</span>
+              </div>
+            ) },
+            { label: 'Role', render: (r) => r.role },
+            { label: 'Status', render: (r) => <Pill status={r.status} /> },
+            { label: 'Joined', render: (r) => fmtDate(r.joined_at) },
+            { label: 'Last active', render: (r) => fmtDate(r.last_active_at) },
+          ]}
+          rows={rows} emptyIcon="users" emptyTitle="No team members" emptyText="Staff added to your company will appear here."
+        />
+      )}
+    </Card>
+  )
+}
+
+function TasksList({ tasks, onDone, limit }: { tasks: Task[]; onDone: (id: string) => void; limit?: number }) {
+  const list = limit ? tasks.slice(0, limit) : tasks
+  if (list.length === 0) return <EmptyState icon="checkCircle" title="You're all caught up" subtitle="You have no pending tasks right now." />
+  return (
+    <div>
+      {list.map((t) => {
+        const priorityColor = t.priority === 'high' ? COLORS.red : t.priority === 'medium' ? '#F59E0B' : COLORS.textMuted
+        return (
+          <div key={t.id} style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
+            borderBottom: `1px solid ${COLORS.border}`, opacity: t.status === 'done' ? 0.5 : 1,
+          }}>
+            <div style={{ width: 9, height: 9, borderRadius: '50%', background: priorityColor, flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 13, color: COLORS.text, textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>{t.title}</span>
+            <span style={{ fontSize: 11, color: COLORS.textMuted }}>{fmtDate(t.created_at)}</span>
+            {t.status === 'open' ? (
+              <button onClick={() => onDone(t.id)} style={{
+                border: `1px solid ${COLORS.border}`, background: '#fff', borderRadius: 8,
+                padding: '6px 12px', fontSize: 12, fontWeight: 700, color: COLORS.primary, cursor: 'pointer',
+              }}>Done</button>
+            ) : (
+              <Icon name="checkCircle" size={16} color={COLORS.green} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 export default function StaffDashboard() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [checking, setChecking] = useState(true)
   const [accessError, setAccessError] = useState('')
-  const [section, setSection] = useState<SectionKey>('home')
+  const [section, setSection] = useState('overview')
+  const [drawer, setDrawer] = useState(false)
 
   const [userEmail, setUserEmail] = useState('')
   const [userName, setUserName] = useState('')
   const [staff, setStaff] = useState<StaffInfo | null>(null)
   const [companyName, setCompanyName] = useState('')
-  const [companyPhone, setCompanyPhone] = useState('')
-  const [companyEmail, setCompanyEmail] = useState('')
   const [roleName, setRoleName] = useState('')
 
   const [catalog, setCatalog] = useState<PermRow[]>([])
   const [effective, setEffective] = useState<Set<string>>(new Set())
 
   const [bookingsToday, setBookingsToday] = useState<number | null>(null)
-  const [tasks, setTasks] = useState<{ id: string; title: string; priority: string; status: string; created_at: string }[]>([])
-  const [activity, setActivity] = useState<{ id: string; action: string; module: string; created_at: string }[]>([])
+  const [openTickets, setOpenTickets] = useState<number | null>(null)
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [activity, setActivity] = useState<ActivityRow[]>([])
 
   useEffect(() => {
     (async () => {
@@ -145,16 +603,8 @@ export default function StaffDashboard() {
         .eq('user_id', user.id)
         .maybeSingle()
 
-      if (staffErr) {
-        setAccessError(`Database error checking staff access: ${staffErr.message}`)
-        setChecking(false)
-        return
-      }
-      if (!staffRow) {
-        setAccessError('No staff access found for this account.')
-        setChecking(false)
-        return
-      }
+      if (staffErr) { setAccessError(`Database error checking staff access: ${staffErr.message}`); setChecking(false); return }
+      if (!staffRow) { setAccessError('No staff access found for this account.'); setChecking(false); return }
       if (staffRow.status === 'suspended') {
         setAccessError('Your staff access has been suspended. Contact your company admin.')
         setChecking(false)
@@ -164,53 +614,47 @@ export default function StaffDashboard() {
       setStaff(staffRow)
       setRoleName(staffRow.role_label || 'Staff')
 
-      const [companyRes, templateRes, catalogRes, overridesRes] = await Promise.all([
-        supabase.from('companies').select('*').eq('id', staffRow.company_id).maybeSingle(),
+      const [companyRes, templateRes, catalogRes, permsRes] = await Promise.all([
+        supabase.from('companies').select('business_name, owner_id').eq('id', staffRow.company_id).maybeSingle(),
         staffRow.template_id
           ? supabase.from('company_role_templates').select('name').eq('id', staffRow.template_id).maybeSingle()
           : Promise.resolve({ data: null } as any),
         supabase.from('company_permissions').select('key, module, description, risk_level'),
-        supabase.from('company_staff_permission_overrides').select('*').eq('company_staff_id', staffRow.id),
+        // Single source of truth: the same rule the database enforces (template + overrides).
+        supabase.rpc('get_my_company_permissions', { p_company_id: staffRow.company_id }),
       ])
 
       if (companyRes.data?.business_name) setCompanyName(companyRes.data.business_name)
-      const cd: any = companyRes.data || {}
-      setCompanyPhone(cd.business_phone || cd.phone || cd.contact_phone || '')
-      setCompanyEmail(cd.business_email || cd.email || cd.contact_email || '')
       if (templateRes?.data?.name) setRoleName(templateRes.data.name)
+      setCatalog(catalogRes.data || [])
 
-      const permCatalog: PermRow[] = catalogRes.data || []
-      setCatalog(permCatalog)
-
-      let basePerms = new Set<string>()
-      if (staffRow.template_id) {
-        const { data: templatePerms } = await supabase
-          .from('company_role_template_permissions')
-          .select('permission_key')
-          .eq('template_id', staffRow.template_id)
-        basePerms = new Set((templatePerms || []).map((r: any) => r.permission_key))
+      if (permsRes.error) {
+        setAccessError(`Could not load your permissions: ${permsRes.error.message}`)
+        setChecking(false)
+        return
       }
+      const perms = new Set<string>((permsRes.data as string[]) || [])
+      setEffective(perms)
 
-      // Overrides layer on top of the role template. The exact override-flag
-      // column wasn't confirmed against the live schema — this handles the
-      // common shapes (`granted` boolean, or `action` text) defensively.
-      for (const row of (overridesRes.data || []) as any[]) {
-        const isGrant = row.granted === true || row.action === 'grant' || row.action === 'allow'
-        const isRevoke = row.granted === false || row.action === 'revoke' || row.action === 'deny'
-        if (isGrant) basePerms.add(row.permission_key)
-        else if (isRevoke) basePerms.delete(row.permission_key)
-      }
-
-      setEffective(basePerms)
-
-      if (basePerms.has('bookings.view')) {
+      if (perms.has('bookings.view')) {
         const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
         const { count } = await supabase
-          .from('bookings')
-          .select('id', { count: 'exact', head: true })
-          .eq('company_id', staffRow.company_id)
-          .gte('created_at', todayStart.toISOString())
+          .from('bookings').select('id', { count: 'exact', head: true })
+          .eq('company_id', staffRow.company_id).gte('created_at', todayStart.toISOString())
         setBookingsToday(count ?? 0)
+      }
+
+      if (perms.has('support.view')) {
+        const { count } = await supabase
+          .from('support_tickets').select('id', { count: 'exact', head: true })
+          .eq('company_id', staffRow.company_id).eq('requester_type', 'company')
+          .in('status', ['open', 'in_progress', 'waiting'])
+        setOpenTickets(count ?? 0)
+      }
+
+      if (perms.has('finance.view') && companyRes.data?.owner_id) {
+        const { data: w } = await supabase.from('wallets').select('balance').eq('user_id', companyRes.data.owner_id).maybeSingle()
+        if (w) setWalletBalance(Number(w.balance))
       }
 
       const { data: taskRows } = await supabase
@@ -219,7 +663,7 @@ export default function StaffDashboard() {
         .eq('assigned_to', staffRow.id)
         .order('status', { ascending: true })
         .order('created_at', { ascending: false })
-        .limit(20)
+        .limit(50)
       setTasks(taskRows || [])
 
       const { data: activityRows } = await supabase
@@ -241,7 +685,6 @@ export default function StaffDashboard() {
       .update({ status: 'done', completed_at: new Date().toISOString() })
       .eq('id', taskId)
     if (error) {
-      // revert on failure
       setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: 'open' } : t))
       alert('Could not update task: ' + error.message)
       return
@@ -250,16 +693,35 @@ export default function StaffDashboard() {
       const { data: userData } = await supabase.auth.getUser()
       if (userData.user) {
         await supabase.from('audit_logs').insert({
-          actor_id: userData.user.id,
-          action: 'completed_task',
-          module: 'tasks',
-          target_type: 'staff_task',
-          target_id: taskId,
-          company_id: staff.company_id,
+          actor_id: userData.user.id, action: 'completed_task', module: 'tasks',
+          target_type: 'staff_task', target_id: taskId, company_id: staff.company_id,
         })
         setActivity((prev) => [{ id: `local-${taskId}`, action: 'completed_task', module: 'tasks', created_at: new Date().toISOString() }, ...prev])
       }
     }
+  }
+
+  // Which modules this staff member has at least one permission in.
+  const effectiveModules = useMemo(() => {
+    const mods = new Set<string>()
+    for (const p of catalog) if (effective.has(p.key)) mods.add(p.module)
+    return mods
+  }, [catalog, effective])
+
+  const canSee = (item: NavItem) => {
+    if (item.requires) return item.requires.some((k) => effective.has(k))
+    if (item.modules) return item.modules.some((m) => effectiveModules.has(m))
+    return true
+  }
+
+  const visibleNav = NAV.filter(canSee)
+  const current = visibleNav.find((n) => n.key === section && n.kind === 'section') || visibleNav[0]
+  const activeKey = current?.key || 'overview'
+
+  const selectNav = (item: NavItem) => {
+    setDrawer(false)
+    if (item.kind === 'route' && item.route) { navigate(item.route); return }
+    setSection(item.key)
   }
 
   if (checking) {
@@ -286,236 +748,273 @@ export default function StaffDashboard() {
     return acc
   }, {})
 
-  const visibleModules = Object.keys(groupedCatalog).filter((m) => {
-    if (!groupedCatalog[m].some((p) => effective.has(p.key))) return false
-    const action = MODULE_ACTIONS[m]
-    if (!action) return false // no built page for this module yet — stays hidden until one exists
-    if (action.type === 'contact' && !companyPhone && !companyEmail) return false
-    return true
-  })
+  const openTaskCount = tasks.filter((t) => t.status === 'open').length
+  const go = (route: string) => navigate(route)
 
-  return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: 480, margin: '0 auto', paddingBottom: 90 }}>
-
-      <div style={{ padding: '18px 20px 14px 20px', background: COLORS.card, borderBottom: `1px solid ${COLORS.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <p style={{ fontSize: 15, fontWeight: 800 }}>
-            <span style={{ color: COLORS.primary }}>TRAVELER</span><span style={{ color: COLORS.secondary }}>.COM</span>
-          </p>
-          <NotificationBell iconColor={COLORS.text} />
+  // ------------------------------- Sidebar -------------------------------
+  const sidebar = (
+    <div style={{ display: 'flex', flexDirection: 'column' as const, height: '100%', color: '#fff' }}>
+      <div style={{ padding: '24px 22px 18px 22px' }}>
+        <p style={{ fontSize: 18, fontWeight: 800 }}>
+          <span style={{ color: COLORS.primary }}>TRAVELER</span><span style={{ color: COLORS.secondary }}>.COM</span>
+        </p>
+        <p style={{ fontSize: 12, color: '#94A3B8', marginTop: 10, fontWeight: 600 }}>{companyName || 'Your company'}</p>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, background: COLORS.navySoft, borderRadius: 8, padding: '5px 10px' }}>
+          <Icon name="briefcase" size={12} color="#FBBF24" />
+          <span style={{ fontSize: 11.5, fontWeight: 700 }}>{roleName}</span>
         </div>
-        {section === 'home' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Avatar label={userName} size={44} />
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 15, fontWeight: 800, color: COLORS.text }}>{greeting()}, {userName}</p>
-              <p style={{ fontSize: 11.5, color: COLORS.textMuted }}>{companyName || 'Loading...'}</p>
-            </div>
-          </div>
-        )}
-        {section === 'permissions' && <p style={{ fontSize: 17, fontWeight: 800, color: COLORS.text }}>My Permissions</p>}
-        {section === 'profile' && <p style={{ fontSize: 17, fontWeight: 800, color: COLORS.text }}>Profile</p>}
       </div>
 
-      <div style={{ padding: 16 }}>
-        {section === 'home' && (
+      <div style={{ flex: 1, overflowY: 'auto' as const, padding: '6px 12px' }}>
+        {(['Workspace', 'Company', 'Account'] as const).map((group) => {
+          const items = visibleNav.filter((n) => n.group === group)
+          if (items.length === 0) return null
+          return (
+            <div key={group} style={{ marginBottom: 18 }}>
+              <p style={{ fontSize: 10.5, fontWeight: 800, color: '#64748B', letterSpacing: 0.8, padding: '0 10px', marginBottom: 6 }}>{group.toUpperCase()}</p>
+              {items.map((item) => {
+                const active = item.kind === 'section' && item.key === activeKey
+                return (
+                  <div key={item.key} onClick={() => selectNav(item)} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, cursor: 'pointer', marginBottom: 2,
+                    background: active ? 'rgba(14,165,233,0.18)' : 'transparent',
+                    color: active ? '#fff' : '#CBD5E1',
+                  }}>
+                    <Icon name={item.icon} size={18} color={active ? COLORS.primary : '#94A3B8'} />
+                    <span style={{ flex: 1, fontSize: 13.5, fontWeight: active ? 700 : 500 }}>{item.label}</span>
+                    {item.kind === 'route' && <Icon name="chevronRight" size={14} color="#64748B" />}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={{ padding: 14, borderTop: `1px solid ${COLORS.navySoft}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <Avatar label={userName} size={34} />
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{userName}</p>
+            <p style={{ fontSize: 10.5, color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{userEmail}</p>
+          </div>
+        </div>
+        <div onClick={async () => { await supabase.auth.signOut(); navigate('/login') }} style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+          background: COLORS.navySoft, color: '#FCA5A5', fontSize: 13, fontWeight: 700,
+        }}>
+          <Icon name="logOut" size={16} color="#FCA5A5" />
+          Log Out
+        </div>
+      </div>
+    </div>
+  )
+
+  // ------------------------------- Pages -------------------------------
+  const pageTitle: Record<string, { title: string; subtitle: string }> = {
+    overview: { title: `${greeting()}, ${userName}`, subtitle: companyName || '' },
+    tasks: { title: 'My Tasks', subtitle: 'Tasks assigned to you' },
+    bookings: { title: 'Bookings', subtitle: 'Latest bookings for your company' },
+    support: { title: 'Support', subtitle: 'Your company tickets with TravelerCom support' },
+    finance: { title: 'Finance', subtitle: 'Only the parts your role allows' },
+    refunds: { title: 'Refunds', subtitle: 'Refund requests on your company bookings' },
+    team: { title: 'Team', subtitle: 'People with access to your company' },
+    access: { title: 'My Access', subtitle: 'Exactly what your role and overrides allow' },
+    profile: { title: 'Profile', subtitle: 'Your staff account' },
+  }
+
+  const companyId = staff?.company_id || ''
+  const kpiGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 14, marginBottom: 18 } as const
+
+  const renderPage = () => {
+    switch (activeKey) {
+      case 'overview':
+        return (
           <>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <div style={{ background: COLORS.navy, borderRadius: 12, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' as const }}>
+              <div style={{ background: COLORS.navy, borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Icon name="briefcase" size={13} color="#FBBF24" />
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{roleName}</span>
               </div>
-              <div style={{ background: COLORS.greenBg, borderRadius: 12, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ background: COLORS.greenBg, borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: COLORS.green }} />
                 <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.green }}>Active</span>
               </div>
             </div>
 
-            <SectionCard title="Today's Overview">
-              {bookingsToday !== null ? (
-                <div style={{ background: '#F8FAFC', borderRadius: 12, padding: 14, flex: 1 }}>
-                  <p style={{ fontSize: 22, fontWeight: 800, color: COLORS.text }}>{bookingsToday}</p>
-                  <p style={{ fontSize: 11.5, color: COLORS.textMuted }}>Bookings today</p>
-                </div>
-              ) : (
-                <p style={{ fontSize: 12.5, color: COLORS.textMuted }}>Nothing to show for your current access yet.</p>
-              )}
-            </SectionCard>
+            <div style={kpiGrid}>
+              <Kpi label="Open tasks" value={String(openTaskCount)} icon="checkCircle" />
+              {bookingsToday !== null && <Kpi label="Bookings today" value={String(bookingsToday)} icon="ticket" />}
+              {openTickets !== null && <Kpi label="Open support tickets" value={String(openTickets)} icon="headphones" />}
+              {walletBalance !== null && <Kpi label="Company wallet" value={fmtMoney(walletBalance)} icon="cash" />}
+              <Kpi label="Permissions" value={String(effective.size)} icon="shield" />
+            </div>
 
-            <SectionCard title="Your Access">
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 12.5, color: COLORS.textMuted }}>Role</span>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.text }}>{roleName}</span>
+            {effective.size === 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <Card><p style={{ fontSize: 13, color: COLORS.textMuted }}>No permissions have been assigned to your role yet. Contact your company admin.</p></Card>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 12.5, color: COLORS.textMuted }}>Access Status</span>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.green }}>Active</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
-                <span style={{ fontSize: 12.5, color: COLORS.textMuted }}>Permissions</span>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.text }}>{effective.size}</span>
-              </div>
-              <button onClick={() => setSection('permissions')} style={{
-                width: '100%', padding: 11, borderRadius: 10, border: `1px solid ${COLORS.border}`,
-                background: COLORS.bg, color: COLORS.primary, fontWeight: 700, fontSize: 12.5, cursor: 'pointer',
-              }}>
-                View My Permissions
-              </button>
-            </SectionCard>
-
-            {visibleModules.length > 0 && (
-              <SectionCard title="Quick Actions">
-                <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 10 }}>
-                  {visibleModules.map((m) => {
-                    const action = MODULE_ACTIONS[m]
-                    const handleClick = () => {
-                      if (action.type === 'route' && action.route) navigate(action.route)
-                      else if (action.type === 'contact') {
-                        if (companyPhone) window.location.href = `tel:${companyPhone}`
-                        else if (companyEmail) window.location.href = `mailto:${companyEmail}`
-                      }
-                    }
-                    return (
-                      <div key={m} onClick={handleClick} style={{
-                        flex: '1 1 45%', background: '#F8FAFC', borderRadius: 12, padding: 12,
-                        display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 6,
-                        cursor: 'pointer',
-                      }}>
-                        <Icon name={action.icon} size={18} color={COLORS.primary} />
-                        <span style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.text }}>{action.label}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </SectionCard>
             )}
 
-            <SectionCard title="My Tasks">
-              {tasks.length === 0 && (
-                <EmptyState icon="checkCircle" title="You're all caught up" subtitle="You have no pending tasks right now." />
-              )}
-              {tasks.map((t) => {
-                const priorityColor = t.priority === 'high' ? COLORS.red : t.priority === 'medium' ? '#F59E0B' : COLORS.textMuted
-                return (
-                  <div key={t.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
-                    borderBottom: `1px solid ${COLORS.border}`, opacity: t.status === 'done' ? 0.5 : 1,
-                  }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: priorityColor, flexShrink: 0 }} />
-                    <span style={{
-                      flex: 1, fontSize: 12.5, color: COLORS.text,
-                      textDecoration: t.status === 'done' ? 'line-through' : 'none',
-                    }}>{t.title}</span>
-                    {t.status === 'open' ? (
-                      <button onClick={() => markTaskDone(t.id)} style={{
-                        border: `1px solid ${COLORS.border}`, background: '#fff', borderRadius: 8,
-                        padding: '5px 10px', fontSize: 11, fontWeight: 700, color: COLORS.primary, cursor: 'pointer',
-                      }}>Done</button>
-                    ) : (
-                      <Icon name="checkCircle" size={15} color={COLORS.green} />
-                    )}
+            <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? '1.5fr 1fr' : '1fr', gap: 16 }}>
+              <Card title="My Tasks" action={openTaskCount > 0 ? <LinkButton label="View all" onClick={() => setSection('tasks')} /> : undefined}>
+                <TasksList tasks={tasks} onDone={markTaskDone} limit={5} />
+              </Card>
+              <Card title="Recent Activity">
+                {activity.length === 0 ? (
+                  <EmptyState icon="clock" title="Nothing yet" subtitle="Your recent activity will appear here." />
+                ) : activity.map((a) => (
+                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${COLORS.border}` }}>
+                    <Icon name="clock" size={14} color={COLORS.textMuted} />
+                    <span style={{ flex: 1, fontSize: 13, color: COLORS.text }}>{a.action.replace(/_/g, ' ')}</span>
+                    <span style={{ fontSize: 11.5, color: COLORS.textMuted }}>{fmtDate(a.created_at)}</span>
                   </div>
-                )
-              })}
-            </SectionCard>
-
-            <SectionCard title="Recent Activity">
-              {activity.length === 0 && (
-                <EmptyState icon="clock" title="Nothing yet" subtitle="Your recent activity will appear here." />
-              )}
-              {activity.map((a) => (
-                <div key={a.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0',
-                  borderBottom: `1px solid ${COLORS.border}`,
-                }}>
-                  <Icon name="clock" size={14} color={COLORS.textMuted} />
-                  <span style={{ flex: 1, fontSize: 12.5, color: COLORS.text }}>
-                    {a.action.replace(/_/g, ' ')}
-                  </span>
-                  <span style={{ fontSize: 11, color: COLORS.textMuted }}>
-                    {new Date(a.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                  </span>
-                </div>
-              ))}
-            </SectionCard>
+                ))}
+              </Card>
+            </div>
           </>
-        )}
+        )
 
-        {section === 'permissions' && (
+      case 'tasks':
+        return (
+          <Card><TasksList tasks={tasks} onDone={markTaskDone} /></Card>
+        )
+
+      case 'bookings':
+        return (
+          <BookingsPage
+            companyId={companyId}
+            canSeeAmounts={effective.has('finance.view')}
+            canManage={effective.has('bookings.edit') || effective.has('bookings.create') || effective.has('bookings.cancel')}
+            go={go}
+          />
+        )
+
+      case 'support':
+        return <SupportPage companyId={companyId} go={go} />
+
+      case 'finance':
+        return <FinancePage companyId={companyId} canWallet={effective.has('finance.view')} canTransactions={effective.has('finance.transactions')} />
+
+      case 'refunds':
+        return <RefundsPage />
+
+      case 'team':
+        return <TeamPage companyId={companyId} />
+
+      case 'access':
+        return (
           <>
-            {Object.keys(groupedCatalog).length === 0 && (
-              <EmptyState icon="shield" title="No permissions found" subtitle="Contact your company admin if this looks wrong." />
+            {Object.keys(groupedCatalog).length === 0 ? (
+              <Card><EmptyState icon="shield" title="No permissions found" subtitle="Contact your company admin if this looks wrong." /></Card>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+                {Object.keys(groupedCatalog).map((mod) => {
+                  const hasAny = groupedCatalog[mod].some((p) => effective.has(p.key))
+                  return (
+                    <Card key={mod} title={moduleLabel(mod)} action={
+                      !hasAny ? undefined : MODULES_WITHOUT_PAGE.has(mod)
+                        ? <span style={{ fontSize: 10.5, color: COLORS.textMuted }}>Page coming soon</span>
+                        : undefined
+                    }>
+                      {groupedCatalog[mod].map((p) => {
+                        const has = effective.has(p.key)
+                        return (
+                          <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}>
+                            <Icon name={has ? 'check' : 'x'} size={15} color={has ? COLORS.green : COLORS.textMuted} />
+                            <span style={{ fontSize: 12.5, color: has ? COLORS.text : COLORS.textMuted }}>{p.description}</span>
+                          </div>
+                        )
+                      })}
+                    </Card>
+                  )
+                })}
+              </div>
             )}
-            {Object.keys(groupedCatalog).map((mod) => {
-              const meta = moduleMeta(mod)
-              return (
-                <SectionCard key={mod} title={meta.label}>
-                  {groupedCatalog[mod].map((p) => {
-                    const has = effective.has(p.key)
-                    return (
-                      <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}>
-                        <Icon name={has ? 'check' : 'x'} size={15} color={has ? COLORS.green : COLORS.textMuted} />
-                        <span style={{ fontSize: 12.5, color: has ? COLORS.text : COLORS.textMuted }}>{p.description}</span>
-                      </div>
-                    )
-                  })}
-                </SectionCard>
-              )
-            })}
           </>
-        )}
+        )
 
-        {section === 'profile' && staff && (
-          <>
-            <SectionCard>
-              <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', textAlign: 'center' as const, padding: '8px 0 16px 0' }}>
-                <Avatar label={userName} size={64} />
-                <p style={{ fontSize: 15, fontWeight: 800, color: COLORS.text, marginTop: 10 }}>{userName}</p>
-                <p style={{ fontSize: 12, color: COLORS.textMuted }}>{userEmail}</p>
+      case 'profile':
+        return staff ? (
+          <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? '1fr 1fr' : '1fr', gap: 16, alignItems: 'start' }}>
+            <Card>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', textAlign: 'center' as const, padding: '8px 0 18px 0' }}>
+                <Avatar label={userName} size={72} />
+                <p style={{ fontSize: 16, fontWeight: 800, color: COLORS.text, marginTop: 12 }}>{userName}</p>
+                <p style={{ fontSize: 12.5, color: COLORS.textMuted }}>{userEmail}</p>
               </div>
               {[
+                ['Company', companyName || '—'],
                 ['Role', roleName],
                 ['Account Status', 'Active'],
-                ['Joined', staff.joined_at ? new Date(staff.joined_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'],
-                ['Last Active', staff.last_active_at ? new Date(staff.last_active_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'],
+                ['Joined', fmtDate(staff.joined_at)],
+                ['Last Active', fmtDate(staff.last_active_at)],
               ].map(([label, value]) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderTop: `1px solid ${COLORS.border}` }}>
-                  <span style={{ fontSize: 12.5, color: COLORS.textMuted }}>{label}</span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.text }}>{value}</span>
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0', borderTop: `1px solid ${COLORS.border}` }}>
+                  <span style={{ fontSize: 13, color: COLORS.textMuted }}>{label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{value}</span>
                 </div>
               ))}
-            </SectionCard>
-
-            <SectionCard title="Account">
-              <div onClick={() => setSection('permissions')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', cursor: 'pointer', borderBottom: `1px solid ${COLORS.border}` }}>
-                <span style={{ fontSize: 13, color: COLORS.text }}>My Permissions</span>
+            </Card>
+            <Card title="Account">
+              <div onClick={() => setSection('access')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', cursor: 'pointer', borderBottom: `1px solid ${COLORS.border}` }}>
+                <span style={{ fontSize: 13.5, color: COLORS.text }}>My Access</span>
                 <Icon name="chevronRight" size={16} color={COLORS.textMuted} />
               </div>
-              <div onClick={async () => { await supabase.auth.signOut(); navigate('/login') }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', cursor: 'pointer' }}>
-                <span style={{ fontSize: 13, color: COLORS.red, fontWeight: 700 }}>Log Out</span>
+              <div onClick={async () => { await supabase.auth.signOut(); navigate('/login') }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', cursor: 'pointer' }}>
+                <span style={{ fontSize: 13.5, color: COLORS.red, fontWeight: 700 }}>Log Out</span>
                 <Icon name="logOut" size={16} color={COLORS.red} />
               </div>
-            </SectionCard>
-          </>
-        )}
-      </div>
-
-      <div style={{
-        position: 'fixed' as const, bottom: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto',
-        background: COLORS.card, borderTop: `1px solid ${COLORS.border}`,
-        display: 'flex', padding: '10px 0 14px 0',
-      }}>
-        {([
-          ['home', 'home', 'Home'],
-          ['permissions', 'shield', 'Access'],
-          ['profile', 'user', 'Profile'],
-        ] as [SectionKey, string, string][]).map(([key, icon, label]) => (
-          <div key={key} onClick={() => setSection(key)} style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-            <Icon name={icon} size={20} color={section === key ? COLORS.primary : COLORS.textMuted} />
-            <span style={{ fontSize: 10.5, fontWeight: section === key ? 700 : 500, color: section === key ? COLORS.primary : COLORS.textMuted }}>{label}</span>
+            </Card>
           </div>
-        ))}
-      </div>
+        ) : null
+
+      default:
+        return null
+    }
+  }
+
+  const header = pageTitle[activeKey] || { title: '', subtitle: '' }
+
+  // ------------------------------- Shell -------------------------------
+  return (
+    <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex' }}>
+      {isDesktop && (
+        <aside style={{ width: 268, flexShrink: 0, background: COLORS.navy, position: 'sticky' as const, top: 0, height: '100vh' }}>
+          {sidebar}
+        </aside>
+      )}
+
+      {!isDesktop && drawer && (
+        <div style={{ position: 'fixed' as const, inset: 0, zIndex: 50, display: 'flex' }}>
+          <div style={{ width: 284, maxWidth: '85%', background: COLORS.navy, height: '100%' }}>{sidebar}</div>
+          <div onClick={() => setDrawer(false)} style={{ flex: 1, background: 'rgba(15,23,42,0.55)' }} />
+        </div>
+      )}
+
+      <main style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          position: 'sticky' as const, top: 0, zIndex: 10, background: COLORS.card, borderBottom: `1px solid ${COLORS.border}`,
+          padding: isDesktop ? '16px 32px' : '12px 16px', display: 'flex', alignItems: 'center', gap: 14,
+        }}>
+          {!isDesktop && (
+            <span onClick={() => setDrawer(true)} style={{
+              fontSize: 12.5, fontWeight: 700, color: COLORS.text, border: `1px solid ${COLORS.border}`,
+              borderRadius: 9, padding: '7px 12px', cursor: 'pointer',
+            }}>Menu</span>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: isDesktop ? 20 : 16, fontWeight: 800, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{header.title}</p>
+            {header.subtitle && isDesktop && <p style={{ fontSize: 12.5, color: COLORS.textMuted, marginTop: 2 }}>{header.subtitle}</p>}
+          </div>
+          <NotificationBell iconColor={COLORS.text} />
+          {isDesktop && <Avatar label={userName} size={36} />}
+        </div>
+
+        <div style={{ padding: isDesktop ? '28px 32px 48px 32px' : '16px 14px 40px 14px' }}>
+          {renderPage()}
+        </div>
+      </main>
     </div>
   )
 }
