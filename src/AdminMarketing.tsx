@@ -421,7 +421,7 @@ function BannersTab() {
         <Icon name="check" size={14} color={COLORS.blue} />
         <div>
           <p style={{ fontSize: '12px', fontWeight: 700, color: '#1E3A8A' }}>Banner tips</p>
-          <p style={{ fontSize: '11.5px', color: '#1E40AF', marginTop: '2px', lineHeight: 1.5 }}>Recommended size: 1920 x 600px. Use high-quality images for better engagement. Discount banners apply a real price cut to the linked listing.</p>
+          <p style={{ fontSize: '11.5px', color: '#1E40AF', marginTop: '2px', lineHeight: 1.5 }}>Recommended size: 1400 x 600px (7:3). The photo is shown on its own, so put any text inside the image itself. Tapping the banner opens its link. Discount banners apply a real price cut to the linked listing.</p>
         </div>
       </div>
 
