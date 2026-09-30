@@ -18,8 +18,10 @@ const COLORS = {
 
 type Ticket = {
   id: string
+  ticket_code: string | null
   user_id: string | null
   company_id: string | null
+  booking_id: string | null
   requester_type: 'customer' | 'company' | 'staff'
   subject: string
   message: string
@@ -92,7 +94,46 @@ type BookingContext = {
   created_at: string
 }
 
-type FilterKey = 'all' | 'customer' | 'company' | 'open' | 'waiting' | 'resolved'
+type FilterKey = 'all' | 'customer' | 'company' | 'open' | 'in_progress' | 'waiting' | 'resolved' | 'unassigned' | 'mine'
+
+type Activity = { id: string; action: string; actor_name: string | null; detail: string | null; created_at: string }
+
+function statusMeta(status: string) {
+  switch (status) {
+    case 'in_progress': return { label: 'In Progress', color: COLORS.primary, bg: '#EFF6FF' }
+    case 'waiting': return { label: 'Waiting for Requester', color: COLORS.purple, bg: '#F5F3FF' }
+    case 'resolved': return { label: 'Resolved', color: COLORS.green, bg: '#F0FDF4' }
+    default: return { label: 'Open', color: COLORS.orange, bg: '#FFF7ED' }
+  }
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const m = statusMeta(status)
+  return (
+    <span style={{ fontSize: '10.5px', fontWeight: 700, color: m.color, background: m.bg, padding: '3px 8px', borderRadius: '6px', whiteSpace: 'nowrap' as const }}>
+      {m.label.toUpperCase()}
+    </span>
+  )
+}
+
+function ActivityCard({ items }: { items: Activity[] }) {
+  if (items.length === 0) return null
+  return (
+    <div style={{ background: '#F1F5F9', borderRadius: '12px', padding: '10px 12px', marginBottom: '14px' }}>
+      <p style={{ fontSize: '10.5px', fontWeight: 800, color: COLORS.textMuted, letterSpacing: '0.4px', marginBottom: '6px' }}>TICKET ACTIVITY</p>
+      {items.map((x) => (
+        <div key={x.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', padding: '3px 0' }}>
+          <span style={{ fontSize: '11.5px', color: COLORS.text }}>
+            {x.detail}{x.actor_name && x.action !== 'submitted' ? ` · by ${x.actor_name}` : ''}
+          </span>
+          <span style={{ fontSize: '10.5px', color: COLORS.textMuted, whiteSpace: 'nowrap' as const }}>
+            {new Date(x.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function priorityMeta(p: string) {
   if (p === 'urgent') return { label: 'URGENT', color: COLORS.red, bg: '#FEF2F2' }
@@ -122,6 +163,7 @@ export default function AdminSupport() {
 
   const [selected, setSelected] = useState<Ticket | null>(null)
   const [msgs, setMsgs] = useState<Msg[]>([])
+  const [activity, setActivity] = useState<Activity[]>([])
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
   const [reply, setReply] = useState('')
   const [isInternal, setIsInternal] = useState(false)
@@ -178,6 +220,9 @@ export default function AdminSupport() {
     if (filter === 'customer') query = query.eq('requester_type', 'customer')
     else if (filter === 'company') query = query.eq('requester_type', 'company')
     else if (filter === 'open') query = query.eq('status', 'open')
+    else if (filter === 'in_progress') query = query.eq('status', 'in_progress')
+    else if (filter === 'unassigned') query = query.is('assigned_staff_id', null).neq('status', 'resolved')
+    else if (filter === 'mine') query = query.eq('assigned_staff_id', currentAdminId || '00000000-0000-0000-0000-000000000000').neq('status', 'resolved')
     else if (filter === 'waiting') query = query.eq('status', 'waiting')
     else if (filter === 'resolved') query = query.eq('status', 'resolved')
 
@@ -219,8 +264,30 @@ export default function AdminSupport() {
     return rolePerms[a.role_id || '']?.has(needed) || false
   }
 
+  async function loadActivity(ticketId: string) {
+    const { data } = await supabase
+      .from('support_ticket_activity')
+      .select('id, action, actor_name, detail, created_at')
+      .eq('ticket_id', ticketId)
+      .order('created_at', { ascending: true })
+    setActivity((data as Activity[]) || [])
+  }
+
+  // Re-read the ticket after any change: the database moves status/assignment on its own
+  // (assigning starts work, a staff reply waits for the requester, etc).
+  async function syncSelected(ticketId: string) {
+    const { data: fresh } = await supabase.from('support_tickets').select('*').eq('id', ticketId).maybeSingle()
+    if (fresh) {
+      setSelected(fresh as any)
+      setTickets((prev) => prev.map((t) => t.id === ticketId ? (fresh as any) : t))
+    }
+    loadActivity(ticketId)
+  }
+
   const openTicket = async (t: Ticket) => {
     setSelected(t)
+    setActivity([])
+    loadActivity(t.id)
     setMsgs([])
     setSignedUrls({})
     setReply('')
@@ -276,12 +343,9 @@ export default function AdminSupport() {
       is_internal: isInternal,
       attachment_url: attachPath,
     })
-    if (!error && !isInternal && selected.status === 'open') {
-      await supabase.from('support_tickets').update({ status: 'waiting' }).eq('id', selected.id)
-      setSelected({ ...selected, status: 'waiting' })
-    }
     setSending(false)
     if (error) { alert('Failed to send: ' + error.message); return }
+    if (!isInternal) await syncSelected(selected.id)
     const localId = `local-${Date.now()}`
     setMsgs((prev) => [...prev, { id: localId, sender_id: currentAdminId, sender_type: 'staff', message: reply.trim() || 'Sent an attachment', is_internal: isInternal, created_at: new Date().toISOString(), attachment_url: attachPath }])
     if (attachPath) {
@@ -296,8 +360,7 @@ export default function AdminSupport() {
     if (!selected) return
     const { error } = await supabase.from('support_tickets').update(fields as any).eq('id', selected.id)
     if (error) { alert('Update failed: ' + error.message); return }
-    setSelected({ ...selected, ...fields })
-    setTickets((prev) => prev.map((t) => t.id === selected.id ? { ...t, ...fields } : t))
+    await syncSelected(selected.id)
   }
 
   const closeTicket = async () => {
@@ -309,7 +372,10 @@ export default function AdminSupport() {
     { key: 'all', label: 'All' },
     { key: 'customer', label: 'Customer' },
     { key: 'company', label: 'Company' },
+    { key: 'unassigned', label: 'Unassigned' },
+    { key: 'mine', label: 'My Tickets' },
     { key: 'open', label: 'Open' },
+    { key: 'in_progress', label: 'In Progress' },
     { key: 'waiting', label: 'Waiting' },
     { key: 'resolved', label: 'Resolved' },
   ]
@@ -328,6 +394,10 @@ export default function AdminSupport() {
             <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, flex: 1 }}>{selected.subject}</p>
             <span style={{ fontSize: '10px', fontWeight: 800, color: pm.color, background: pm.bg, padding: '4px 9px', borderRadius: '6px' }}>{pm.label}</span>
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            {selected.ticket_code && <span style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted }}>{selected.ticket_code}</span>}
+            <StatusBadge status={selected.status} />
+          </div>
           <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '2px' }}>
             {selected.requester_type === 'company' ? 'Company' : 'Customer'}: {requesterLabel(selected)}
           </p>
@@ -345,7 +415,8 @@ export default function AdminSupport() {
             <select value={selected.status} onChange={(e) => updateTicket({ status: e.target.value })}
               style={{ padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '12px' }}>
               <option value="open">Open</option>
-              <option value="waiting">Waiting</option>
+              <option value="in_progress">In Progress</option>
+              <option value="waiting">Waiting for Requester</option>
               <option value="resolved">Resolved</option>
             </select>
             <select value={selected.assigned_staff_id || ''} onChange={(e) => updateTicket({ assigned_staff_id: e.target.value || null })}
@@ -373,6 +444,12 @@ export default function AdminSupport() {
                 )
               })()}
             </select>
+            {!selected.assigned_staff_id && currentAdminId && selected.status !== 'resolved' && (
+              <div onClick={() => updateTicket({ assigned_staff_id: currentAdminId })} style={{
+                padding: '7px 12px', borderRadius: '8px', border: `1px solid ${COLORS.primary}`,
+                fontSize: '12px', fontWeight: 700, color: COLORS.primary, cursor: 'pointer',
+              }}>Assign to me</div>
+            )}
           </div>
 
           {selected.assigned_staff_id && (() => {
@@ -453,6 +530,8 @@ export default function AdminSupport() {
           </div>
         )}
 
+        <ActivityCard items={activity} />
+
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '14px' }}>
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '12px 14px', maxWidth: '90%' }}>
             <p style={{ fontSize: '12.5px', color: COLORS.text, lineHeight: 1.5 }}>{selected.message}</p>
@@ -511,9 +590,13 @@ export default function AdminSupport() {
           </div>
         </div>
 
-        {selected.status !== 'resolved' && (
+        {selected.status !== 'resolved' ? (
           <div onClick={closeTicket} style={{ marginTop: '12px', textAlign: 'center' as const, padding: '11px', borderRadius: '10px', background: COLORS.green, color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>
-            Close Ticket
+            Resolve Ticket
+          </div>
+        ) : (
+          <div onClick={() => updateTicket({ status: selected.assigned_staff_id ? 'in_progress' : 'open' })} style={{ marginTop: '12px', textAlign: 'center' as const, padding: '11px', borderRadius: '10px', border: `1px solid ${COLORS.primary}`, color: COLORS.primary, fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>
+            Reopen Ticket
           </div>
         )}
       </div>
@@ -561,20 +644,15 @@ export default function AdminSupport() {
               <div key={t.id} onClick={() => openTicket(t)} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '14px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <span style={{ fontSize: '10px', fontWeight: 800, color: pm.color, background: pm.bg, padding: '3px 8px', borderRadius: '6px' }}>{pm.label}</span>
-                  <span style={{
-                    fontSize: '10.5px', fontWeight: 700,
-                    color: t.status === 'open' ? COLORS.orange : t.status === 'resolved' ? COLORS.green : COLORS.textMuted,
-                    background: t.status === 'open' ? '#FFF7ED' : t.status === 'resolved' ? '#F0FDF4' : '#F1F5F9',
-                    padding: '3px 8px', borderRadius: '6px',
-                  }}>{t.status.toUpperCase()}</span>
+                  <StatusBadge status={t.status} />
                 </div>
-                <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginTop: '8px' }}>{t.subject}</p>
+                <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text, marginTop: '8px' }}>{t.ticket_code && <span style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted }}>{t.ticket_code} · </span>}{t.subject}</p>
                 <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '4px' }}>
                   {t.requester_type === 'company' ? 'Company' : 'Customer'}: {requesterLabel(t)}
                   {t.category ? ` · ${t.category}` : ''}
                 </p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                  <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Assigned: {adminName(t.assigned_staff_id) || 'Unassigned'}</p>
+                  <p style={{ fontSize: '11px', fontWeight: t.assigned_staff_id ? 400 : 700, color: t.assigned_staff_id ? COLORS.textMuted : COLORS.amber }}>{t.assigned_staff_id ? `Assigned: ${adminName(t.assigned_staff_id)}` : 'Unassigned'}</p>
                   <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{timeAgo(t.created_at)}</p>
                 </div>
               </div>
