@@ -1,13 +1,31 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from './supabaseClient'
 import { Logo } from './AuthComponents'
 
 function SplashScreen() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    const t = setTimeout(() => navigate('/account-type'), 5000)
-    return () => clearTimeout(t)
+    let cancelled = false
+
+    // Keep the splash visible for a short moment, and in parallel check whether the user
+    // is still signed in. A saved session means they go straight to Home; they only see
+    // the login/sign-up flow if they have no session (new user, or they logged out).
+    const minimumDelay = new Promise((resolve) => setTimeout(resolve, 2500))
+    const sessionCheck = supabase.auth
+      .getSession()
+      .then(({ data }) => data.session)
+      .catch(() => null)
+
+    Promise.all([minimumDelay, sessionCheck]).then(([, session]) => {
+      if (cancelled) return
+      navigate(session ? '/home' : '/account-type', { replace: true })
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [navigate])
 
   return (
