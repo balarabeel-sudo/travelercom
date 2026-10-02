@@ -115,117 +115,17 @@ function VerifyBooking() {
     setConfirming(true)
     setErrorMsg('')
 
-    const commissionAmount = (result.amount_paid * result.commission_rate) / 100
-    const companyReceives = result.amount_paid - commissionAmount
-
-    const { error: bookingErr } = await supabase
-      .from('bookings')
-      .update({ checked_in: true, checked_in_at: new Date().toISOString(), commission_amount: commissionAmount })
-      .eq('id', result.id)
-
-    if (bookingErr) {
-      setConfirming(false)
-      setErrorMsg('DEBUG booking update error: ' + bookingErr.message)
-      return
-    }
-
-    const { data: companyRow, error: companyErr } = await supabase
-      .from('companies')
-      .select('owner_id')
-      .eq('id', result.company_id)
-      .maybeSingle()
-
-    if (companyErr) {
-      setConfirming(false)
-      setErrorMsg('DEBUG company lookup error: ' + companyErr.message)
-      return
-    }
-    if (!companyRow) {
-      setConfirming(false)
-      setErrorMsg('DEBUG: company row not found for company_id ' + result.company_id)
-      return
-    }
-
-    let { data: ownerWallet, error: walletFetchErr } = await supabase
-      .from('wallets')
-      .select('id, balance')
-      .eq('user_id', companyRow.owner_id)
-      .maybeSingle()
-
-    if (walletFetchErr) {
-      setConfirming(false)
-      setErrorMsg('DEBUG wallet fetch error: ' + walletFetchErr.message)
-      return
-    }
-
-    if (!ownerWallet) {
-      const { data: newWallet, error: walletCreateErr } = await supabase
-        .from('wallets')
-        .insert({ user_id: companyRow.owner_id, balance: 0 })
-        .select('id, balance')
-        .single()
-      if (walletCreateErr) {
-        setConfirming(false)
-        setErrorMsg('DEBUG wallet create error: ' + walletCreateErr.message)
-        return
-      }
-      ownerWallet = newWallet
-    }
-
-    if (!ownerWallet) {
-      setConfirming(false)
-      setErrorMsg('DEBUG: could not get or create company wallet')
-      return
-    }
-
-   const newBalance = Number(ownerWallet.balance) + companyReceives
-    const { data: updatedWallet, error: walletUpdateErr } = await supabase
-      .from('wallets')
-      .update({ balance: newBalance })
-      .eq('id', ownerWallet.id)
-      .select()
-
-    if (walletUpdateErr) {
-      setConfirming(false)
-      setErrorMsg('DEBUG wallet update error: ' + walletUpdateErr.message)
-      return
-    }
-
-    if (!updatedWallet || updatedWallet.length === 0) {
-      setConfirming(false)
-      setErrorMsg('DEBUG: wallet update matched 0 rows (likely blocked by RLS). wallet.id=' + ownerWallet.id + ' owner_id=' + companyRow.owner_id)
-      return
-    }
-    const { error: txErr } = await supabase.from('transactions').insert({
-      user_id: companyRow.owner_id,
-      wallet_id: ownerWallet.id,
-      booking_id: result.id,
-      transaction_type: 'commission_payout',
-      amount: companyReceives,
-      status: 'successful',
-    })
-
-    if (txErr) {
-      setConfirming(false)
-      setErrorMsg('DEBUG transaction insert error: ' + txErr.message)
-      return
-    }
-
-    // Best-effort activity log — a failure here shouldn't block the
-    // check-in itself, which already succeeded.
-    const { data: currentUserData } = await supabase.auth.getUser()
-    if (currentUserData.user) {
-      await supabase.from('audit_logs').insert({
-        actor_id: currentUserData.user.id,
-        action: 'verified_ticket',
-        module: 'tickets',
-        target_type: 'booking',
-        target_id: result.id,
-        company_id: result.company_id,
-      })
-    }
+    // All money logic (commission, owner payout, audit log) runs securely
+    // inside the database in a single atomic step.
+    const { error } = await supabase.rpc('verify_ticket', { p_booking_id: result.id })
 
     setConfirming(false)
+
+    if (error) {
+      setErrorMsg(error.message || 'Could not verify this ticket. Please try again.')
+      return
+    }
+
     setResult({ ...result, checked_in: true })
   }
 
