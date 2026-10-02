@@ -36,11 +36,8 @@ function Login() {
     }
 
     if (data.user) {
-      try {
-        await supabase.rpc('accept_staff_invite')
-      } catch {
-        // no pending invite for this user, or claim failed silently -- not fatal to login
-      }
+      // Invites are no longer accepted silently at login. The invited person now sees
+      // an invite card (InviteGate) and must tap Accept themselves.
       setLoading(false)
       navigate('/home')
     }
