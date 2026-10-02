@@ -223,40 +223,21 @@ function Wallet() {
 
     setWithdrawing(true)
 
-    await supabase
-      .from('companies')
-      .update({
-        bank_name: bankName.trim(),
-        bank_account_number: bankAccountNumber.trim(),
-        bank_account_name: bankAccountName.trim(),
-      })
-      .eq('id', companyId)
+    // Debit + pending withdrawal + bank details are saved atomically in the database.
+    const { data: newBalanceData, error: wdErr } = await supabase.rpc('request_withdrawal', {
+      p_amount: amt,
+      p_bank_name: bankName.trim(),
+      p_account_number: bankAccountNumber.trim(),
+      p_account_name: bankAccountName.trim(),
+    })
 
-    const newBalance = balance - amt
-    const { error: walletErr } = await supabase
-      .from('wallets')
-      .update({ balance: newBalance })
-      .eq('user_id', userId)
-
-    if (walletErr) {
+    if (wdErr) {
       setWithdrawing(false)
-      setWithdrawMsg({ type: 'error', text: 'Withdrawal failed: ' + walletErr.message })
+      setWithdrawMsg({ type: 'error', text: 'Withdrawal failed: ' + wdErr.message })
       return
     }
 
-    const { data: walletRow } = await supabase
-      .from('wallets')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    await supabase.from('transactions').insert({
-      user_id: userId,
-      wallet_id: walletRow?.id,
-      transaction_type: 'withdrawal',
-      amount: amt,
-      status: 'pending',
-    })
+    const newBalance = Number(newBalanceData)
 
     setWithdrawing(false)
     setBalance(newBalance)
