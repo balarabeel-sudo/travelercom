@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 
@@ -104,34 +104,59 @@ export default function CompanyStaffAccess({
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
 
-  // If no companyId was passed in, resolve it from the logged-in user's own company
+  const [searchParams] = useSearchParams()
+  const companyParam = searchParams.get('company')
+
+  // Permissions of the signed-in person in THIS company. Owners get everything.
+  const [myPerms, setMyPerms] = useState<Set<string> | null>(null)
+  const can = (key: string) => !!myPerms && myPerms.has(key)
+
+  // If no companyId was passed in, resolve it: first the company named in the URL
+  // (?company=...), then a company the user owns, then a company they are active staff in.
+  // A person can own one company and be staff in others, so every lookup takes the first
+  // match instead of expecting exactly one row.
   useEffect(() => {
     if (companyIdProp) { setCompanyId(companyIdProp); return }
     ;(async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setErrorMsg('Not signed in'); setLoading(false); return }
 
-      // Try as company owner first
-      const { data: owned } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('owner_id', user.id)
-        .maybeSingle()
-      if (owned) { setCompanyId(owned.id); return }
+      if (companyParam) {
+        const { data: ownedParam } = await supabase
+          .from('companies').select('id').eq('id', companyParam).eq('owner_id', user.id).limit(1)
+        if (ownedParam && ownedParam.length > 0) { setCompanyId(ownedParam[0].id); return }
 
-      // Not an owner — check if they're an active staff member instead
-      const { data: staffRow } = await supabase
-        .from('company_staff')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .maybeSingle()
-      if (staffRow) { setCompanyId(staffRow.company_id); return }
+        const { data: staffParam } = await supabase
+          .from('company_staff').select('company_id')
+          .eq('company_id', companyParam).eq('user_id', user.id).eq('status', 'active').limit(1)
+        if (staffParam && staffParam.length > 0) { setCompanyId(staffParam[0].company_id); return }
+      }
+
+      // Not named in the URL: try as company owner first
+      const { data: owned } = await supabase
+        .from('companies').select('id').eq('owner_id', user.id)
+        .order('created_at', { ascending: true }).limit(1)
+      if (owned && owned.length > 0) { setCompanyId(owned[0].id); return }
+
+      // Not an owner: use their first active staff membership
+      const { data: staffRows } = await supabase
+        .from('company_staff').select('company_id')
+        .eq('user_id', user.id).eq('status', 'active')
+        .order('joined_at', { ascending: true }).limit(1)
+      if (staffRows && staffRows.length > 0) { setCompanyId(staffRows[0].company_id); return }
 
       setErrorMsg('No company found for this account')
       setLoading(false)
     })()
-  }, [companyIdProp])
+  }, [companyIdProp, companyParam])
+
+  useEffect(() => {
+    if (!companyId) return
+    ;(async () => {
+      const { data } = await supabase.rpc('get_my_company_permissions', { p_company_id: companyId })
+      setMyPerms(new Set((data as string[]) || []))
+    })()
+  }, [companyId])
 
   const [totalStaff, setTotalStaff] = useState(0)
   const [activeCount, setActiveCount] = useState(0)
@@ -148,6 +173,7 @@ export default function CompanyStaffAccess({
   const [selectedStaff, setSelectedStaff] = useState<StaffRow | null>(null)
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null)
   const [showInvite, setShowInvite] = useState(false)
+  const [roleStaff, setRoleStaff] = useState<StaffRow | null>(null)
 
   const loadAll = useCallback(async () => {
     if (!companyId) return
@@ -268,12 +294,14 @@ export default function CompanyStaffAccess({
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button style={iconBtnStyle}><Icon name="search" size={17} color={COLORS.text} /></button>
-            <button
-              onClick={() => setShowInvite(true)}
-              style={{ ...iconBtnStyle, background: COLORS.purple, color: '#fff' }}
-            >
-              +
-            </button>
+            {can('staff.invite') && (
+              <button
+                onClick={() => setShowInvite(true)}
+                style={{ ...iconBtnStyle, background: COLORS.purple, color: '#fff' }}
+              >
+                +
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -281,6 +309,12 @@ export default function CompanyStaffAccess({
       {errorMsg && (
         <div style={{ margin: 16, padding: 12, background: COLORS.redBg, color: COLORS.red, borderRadius: 10, fontSize: 13 }}>
           {errorMsg}
+        </div>
+      )}
+
+      {myPerms && !can('staff.view') && !can('staff.edit') && !can('staff.invite') && (
+        <div style={{ margin: 16, padding: 12, background: COLORS.orangeBg, color: COLORS.orange, borderRadius: 10, fontSize: 13 }}>
+          Your role does not include access to manage staff in this company.
         </div>
       )}
 
@@ -415,12 +449,12 @@ export default function CompanyStaffAccess({
                   </div>
                   <div style={{ fontSize: 10.5, color: COLORS.textMuted }}>Permissions</div>
                 </div>
-                <button
+                {(can('staff.edit') || can('staff.suspend') || can('staff.revoke')) && <button
                   onClick={() => setMenuOpenFor(menuOpenFor === s.id ? null : s.id)}
                   style={{ background: 'none', border: 'none', fontSize: 18, color: COLORS.textMuted, cursor: 'pointer', padding: 4 }}
                 >
                   <Icon name="moreHorizontal" size={17} color={COLORS.textMuted} />
-                </button>
+                </button>}
                 {menuOpenFor === s.id && (
                   <div
                     style={{
@@ -436,9 +470,9 @@ export default function CompanyStaffAccess({
                       overflow: 'hidden',
                     }}
                   >
-                    <MenuItem label="Manage Access" onClick={() => { setSelectedStaff(s); setMenuOpenFor(null) }} />
-                    <MenuItem label="Change Role" onClick={() => setMenuOpenFor(null)} />
-                    {s.status === 'active' ? (
+                    {can('staff.edit') && <MenuItem label="Manage Access" onClick={() => { setSelectedStaff(s); setMenuOpenFor(null) }} />}
+                    {can('staff.edit') && <MenuItem label="Change Role" onClick={() => { setRoleStaff(s); setMenuOpenFor(null) }} />}
+                    {!can('staff.suspend') ? null : s.status === 'active' ? (
                       <MenuItem
                         label="Suspend"
                         danger
@@ -458,7 +492,7 @@ export default function CompanyStaffAccess({
                       />
                     )}
                     <MenuItem label="Activity Log" onClick={() => setMenuOpenFor(null)} />
-                    <MenuItem
+                    {can('staff.revoke') && <MenuItem
                       label="Revoke Access"
                       danger
                       onClick={async () => {
@@ -467,7 +501,7 @@ export default function CompanyStaffAccess({
                           await runStaffAction('revoke_access', { target_staff_id: s.id })
                         }
                       }}
-                    />
+                    />}
                   </div>
                 )}
               </div>
@@ -567,10 +601,10 @@ export default function CompanyStaffAccess({
       <div style={{ padding: '20px 16px 0' }}>
         <div style={{ fontSize: 15, fontWeight: 800, color: COLORS.text, marginBottom: 10 }}>Quick Actions</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))', gap: 10 }}>
-          <QuickAction icon="userPlus" label="Invite Staff" onClick={() => setShowInvite(true)} />
-          <QuickAction icon="shield" label="Create Role" onClick={() => navigate('/staff/create-role')} />
+          {can('staff.invite') && <QuickAction icon="userPlus" label="Invite Staff" onClick={() => setShowInvite(true)} />}
+          {can('staff.edit') && <QuickAction icon="shield" label="Create Role" onClick={() => navigate('/staff/create-role')} />}
           <QuickAction icon="clipboard" label="Permission Matrix" onClick={() => navigate('/staff/permission-matrix')} />
-          <QuickAction icon="crown" label="Manage Roles" onClick={() => navigate('/staff/manage-roles')} />
+          {can('staff.edit') && <QuickAction icon="crown" label="Manage Roles" onClick={() => navigate('/staff/manage-roles')} />}
           <QuickAction icon="fileText" label="Activity Log" onClick={() => navigate('/staff/activity-log')} />
         </div>
       </div>
@@ -579,6 +613,14 @@ export default function CompanyStaffAccess({
         <ManageAccessSheet
           staff={selectedStaff}
           onClose={() => setSelectedStaff(null)}
+          runStaffAction={runStaffAction}
+        />
+      )}
+
+      {roleStaff && (
+        <ChangeRoleSheet
+          staff={roleStaff}
+          onClose={() => setRoleStaff(null)}
           runStaffAction={runStaffAction}
         />
       )}
@@ -807,6 +849,81 @@ function ManageAccessSheet({
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------- Change Role bottom sheet ----------------
+function ChangeRoleSheet({
+  staff,
+  onClose,
+  runStaffAction,
+}: {
+  staff: StaffRow
+  onClose: () => void
+  runStaffAction: (action: string, extra?: Record<string, unknown>) => Promise<boolean>
+}) {
+  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([])
+  const [templateId, setTemplateId] = useState('')
+  // Custom grants/revokes belong to the old role, so by default they are reset.
+  const [clearOverrides, setClearOverrides] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    supabase.from('company_role_templates').select('id, name').order('name').then(({ data }) => setTemplates(data || []))
+  }, [])
+
+  const name = staff.profiles?.full_name || staff.profiles?.email || 'this staff member'
+  const currentRole = staff.company_role_templates?.name || staff.role_label || 'No role'
+
+  const submit = async () => {
+    if (!templateId) return
+    setSaving(true)
+    const ok = await runStaffAction('change_role', {
+      target_staff_id: staff.id,
+      template_id: templateId,
+      clear_overrides: clearOverrides,
+    })
+    setSaving(false)
+    if (ok) onClose()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 20, display: 'flex', alignItems: 'flex-end' }}>
+      <div style={{ background: COLORS.card, width: '100%', borderRadius: '20px 20px 0 0', padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>Change Role</div>
+          <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={18} color={COLORS.textMuted} /></span>
+        </div>
+
+        <div style={{ background: COLORS.bg, borderRadius: 12, padding: 12, marginBottom: 6 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: COLORS.text }}>{name}</div>
+          <div style={{ fontSize: 12, color: COLORS.textMuted }}>Current role: {currentRole}</div>
+        </div>
+
+        <label style={labelStyle}>New Role</label>
+        <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} style={inputStyle}>
+          <option value="">Choose a role…</option>
+          {templates.filter((t) => t.id !== staff.template_id).map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 14, cursor: 'pointer' }}>
+          <input type="checkbox" checked={clearOverrides} onChange={(e) => setClearOverrides(e.target.checked)} style={{ width: 18, height: 18, marginTop: 2 }} />
+          <span style={{ fontSize: 12.5, color: COLORS.text, lineHeight: 1.5 }}>
+            Reset this person's custom permissions so the new role applies exactly as defined (recommended).
+          </span>
+        </label>
+
+        <button
+          onClick={submit}
+          disabled={!templateId || saving}
+          style={{ width: '100%', marginTop: 16, padding: 14, borderRadius: 12, border: 'none', background: COLORS.purple, color: '#fff', fontWeight: 700, fontSize: 14, opacity: !templateId || saving ? 0.6 : 1 }}
+        >
+          {saving ? 'Saving…' : 'Change Role'}
+        </button>
       </div>
     </div>
   )
