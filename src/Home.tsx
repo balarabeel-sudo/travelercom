@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import NotificationBell from './NotificationBell'
 import { releaseExpiredUnits } from './inventoryUtils'
+import HomeInviteCard from './HomeInviteCard'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -145,22 +146,8 @@ function Home() {
       const meta = data.user.user_metadata || {}
       const isCompany = meta.account_type === 'company'
 
-      // Staff members (invited via Staff Access) don't own a company, so
-      // they'd otherwise land on the generic personal Home. Send them to
-      // their own Staff Dashboard instead.
-      if (!isCompany) {
-        const { data: staffRow } = await supabase
-          .from('company_staff')
-          .select('id')
-          .eq('user_id', data.user.id)
-          .eq('status', 'active')
-          .maybeSingle()
-        if (staffRow) {
-          navigate('/staff-dashboard', { replace: true })
-          return
-        }
-      }
-
+      // Staff members now stay on Home like everyone else; they open their workspace
+      // from the Account page.
       setAccountType(isCompany ? 'company' : 'personal')
       const { data: bannerRows } = await supabase
         .from('platform_banners')
@@ -482,6 +469,8 @@ if (accountType === 'company') {
             </div>
           </div>
         </div>
+
+        <HomeInviteCard />
 
         <div style={{
           margin: '16px', padding: '18px', borderRadius: '16px',
@@ -814,6 +803,9 @@ const services = [
           </div>
         </div>
       </div>
+
+      {/* ---------- PENDING TEAM INVITE ---------- */}
+      <HomeInviteCard />
 
       {/* ---------- HERO SECTION (rotating: default + active banners) ---------- */}
       <div style={{ margin: '16px' }}>
