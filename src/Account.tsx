@@ -77,6 +77,7 @@ function Account() {
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
+  const [workspaces, setWorkspaces] = useState<{ kind: 'admin' | 'company'; company_id: string | null; company_name: string | null; role_name: string | null }[]>([])
 
   useEffect(() => {
     const loadUser = async () => {
@@ -87,6 +88,10 @@ function Account() {
       }
       setDisplayName(data.user.user_metadata?.full_name || '')
       setEmail(data.user.email || '')
+
+      // Workspaces this user may open (admin console and/or company staff dashboard).
+      const { data: ws } = await supabase.rpc('get_my_workspaces')
+      setWorkspaces((ws as any[]) || [])
     }
     loadUser()
   }, [navigate])
@@ -183,6 +188,22 @@ function Account() {
           <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text }}>Edit</span>
         </div>
       </div>
+
+      {/* Workspace (only for admins / staff) */}
+      {workspaces.length > 0 && (
+        <AccountSection title="Workspace">
+          {workspaces.map((w, idx) => (
+            <AccountRow
+              key={`${w.kind}-${w.company_id || 'platform'}`}
+              icon="users"
+              label={w.kind === 'admin' ? 'TravelerCom Admin Workspace' : `${w.company_name || 'Company'} Workspace`}
+              desc={`Role: ${w.role_name || 'Staff'}`}
+              onClick={() => navigate(w.kind === 'admin' ? '/admin' : '/staff-dashboard')}
+              isLast={idx === workspaces.length - 1}
+            />
+          ))}
+        </AccountSection>
+      )}
 
       {/* Menu sections */}
       {sections.map((section) => (
