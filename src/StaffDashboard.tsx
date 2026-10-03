@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import NotificationBell from './NotificationBell'
@@ -32,8 +32,8 @@ const COLORS = {
 //               one of these modules (company_permissions.module)
 //   kind 'section' = page built into this dashboard
 //   kind 'route'   = an existing app page, opened via navigate()
-// A module with no page yet (operations, company, platform) is intentionally
-// not in the sidebar; it is still listed on "My Access".
+// Every permission module now has a page: Operations, Company and Platform are
+// built into this dashboard and use permission-checked database functions.
 // ---------------------------------------------------------------------------
 type NavItem = {
   key: string
@@ -59,6 +59,9 @@ const NAV: NavItem[] = [
   { key: 'analytics', label: 'Analytics', icon: 'barChart', group: 'Company', kind: 'route', route: '/analytics', requires: ['finance.view'] },
   { key: 'marketing', label: 'Marketing', icon: 'megaphone', group: 'Company', kind: 'route', route: '/promotions', modules: ['marketing'] },
   { key: 'team', label: 'Team', icon: 'users', group: 'Company', kind: 'section', requires: ['staff.view'] },
+  { key: 'operations', label: 'Operations', icon: 'calendar', group: 'Company', kind: 'section', requires: ['operations.view', 'operations.manage', 'availability.manage', 'schedules.manage'] },
+  { key: 'company', label: 'Company Profile', icon: 'briefcase', group: 'Company', kind: 'section', requires: ['company.view', 'company.edit', 'company.settings'] },
+  { key: 'platform', label: 'Platform Settings', icon: 'settings', group: 'Company', kind: 'section', requires: ['platform.view', 'platform.edit', 'platform.manage'] },
 
   { key: 'access', label: 'My Access', icon: 'shield', group: 'Account', kind: 'section' },
   { key: 'profile', label: 'Profile', icon: 'user', group: 'Account', kind: 'section' },
@@ -72,8 +75,8 @@ const MODULE_LABELS: Record<string, string> = {
 function moduleLabel(mod: string) {
   return MODULE_LABELS[mod] || mod.charAt(0).toUpperCase() + mod.slice(1)
 }
-// Modules that have no page in the app yet.
-const MODULES_WITHOUT_PAGE = new Set(['operations', 'company', 'platform'])
+// Modules that have no page in the app yet (none at the moment).
+const MODULES_WITHOUT_PAGE = new Set<string>()
 
 type PermRow = { key: string; module: string; description: string; risk_level: string }
 type StaffInfo = {
@@ -533,6 +536,267 @@ function TeamPage({ companyId }: { companyId: string }) {
   )
 }
 
+const fieldLabel: React.CSSProperties = { fontSize: 11.5, fontWeight: 800, color: COLORS.textMuted, letterSpacing: 0.4, marginBottom: 5, display: 'block' }
+const fieldInput: React.CSSProperties = {
+  width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10,
+  border: `1px solid ${COLORS.border}`, fontSize: 13, background: '#fff', outline: 'none', color: COLORS.text,
+}
+const primaryBtn: React.CSSProperties = {
+  border: 'none', background: COLORS.primary, color: '#fff', borderRadius: 10,
+  padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+}
+
+const toLocalInput = (iso?: string | null) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
+// Operations: availability and schedules for the company's listings.
+function OperationsPage({ companyId, canAvailability, canSchedule }: { companyId: string; canAvailability: boolean; canSchedule: boolean }) {
+  const [rows, setRows] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  const [seats, setSeats] = useState('')
+  const [status, setStatus] = useState('active')
+  const [departure, setDeparture] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const load = async () => {
+    const { data, error: err } = await supabase.rpc('staff_list_services', { p_company_id: companyId })
+    if (err) setError(err.message)
+    setRows((data as any[]) || [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [companyId])
+
+  const startEdit = (r: any) => {
+    setEditing(r.id)
+    setSeats(r.seats_available == null ? '' : String(r.seats_available))
+    setStatus(r.status === 'active' ? 'active' : 'inactive')
+    setDeparture(toLocalInput(r.departure_time))
+    setError('')
+  }
+
+  const save = async (r: any) => {
+    setSaving(true)
+    setError('')
+    const { error: err } = await supabase.rpc('staff_update_service', {
+      p_company_id: companyId,
+      p_service_id: r.id,
+      p_seats_available: canAvailability && seats !== '' ? Number(seats) : null,
+      p_status: canAvailability ? status : null,
+      p_departure_time: canSchedule && departure ? new Date(departure).toISOString() : null,
+    })
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    setEditing(null)
+    await load()
+  }
+
+  const canEdit = canAvailability || canSchedule
+
+  return (
+    <Card pad={0}>
+      {loading ? (
+        <p style={{ padding: 24, fontSize: 13, color: COLORS.textMuted }}>Loading listings...</p>
+      ) : (
+        <>
+          {error && <p style={{ padding: '16px 18px 0', fontSize: 13, color: COLORS.red }}>{error}</p>}
+          <DataTable
+            cols={[
+              { label: 'Listing', render: (r) => (
+                <span><span style={{ fontWeight: 700 }}>{r.title || '—'}</span>{r.category && <span style={{ color: COLORS.textMuted }}> · {prettify(r.category)}</span>}</span>
+              ) },
+              { label: 'Route', render: (r) => (r.origin ? `${r.origin} → ${r.destination || ''}` : (r.destination || '—')) },
+              { label: 'Departure', render: (r) => editing === r.id && canSchedule
+                ? <input type="datetime-local" value={departure} onChange={(e) => setDeparture(e.target.value)} style={{ ...fieldInput, minWidth: 190 }} />
+                : (r.departure_time ? new Date(r.departure_time).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—') },
+              { label: 'Seats', render: (r) => editing === r.id && canAvailability
+                ? <input type="number" min={0} value={seats} onChange={(e) => setSeats(e.target.value)} style={{ ...fieldInput, width: 90 }} />
+                : (r.seats_available ?? '—') },
+              { label: 'Status', render: (r) => editing === r.id && canAvailability
+                ? (
+                  <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...fieldInput, width: 110 }}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                )
+                : <Pill status={r.status || 'unknown'} /> },
+              ...(canEdit ? [{ label: 'Action', align: 'right' as const, render: (r: any) => editing === r.id ? (
+                <span style={{ display: 'inline-flex', gap: 8 }}>
+                  <button disabled={saving} onClick={() => save(r)} style={{ ...primaryBtn, padding: '7px 14px', opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving...' : 'Save'}</button>
+                  <LinkButton label="Cancel" onClick={() => setEditing(null)} />
+                </span>
+              ) : <LinkButton label="Edit" onClick={() => startEdit(r)} /> }] : []),
+            ]}
+            rows={rows} emptyIcon="calendar" emptyTitle="No listings yet" emptyText="Your company's listings will appear here."
+          />
+          {!canEdit && <p style={{ padding: '10px 18px 16px', fontSize: 11.5, color: COLORS.textMuted }}>Your role can view operations but not change them.</p>}
+        </>
+      )}
+    </Card>
+  )
+}
+
+// Company: profile details. Name, bank details, plan and approval stay owner/admin-only.
+function CompanyPage({ companyId, canEdit }: { companyId: string; canEdit: boolean }) {
+  const [info, setInfo] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ description: '', phone: '', email: '', address: '', city: '', opening_time: '', closing_time: '' })
+
+  useEffect(() => {
+    (async () => {
+      const { data, error: err } = await supabase.rpc('staff_get_company_profile', { p_company_id: companyId })
+      if (err) { setError(err.message); setLoading(false); return }
+      setInfo(data)
+      setForm({
+        description: data?.description || '', phone: data?.phone || '', email: data?.email || '',
+        address: data?.address || '', city: data?.city || '',
+        opening_time: data?.opening_time || '', closing_time: data?.closing_time || '',
+      })
+      setLoading(false)
+    })()
+  }, [companyId])
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  const save = async () => {
+    setSaving(true); setError(''); setSaved(false)
+    const { error: err } = await supabase.rpc('staff_update_company_profile', {
+      p_company_id: companyId,
+      p_description: form.description, p_phone: form.phone, p_email: form.email,
+      p_address: form.address, p_city: form.city,
+      p_opening_time: form.opening_time, p_closing_time: form.closing_time,
+    })
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    setSaved(true)
+  }
+
+  if (loading) return <p style={{ fontSize: 13, color: COLORS.textMuted }}>Loading company profile...</p>
+  if (error && !info) return <Card><p style={{ fontSize: 13, color: COLORS.red }}>{error}</p></Card>
+
+  const field = (label: string, key: keyof typeof form, multiline = false) => (
+    <div style={{ marginBottom: 14 }}>
+      <label style={fieldLabel}>{label.toUpperCase()}</label>
+      {canEdit ? (
+        multiline
+          ? <textarea value={form[key]} onChange={set(key)} rows={4} style={{ ...fieldInput, resize: 'vertical' as const, fontFamily: 'inherit' }} />
+          : <input value={form[key]} onChange={set(key)} style={fieldInput} />
+      ) : (
+        <p style={{ fontSize: 13.5, color: COLORS.text }}>{form[key] || '—'}</p>
+      )}
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, alignItems: 'start' }}>
+      <Card title="Business">
+        {[
+          ['Business name', info?.business_name || '—'],
+          ['Business type', info?.business_type ? prettify(info.business_type) : '—'],
+          ['Approval', info?.approval_status ? prettify(info.approval_status) : '—'],
+          ['Verification', info?.verification_status ? prettify(info.verification_status) : '—'],
+        ].map(([label, value]) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0', borderBottom: `1px solid ${COLORS.border}` }}>
+            <span style={{ fontSize: 13, color: COLORS.textMuted }}>{label}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{value}</span>
+          </div>
+        ))}
+        <p style={{ fontSize: 11.5, color: COLORS.textMuted, marginTop: 12 }}>The business name, bank details and approval can only be changed by the company owner.</p>
+      </Card>
+      <Card title="Contact & hours">
+        {field('Description', 'description', true)}
+        {field('Phone', 'phone')}
+        {field('Email', 'email')}
+        {field('Address', 'address')}
+        {field('City', 'city')}
+        {field('Opening time', 'opening_time')}
+        {field('Closing time', 'closing_time')}
+        {error && <p style={{ fontSize: 12.5, color: COLORS.red, marginBottom: 10 }}>{error}</p>}
+        {saved && <p style={{ fontSize: 12.5, color: COLORS.green, marginBottom: 10 }}>Saved.</p>}
+        {canEdit
+          ? <button disabled={saving} onClick={save} style={{ ...primaryBtn, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving...' : 'Save changes'}</button>
+          : <p style={{ fontSize: 11.5, color: COLORS.textMuted }}>Your role can view the company profile but not edit it.</p>}
+      </Card>
+    </div>
+  )
+}
+
+// Platform: how the company is set up on TravelerCom.
+function PlatformPage({ companyId, canEdit }: { companyId: string; canEdit: boolean }) {
+  const [info, setInfo] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    (async () => {
+      const { data, error: err } = await supabase.rpc('staff_get_platform_settings', { p_company_id: companyId })
+      if (err) setError(err.message)
+      setInfo(data)
+      setLoading(false)
+    })()
+  }, [companyId])
+
+  const toggleUnits = async () => {
+    if (!info) return
+    setSaving(true); setError('')
+    const next = !info.allow_unit_selection
+    const { error: err } = await supabase.rpc('staff_set_unit_selection', { p_company_id: companyId, p_allow: next })
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    setInfo({ ...info, allow_unit_selection: next })
+  }
+
+  if (loading) return <p style={{ fontSize: 13, color: COLORS.textMuted }}>Loading platform settings...</p>
+  if (error && !info) return <Card><p style={{ fontSize: 13, color: COLORS.red }}>{error}</p></Card>
+
+  return (
+    <div style={{ maxWidth: 560 }}>
+      <Card title="Plan & status">
+        {[
+          ['Plan', info?.plan ? prettify(info.plan) : 'Free'],
+          ['Plan expires', fmtDate(info?.plan_expires_at)],
+          ['Approval', info?.approval_status ? prettify(info.approval_status) : '—'],
+          ['Verification', info?.verification_status ? prettify(info.verification_status) : '—'],
+        ].map(([label, value]) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0', borderBottom: `1px solid ${COLORS.border}` }}>
+            <span style={{ fontSize: 13, color: COLORS.textMuted }}>{label}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{value}</span>
+          </div>
+        ))}
+      </Card>
+      <div style={{ height: 16 }} />
+      <Card title="Booking options">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+          <div>
+            <p style={{ fontSize: 13.5, fontWeight: 700, color: COLORS.text }}>Let guests choose their unit</p>
+            <p style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>Guests can pick a specific room, seat or unit when booking.</p>
+          </div>
+          {canEdit ? (
+            <button disabled={saving} onClick={toggleUnits} style={{
+              border: `1px solid ${COLORS.border}`, borderRadius: 20, padding: '7px 16px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+              background: info?.allow_unit_selection ? COLORS.greenBg : '#fff',
+              color: info?.allow_unit_selection ? COLORS.green : COLORS.textMuted, opacity: saving ? 0.6 : 1,
+            }}>{info?.allow_unit_selection ? 'On' : 'Off'}</button>
+          ) : (
+            <Pill status={info?.allow_unit_selection ? 'active' : 'pending'} label={info?.allow_unit_selection ? 'On' : 'Off'} />
+          )}
+        </div>
+        {error && <p style={{ fontSize: 12.5, color: COLORS.red, marginTop: 10 }}>{error}</p>}
+        {!canEdit && <p style={{ fontSize: 11.5, color: COLORS.textMuted, marginTop: 12 }}>Your role can view platform settings but not change them.</p>}
+      </Card>
+    </div>
+  )
+}
+
 function TasksList({ tasks, onDone, limit }: { tasks: Task[]; onDone: (id: string) => void; limit?: number }) {
   const list = limit ? tasks.slice(0, limit) : tasks
   if (list.length === 0) return <EmptyState icon="checkCircle" title="You're all caught up" subtitle="You have no pending tasks right now." />
@@ -568,7 +832,10 @@ function TasksList({ tasks, onDone, limit }: { tasks: Task[]; onDone: (id: strin
 // ---------------------------------------------------------------------------
 export default function StaffDashboard() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const companyParam = searchParams.get('company')
   const isDesktop = useIsDesktop()
+  const [multiCompany, setMultiCompany] = useState(false)
   const [checking, setChecking] = useState(true)
   const [accessError, setAccessError] = useState('')
   const [section, setSection] = useState('overview')
@@ -597,13 +864,21 @@ export default function StaffDashboard() {
       setUserEmail(user.email || '')
       setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'there')
 
-      const { data: staffRow, error: staffErr } = await supabase
+      // A person can be staff in more than one company, so load all memberships and pick
+      // the one requested in the URL (?company=...), otherwise the first active one.
+      const { data: staffRows, error: staffErr } = await supabase
         .from('company_staff')
         .select('id, company_id, template_id, role_label, status, joined_at, last_active_at')
         .eq('user_id', user.id)
-        .maybeSingle()
+        .order('joined_at', { ascending: true })
 
       if (staffErr) { setAccessError(`Database error checking staff access: ${staffErr.message}`); setChecking(false); return }
+      const memberships = staffRows || []
+      const staffRow =
+        (companyParam && memberships.find((m: any) => m.company_id === companyParam)) ||
+        memberships.find((m: any) => m.status === 'active') ||
+        memberships[0]
+      setMultiCompany(memberships.filter((m: any) => m.status === 'active').length > 1)
       if (!staffRow) { setAccessError('No staff access found for this account.'); setChecking(false); return }
       if (staffRow.status === 'suspended') {
         setAccessError('Your staff access has been suspended. Contact your company admin.')
@@ -676,7 +951,7 @@ export default function StaffDashboard() {
 
       setChecking(false)
     })()
-  }, [navigate])
+  }, [navigate, companyParam])
 
   const markTaskDone = async (taskId: string) => {
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: 'done' } : t))
@@ -799,6 +1074,15 @@ export default function StaffDashboard() {
             <p style={{ fontSize: 10.5, color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{userEmail}</p>
           </div>
         </div>
+        {multiCompany && (
+          <div onClick={() => navigate('/account')} style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+            background: COLORS.navySoft, color: '#CBD5E1', fontSize: 13, fontWeight: 700, marginBottom: 8,
+          }}>
+            <Icon name="refresh" size={16} color="#CBD5E1" />
+            Switch workspace
+          </div>
+        )}
         <div onClick={async () => { await supabase.auth.signOut(); navigate('/login') }} style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
           background: COLORS.navySoft, color: '#FCA5A5', fontSize: 13, fontWeight: 700,
@@ -819,6 +1103,9 @@ export default function StaffDashboard() {
     finance: { title: 'Finance', subtitle: 'Only the parts your role allows' },
     refunds: { title: 'Refunds', subtitle: 'Refund requests on your company bookings' },
     team: { title: 'Team', subtitle: 'People with access to your company' },
+    operations: { title: 'Operations', subtitle: 'Availability and schedules for your listings' },
+    company: { title: 'Company Profile', subtitle: 'Contact details and opening hours' },
+    platform: { title: 'Platform Settings', subtitle: 'How your company is set up on TravelerCom' },
     access: { title: 'My Access', subtitle: 'Exactly what your role and overrides allow' },
     profile: { title: 'Profile', subtitle: 'Your staff account' },
   }
@@ -901,6 +1188,21 @@ export default function StaffDashboard() {
 
       case 'team':
         return <TeamPage companyId={companyId} />
+
+      case 'operations':
+        return (
+          <OperationsPage
+            companyId={companyId}
+            canAvailability={effective.has('availability.manage') || effective.has('operations.manage')}
+            canSchedule={effective.has('schedules.manage') || effective.has('operations.manage')}
+          />
+        )
+
+      case 'company':
+        return <CompanyPage companyId={companyId} canEdit={effective.has('company.edit')} />
+
+      case 'platform':
+        return <PlatformPage companyId={companyId} canEdit={effective.has('platform.edit') || effective.has('platform.manage')} />
 
       case 'access':
         return (
