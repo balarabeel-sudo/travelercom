@@ -198,7 +198,7 @@ function Account() {
               icon="users"
               label={w.kind === 'admin' ? 'TravelerCom Admin Workspace' : `${w.company_name || 'Company'} Workspace`}
               desc={`Role: ${w.role_name || 'Staff'}`}
-              onClick={() => navigate(w.kind === 'admin' ? '/admin' : '/staff-dashboard')}
+              onClick={() => navigate(w.kind === 'admin' ? '/admin' : `/staff-dashboard?company=${w.company_id}`)}
               isLast={idx === workspaces.length - 1}
             />
           ))}
