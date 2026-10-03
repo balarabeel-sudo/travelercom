@@ -477,7 +477,7 @@ function RefundsPage() {
   )
 }
 
-function TeamPage({ companyId }: { companyId: string }) {
+function TeamPage({ companyId, canManage, go }: { companyId: string; canManage: boolean; go: (route: string) => void }) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -511,6 +511,12 @@ function TeamPage({ companyId }: { companyId: string }) {
 
   return (
     <Card pad={0}>
+      {canManage && (
+        <div style={{ padding: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' as const }}>
+          <p style={{ fontSize: 13, color: COLORS.textMuted }}>Manage roles, permissions and invitations.</p>
+          <LinkButton label="Open Staff & Access" onClick={() => go(`/staff?company=${companyId}`)} />
+        </div>
+      )}
       {loading ? (
         <p style={{ padding: 24, fontSize: 13, color: COLORS.textMuted }}>Loading team...</p>
       ) : error ? (
@@ -1074,6 +1080,13 @@ export default function StaffDashboard() {
             <p style={{ fontSize: 10.5, color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{userEmail}</p>
           </div>
         </div>
+        <div onClick={() => navigate('/account')} style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+          background: COLORS.navySoft, color: '#CBD5E1', fontSize: 13, fontWeight: 700, marginBottom: 8,
+        }}>
+          <Icon name="arrowLeft" size={16} color="#CBD5E1" />
+          Back to my account
+        </div>
         {multiCompany && (
           <div onClick={() => navigate('/account')} style={{
             display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
@@ -1187,7 +1200,7 @@ export default function StaffDashboard() {
         return <RefundsPage />
 
       case 'team':
-        return <TeamPage companyId={companyId} />
+        return <TeamPage companyId={companyId} canManage={effective.has('staff.edit') || effective.has('staff.invite')} go={go} />
 
       case 'operations':
         return (
@@ -1299,6 +1312,11 @@ export default function StaffDashboard() {
           position: 'sticky' as const, top: 0, zIndex: 10, background: COLORS.card, borderBottom: `1px solid ${COLORS.border}`,
           padding: isDesktop ? '16px 32px' : '12px 16px', display: 'flex', alignItems: 'center', gap: 14,
         }}>
+          {!isDesktop && (
+            <span onClick={() => navigate('/account')} style={{
+              border: `1px solid ${COLORS.border}`, borderRadius: 9, padding: '7px 9px', cursor: 'pointer', display: 'inline-flex',
+            }}><Icon name="arrowLeft" size={16} color={COLORS.text} /></span>
+          )}
           {!isDesktop && (
             <span onClick={() => setDrawer(true)} style={{
               fontSize: 12.5, fontWeight: 700, color: COLORS.text, border: `1px solid ${COLORS.border}`,
