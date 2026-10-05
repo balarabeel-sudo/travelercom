@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import { useBackTo } from './useBackTo'
 
 const COLORS = {
   bg: '#F8FAFC',
@@ -66,37 +67,86 @@ import VehicleRentalAnalytics from './VehicleRentalAnalytics'
 
 export default function Analytics() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [resolving, setResolving] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [businessType, setBusinessType] = useState<string | null>(null)
   const [isOwner, setIsOwner] = useState(false)
+  const [noAccess, setNoAccess] = useState(false)
+
+  // When opened from the staff workspace, the company being worked in is passed along.
+  const requestedCompanyId = (location.state as { companyId?: string } | null)?.companyId
 
   useEffect(() => {
     const resolve = async () => {
       const { data: userData } = await supabase.auth.getUser()
       if (!userData.user) { navigate('/login'); return }
+      const uid = userData.user.id
 
-      const { data: company } = await supabase
-        .from('companies')
-        .select('id, business_type')
-        .eq('owner_id', userData.user.id)
-        .maybeSingle()
+      let cId: string | null = null
+      let bType: string | null = null
+      let owner = false
 
-      let cId: string | null = company?.id || null
-      let bType: string | null = company?.business_type || null
-      const owner = !!company
+      // 1) The company named by the workspace (only if this person owns it or is active staff in it)
+      if (requestedCompanyId) {
+        const { data: ownedRows } = await supabase
+          .from('companies')
+          .select('id, business_type')
+          .eq('id', requestedCompanyId)
+          .eq('owner_id', uid)
+          .limit(1)
+        if (ownedRows && ownedRows.length > 0) {
+          cId = ownedRows[0].id
+          bType = ownedRows[0].business_type || null
+          owner = true
+        } else {
+          const { data: staffRows } = await supabase
+            .from('company_staff')
+            .select('company_id, companies(business_type)')
+            .eq('company_id', requestedCompanyId)
+            .eq('user_id', uid)
+            .eq('status', 'active')
+            .limit(1)
+          if (staffRows && staffRows.length > 0) {
+            cId = staffRows[0].company_id
+            bType = (staffRows[0] as any).companies?.business_type || null
+          }
+        }
+      }
+
+      // 2) Otherwise the usual behaviour: the company the user owns, then their staff company
+      if (!cId) {
+        const { data: ownedRows } = await supabase
+          .from('companies')
+          .select('id, business_type')
+          .eq('owner_id', uid)
+          .order('created_at', { ascending: true })
+          .limit(1)
+        if (ownedRows && ownedRows.length > 0) {
+          cId = ownedRows[0].id
+          bType = ownedRows[0].business_type || null
+          owner = true
+        }
+      }
 
       if (!cId) {
-        const { data: staffRow } = await supabase
+        const { data: staffRows } = await supabase
           .from('company_staff')
           .select('company_id, companies(business_type)')
-          .eq('user_id', userData.user.id)
+          .eq('user_id', uid)
           .eq('status', 'active')
-          .maybeSingle()
-        if (staffRow) {
-          cId = staffRow.company_id
-          bType = (staffRow as any).companies?.business_type || null
+          .order('joined_at', { ascending: true })
+          .limit(1)
+        if (staffRows && staffRows.length > 0) {
+          cId = staffRows[0].company_id
+          bType = (staffRows[0] as any).companies?.business_type || null
         }
+      }
+
+      // Staff (not owners) need the finance permission to see analytics.
+      if (cId && !owner) {
+        const { data: perms } = await supabase.rpc('get_my_company_permissions', { p_company_id: cId })
+        if (!((perms as string[]) || []).includes('finance.view')) setNoAccess(true)
       }
 
       setCompanyId(cId)
@@ -105,7 +155,7 @@ export default function Analytics() {
       setResolving(false)
     }
     resolve()
-  }, [navigate])
+  }, [navigate, requestedCompanyId])
 
   if (resolving) {
     return (
@@ -119,6 +169,14 @@ export default function Analytics() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted, padding: '20px', textAlign: 'center' as const }}>
         No company found for this account.
+      </div>
+    )
+  }
+
+  if (noAccess) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted, padding: '20px', textAlign: 'center' as const }}>
+        Your role does not include access to analytics for this company.
       </div>
     )
   }
@@ -155,6 +213,7 @@ export default function Analytics() {
 // category-specific analytics page.
 function GenericAnalytics({ companyId }: { companyId: string }) {
   const navigate = useNavigate()
+  const { goBack } = useBackTo('/home')
   const [loading, setLoading] = useState(true)
   const [bookings, setBookings] = useState<Booking[]>([])
   const [promotions, setPromotions] = useState<Promo[]>([])
@@ -319,7 +378,7 @@ function GenericAnalytics({ companyId }: { companyId: string }) {
         background: `linear-gradient(135deg, ${COLORS.purple}, #4C1D95)`, color: 'white'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}>
+          <div onClick={goBack} style={{ cursor: 'pointer', display: 'flex' }}>
             <Icon name="arrowLeft" size={22} color="white" />
           </div>
           <h1 style={{ fontSize: '17px', fontWeight: 800 }}>Analytics</h1>
