@@ -1001,7 +1001,11 @@ export default function StaffDashboard() {
 
   const selectNav = (item: NavItem) => {
     setDrawer(false)
-    if (item.kind === 'route' && item.route) { navigate(item.route); return }
+    if (item.kind === 'route' && item.route) {
+      // Tell the page which workspace we came from so its back arrow returns here.
+      navigate(item.route, { state: { backTo: `/staff-dashboard?company=${staff?.company_id || ''}`, companyId: staff?.company_id } })
+      return
+    }
     setSection(item.key)
   }
 
