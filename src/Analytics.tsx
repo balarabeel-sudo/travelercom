@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
-import { useBackTo } from './useBackTo'
+import { useBackTo } from './userBackTo'
 
 const COLORS = {
   bg: '#F8FAFC',
