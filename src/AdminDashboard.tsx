@@ -26,6 +26,7 @@ import AdminSettings from './AdminSettings'
 import AdminApprovals from './AdminApprovals'
 import AdminReviews from './AdminReviews'
 import StaffOverview from './StaffOverview'
+import FounderNotifications from './FounderNotifications'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -87,7 +88,7 @@ const NAV: NavGroup[] = [
       { key: 'platform', label: 'Platform Management', icon: 'globe' },
       { key: 'staff', label: 'Staff & Permissions', icon: 'userPlus' },
       { key: 'audit', label: 'Audit Logs', icon: 'clipboard' },
-      { key: 'notifications', label: 'Notifications', icon: 'bell' },
+      { key: 'notifications', label: 'Founder Notifications', icon: 'bell' },
       { key: 'settings', label: 'Settings', icon: 'settings' },
     ]
   },
@@ -98,7 +99,7 @@ const ALL_ITEMS: NavItem[] = NAV.flatMap((g) => g.items)
 // Only sections with no real component wired up yet show "Coming Soon".
 // Keep this in sync with the sectionContent JSX below — every other
 // SectionKey must have a matching component there.
-const NO_COMPONENT_YET = new Set<SectionKey>(['notifications'])
+const NO_COMPONENT_YET = new Set<SectionKey>([])
 
 const SECTION_PERMISSION: Partial<Record<SectionKey, string | string[]>> = {
   users: 'users.view',
@@ -123,6 +124,8 @@ const SECTION_PERMISSION: Partial<Record<SectionKey, string | string[]>> = {
 }
 
 function canSeeSection(key: SectionKey, isSuperAdmin: boolean, perms: Set<string>): boolean {
+  // Founder Notifications are visible to the Founder (super admin) only.
+  if (key === 'notifications') return isSuperAdmin
   if (isSuperAdmin) return true
   if (key === 'approvals') return false
   const required = SECTION_PERMISSION[key]
@@ -154,6 +157,7 @@ function AdminDashboard() {
   const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : false)
   const [userEmail, setUserEmail] = useState('')
   const [roleName, setRoleName] = useState('')
+  const [founderUnread, setFounderUnread] = useState(0)
 
   const [accessError, setAccessError] = useState('')
 
@@ -213,6 +217,24 @@ function AdminDashboard() {
     checkAccess()
   }, [navigate])
 
+  // Founder only: keeps the unread badge on the Founder Notifications entry up to date.
+  useEffect(() => {
+    if (!isSuperAdmin) return
+    const refreshUnread = async () => {
+      const { count } = await supabase
+        .from('founder_notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_read', false)
+      setFounderUnread(count || 0)
+    }
+    refreshUnread()
+    const channel = supabase
+      .channel('founder-unread-badge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'founder_notifications' }, () => { refreshUnread() })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [isSuperAdmin])
+
   if (checking) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textMuted, fontSize: '13px' }}>
@@ -263,6 +285,9 @@ function AdminDashboard() {
       {section === 'audit' && <AdminAuditLogs />}
       {section === 'settings' && <AdminSettings />}
       {section === 'approvals' && <AdminApprovals />}
+      {section === 'notifications' && isSuperAdmin && (
+        <FounderNotifications onNavigate={(key) => setSection(key as SectionKey)} onUnreadChange={setFounderUnread} />
+      )}
       {NO_COMPONENT_YET.has(section) && <ComingSoonPanel label={currentLabel} />}
     </>
   )
@@ -293,6 +318,11 @@ function AdminDashboard() {
                 }}>
                 <Icon name={item.icon} size={16} color={section === item.key ? COLORS.primary : COLORS.text} />
                 <span style={{ fontSize: '13px', fontWeight: section === item.key ? 700 : 500, color: section === item.key ? COLORS.primary : COLORS.text }}>{item.label}</span>
+                {item.key === 'notifications' && founderUnread > 0 && (
+                  <span style={{ marginLeft: 'auto', background: COLORS.red, color: '#fff', fontSize: '10px', fontWeight: 700, borderRadius: '999px', minWidth: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>
+                    {founderUnread > 99 ? '99+' : founderUnread}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -332,7 +362,18 @@ function AdminDashboard() {
               <p style={{ fontSize: '11.5px', color: COLORS.textMuted }}>Platform overview and key metrics</p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-              <Icon name="bell" size={19} color={COLORS.text} />
+              {isSuperAdmin ? (
+                <div onClick={() => setSection('notifications')} title="Founder Notifications" style={{ cursor: 'pointer', display: 'flex', position: 'relative' }}>
+                  <Icon name="bell" size={19} color={COLORS.text} />
+                  {founderUnread > 0 && (
+                    <span style={{ position: 'absolute', top: '-5px', right: '-7px', background: COLORS.red, color: '#fff', fontSize: '9px', fontWeight: 700, borderRadius: '999px', minWidth: '15px', height: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', lineHeight: 1 }}>
+                      {founderUnread > 9 ? '9+' : founderUnread}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <Icon name="bell" size={19} color={COLORS.text} />
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: COLORS.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '13px', fontWeight: 700 }}>
                   {(userEmail[0] || 'A').toUpperCase()}
@@ -360,8 +401,11 @@ function AdminDashboard() {
         borderBottom: `1px solid ${COLORS.border}`,
         position: 'sticky', top: 0, zIndex: 20,
       }}>
-        <div onClick={() => setDrawerOpen(true)} style={{ cursor: 'pointer', display: 'flex' }}>
+        <div onClick={() => setDrawerOpen(true)} style={{ cursor: 'pointer', display: 'flex', position: 'relative' }}>
           <Icon name="menu" size={22} color={COLORS.text} />
+          {isSuperAdmin && founderUnread > 0 && (
+            <span style={{ position: 'absolute', top: '-2px', right: '-3px', width: '9px', height: '9px', borderRadius: '50%', background: COLORS.red, border: `2px solid ${COLORS.card}` }} />
+          )}
         </div>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.5px' }}>TRAVELER.COM — FOUNDER</p>
