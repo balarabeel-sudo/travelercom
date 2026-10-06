@@ -2,7 +2,17 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
-import { useBackTo } from './userBackTo'
+
+// Back-arrow helper. When this page is opened from the staff workspace, the workspace passes
+// { backTo, companyId } in the navigation state and the arrow returns there. Company owners
+// (no state) go to the fallback, so their behaviour does not change.
+function useBackTo(fallback = '/home') {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const state = (location.state || {}) as { backTo?: string; companyId?: string }
+  const goBack = () => navigate(state.backTo || fallback)
+  return { goBack }
+}
 
 const COLORS = {
   bg: '#F8FAFC',
