@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { requestPushToken, listenForegroundMessages } from './firebaseMessaging'
@@ -13,6 +13,18 @@ const COLORS = {
 }
 
 const DISMISS_KEY = 'tc_push_prompt_dismissed'
+// After tapping "Ba yanzu ba" the prompt stays hidden for a few days, then asks again.
+// (Before, one tap hid it forever, so most people never enabled push.)
+const DISMISS_DAYS = 3
+
+function promptRecentlyDismissed() {
+  const raw = localStorage.getItem(DISMISS_KEY)
+  if (!raw) return false
+  const stamp = Number(raw)
+  // Old versions stored '1' - treat that as expired so those people get asked again.
+  if (!Number.isFinite(stamp) || stamp < 1000) return false
+  return Date.now() - stamp < DISMISS_DAYS * 24 * 60 * 60 * 1000
+}
 
 async function saveToken(token: string) {
   const { data } = await supabase.auth.getUser()
@@ -34,28 +46,57 @@ function PushNotificationSetup() {
   const [showPrompt, setShowPrompt] = useState(false)
   const [enabling, setEnabling] = useState(false)
   const [toast, setToast] = useState<{ title: string; body: string; actionUrl: string } | null>(null)
+  const handledUserRef = useRef<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+
     const init = async () => {
       if (!('Notification' in window)) return
       const { data } = await supabase.auth.getUser()
-      if (!data.user) return
+      if (cancelled) return
+      if (!data.user) {
+        setShowPrompt(false)
+        return
+      }
+
+      // Only act once per signed-in user (sign-in events can fire again on tab focus).
+      const alreadyHandled = handledUserRef.current === data.user.id
+      handledUserRef.current = data.user.id
 
       if (Notification.permission === 'granted') {
+        if (alreadyHandled) return
         // Already allowed (e.g. previous visit) — silently (re)register so
         // the token stays fresh, no banner needed.
         const token = await requestPushToken()
         if (token) saveToken(token)
-      } else if (Notification.permission === 'default' && !localStorage.getItem(DISMISS_KEY)) {
+      } else if (Notification.permission === 'default' && !promptRecentlyDismissed()) {
         setShowPrompt(true)
       }
     }
     init()
 
+    // The app mounts this component before the person logs in, so also run again
+    // right after login. Without this the prompt only appeared if the app was
+    // reopened while already logged in.
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        setTimeout(() => { init() }, 0)
+      } else if (event === 'SIGNED_OUT') {
+        handledUserRef.current = null
+        setShowPrompt(false)
+      }
+    })
+
     listenForegroundMessages((title, body, actionUrl) => {
       setToast({ title, body, actionUrl })
       setTimeout(() => setToast(null), 6000)
     })
+
+    return () => {
+      cancelled = true
+      authListener.subscription.unsubscribe()
+    }
   }, [])
 
   const handleEnable = async () => {
@@ -67,7 +108,7 @@ function PushNotificationSetup() {
   }
 
   const handleDismiss = () => {
-    localStorage.setItem(DISMISS_KEY, '1')
+    localStorage.setItem(DISMISS_KEY, String(Date.now()))
     setShowPrompt(false)
   }
 
