@@ -6,6 +6,7 @@ import AppLockScreen from './AppLockScreen'
 import SplashScreen from './splashScreen'
 import AccountType from './AccountType'
 import Login from './Login'
+import ForgotPassword from './ForgotPassword'
 import Register from './Ragister'
 import Home from './Home'
 import VerifyOTP from './VerifyOTP'
@@ -127,6 +128,7 @@ function App() {
             <Route path="/" element={<SplashScreen />} />
         <Route path="/account-type" element={<AccountType />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/register" element={<Register />} />
         <Route path="/home" element={<Home />} />
         <Route path="/verify-otp" element={<VerifyOTP />} />
