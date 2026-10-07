@@ -79,7 +79,7 @@ function Login() {
         <InputField label="Email Address" type="email" value={email} onChange={setEmail} placeholder="Enter your email" />
         <PasswordField label="Password" value={password} onChange={setPassword} />
 
-        <p onClick={() => setToast('Password reset is coming soon')} style={{ textAlign: 'right', fontSize: '12.5px', color, fontWeight: 700, cursor: 'pointer', marginBottom: '18px' }}>
+        <p onClick={() => navigate('/forgot-password', { state: { email: email.trim() } })} style={{ textAlign: 'right', fontSize: '12.5px', color, fontWeight: 700, cursor: 'pointer', marginBottom: '18px' }}>
           Forgot Password?
         </p>
 
