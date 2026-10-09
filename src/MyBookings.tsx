@@ -257,7 +257,7 @@ function MyBookings() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: `1px solid ${COLORS.border}` }}>
                 <div>
                   <p style={{ fontSize: '10px', color: COLORS.textMuted }}>Ticket Code</p>
-                  <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{b.ticket_code || '—'}{b.assigned_unit_number ? ` · Seat ${b.assigned_unit_number}` : ''}</p>
+                  <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{b.ticket_code || '—'}{b.assigned_unit_number ? ` · ${b.services?.category === 'hotel' ? 'Room' : 'Seat'} ${b.assigned_unit_number}` : ''}</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.secondary }}>₦{Number(b.amount_paid).toLocaleString()}</p>
