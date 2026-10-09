@@ -43,11 +43,6 @@ function isIdFormatValid(idType: string, idNumber: string): boolean {
   }
 }
 
-function generateTicketCode() {
-  const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
-  return `TRN-${new Date().getFullYear()}-${rand}`
-}
-
 type TrainService = {
   id: string
   title: string
@@ -219,7 +214,6 @@ function TrainDetails() {
     }
 
     setBooking(true)
-    const code = generateTicketCode()
     let assignedUnitId: string | null = null
     let assignedNumber = ''
 
@@ -246,13 +240,12 @@ function TrainDetails() {
       amount_paid: total,
       commission_amount: 0,
       booking_status: 'confirmed',
-      ticket_code: code,
       customer_name: fullName || null,
       assigned_unit_number: assignedNumber || null,
       promotion_id: activePromo?.id || null,
       id_type: idType,
       id_number: idNumber.trim(),
-    }).select('id').single()
+    }).select('id, ticket_code').single()
 
     if (bookingErr) {
       if (assignedUnitId) await supabase.from('inventory_units').update({ status: 'available' }).eq('id', assignedUnitId)
@@ -286,7 +279,8 @@ function TrainDetails() {
     setBooking(false)
     setWalletBalance(newBalance)
     setReservationId(newBooking?.id || '')
-    setPnr(code)
+    // The ticket code is created by the database; always show that exact code.
+    setPnr(newBooking?.ticket_code || 'Open My Bookings')
     setTransactionId(txnRow?.id || '')
     setStep(6)
   }
