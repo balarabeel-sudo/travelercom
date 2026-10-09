@@ -67,11 +67,6 @@ type RoomType = {
   availableUnits: AvailableUnit[]
 }
 
-function generateTicketCode(prefix: string) {
-  const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
-  return `${prefix}-${new Date().getFullYear()}-${rand}`
-}
-
 function HotelDetails() {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -349,8 +344,6 @@ function HotelDetails() {
     }
 
     setBooking(true)
-    const code = generateTicketCode('HTL')
-
     let assignedUnitId: string | null = null
     let assignedNumber = ''
 
@@ -389,13 +382,12 @@ function HotelDetails() {
       amount_paid: activePrice,
       commission_amount: 0,
       booking_status: 'confirmed',
-      ticket_code: code,
       customer_name: displayName || null,
       check_in_date: checkInDate,
       check_out_date: checkOutDate,
       promotion_id: activePromo?.id || null,
       assigned_unit_number: assignedNumber || null,
-    }).select('id').single()
+    }).select('id, ticket_code').single()
 
     if (bookingErr) {
       if (assignedUnitId) {
@@ -447,7 +439,8 @@ function HotelDetails() {
     setBooking(false)
     setWalletBalance(newBalance)
     setAssignedUnitNumber(assignedNumber)
-    setTicketCode(code)
+    // The ticket code is created by the database; always show that exact code.
+    setTicketCode(newBooking?.ticket_code || 'Open My Bookings')
     setTransactionId(txnRow?.id || '')
     setMessage({ type: 'success', text: 'Booking confirmed!' })
   }
