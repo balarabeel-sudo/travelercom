@@ -199,7 +199,7 @@ function VerifyBooking() {
         }}>
           <input
             type="text"
-            placeholder="e.g. BUS-2026-8X4K9P"
+            placeholder="Enter ticket code (e.g. XXX-2026-A1B2C3)"
             value={code}
             onChange={(e) => setCode(e.target.value)}
             style={{
