@@ -43,11 +43,6 @@ function isIdFormatValid(idType: string, idNumber: string): boolean {
   }
 }
 
-function generateBookingCode() {
-  const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
-  return `VR-${new Date().getFullYear()}-${rand}`
-}
-
 const FEATURE_ICON: Record<string, string> = {
   'Air Conditioning': 'snowflake', GPS: 'compass', Bluetooth: 'bluetooth', USB: 'plug', 'Wi-Fi': 'wifi', 'Child Seat': 'seat',
 }
@@ -237,7 +232,6 @@ function VehicleRentalDetails() {
     }
 
     setBooking(true)
-    const code = generateBookingCode()
     let assignedNumber = ''
 
     if (inventoryItemId) {
@@ -262,7 +256,6 @@ function VehicleRentalDetails() {
       amount_paid: total,
       commission_amount: 0,
       booking_status: 'confirmed',
-      ticket_code: code,
       customer_name: fullName || null,
       assigned_unit_number: assignedNumber || null,
       check_in_date: pickupDate,
@@ -270,7 +263,7 @@ function VehicleRentalDetails() {
       promotion_id: activePromo?.id || null,
       id_type: idType,
       id_number: idNumber.trim(),
-    }).select('id').single()
+    }).select('id, ticket_code').single()
 
     if (bookingErr) {
       setBooking(false)
@@ -301,7 +294,8 @@ function VehicleRentalDetails() {
     setBooking(false)
     setWalletBalance(newBalance)
     setReservationId(newBooking?.id || '')
-    setBookingRef(code)
+    // The ticket code is created by the database; always show that exact code.
+    setBookingRef(newBooking?.ticket_code || 'Open My Bookings')
     setTransactionId(txnRow?.id || '')
     setStep(6)
   }
