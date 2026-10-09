@@ -49,11 +49,6 @@ type TourDetail = {
 
 const TOUR_TYPE_ICON: Record<string, string> = { Nature: 'sun', History: 'building', Adventure: 'compass', Water: 'pool', Culture: 'party' }
 
-function generateTicketCode() {
-  const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
-  return `TUR-${new Date().getFullYear()}-${rand}`
-}
-
 function TourDetails() {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -234,7 +229,6 @@ function TourDetails() {
     }
 
     setBooking(true)
-    const code = generateTicketCode()
 
     const { data: newBooking, error: bookingErr } = await supabase.from('bookings').insert({
       user_id: userId,
@@ -244,12 +238,11 @@ function TourDetails() {
       amount_paid: activePrice,
       commission_amount: 0,
       booking_status: 'confirmed',
-      ticket_code: code,
       customer_name: displayName || null,
       check_in_date: tourDate,
       promotion_id: activePromo?.id || null,
       booking_details: [addGateFee ? 'Gate Fee add-on' : null, addVehicleFee ? 'Vehicle Fee add-on' : null].filter(Boolean).join(', ') || null,
-    }).select('id').single()
+    }).select('id, ticket_code').single()
 
     if (bookingErr) {
       setBooking(false)
@@ -293,7 +286,8 @@ function TourDetails() {
     void newBooking
     setBooking(false)
     setWalletBalance(newBalance)
-    setTicketCode(code)
+    // The ticket code is created by the database; always show that exact code.
+    setTicketCode(newBooking?.ticket_code || 'Open My Bookings')
     setTransactionId(txnRow?.id || '')
     setMessage({ type: 'success', text: 'Booking confirmed!' })
   }
