@@ -61,11 +61,6 @@ type HallType = {
   available: number
 }
 
-function generateTicketCode(prefix: string) {
-  const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
-  return `${prefix}-${new Date().getFullYear()}-${rand}`
-}
-
 function EventCenterDetails() {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -355,7 +350,6 @@ function EventCenterDetails() {
     }
 
     setBooking(true)
-    const code = generateTicketCode('EVT')
 
     let assignedUnitId: string | null = null
     let assignedNumber = ''
@@ -389,13 +383,12 @@ function EventCenterDetails() {
       amount_paid: activePrice,
       commission_amount: 0,
       booking_status: 'confirmed',
-      ticket_code: code,
       customer_name: displayName || null,
       check_in_date: startDate,
       check_out_date: endDate,
       promotion_id: activePromo?.id || null,
       assigned_unit_number: assignedNumber || null,
-    }).select('id').single()
+    }).select('id, ticket_code').single()
 
     if (bookingErr) {
       setBooking(false)
@@ -444,7 +437,8 @@ function EventCenterDetails() {
     setBooking(false)
     setWalletBalance(newBalance)
     setAssignedUnitNumber(assignedNumber)
-    setTicketCode(code)
+    // The ticket code is created by the database; always show that exact code.
+    setTicketCode(newBooking?.ticket_code || 'Open My Bookings')
     setTransactionId(txnRow?.id || '')
     setMessage({ type: 'success', text: 'Booking confirmed!' })
   }
