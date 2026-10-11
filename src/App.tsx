@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { HashRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
+import { HashRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import PushNotificationSetup from './PushNotificationSetup'
 import AppLockScreen from './AppLockScreen'
@@ -75,6 +75,8 @@ import AddVehicleRentalListing from './AddVehicleRentalListing'
 import AddFlightListing from './AddFlightListing'
 import VehicleRentals from './VehicleRentals'
 import VehicleRentalDetails from './VehicleRentalDetails'
+import CompanyLayout, { isCompanyDesktopPath } from './CompanyLayout'
+import useIsDesktop from './useIsDesktop'
 
 // Listens for the auth session created when an invited staff member clicks
 // their invite email link, and routes them to the Accept Invite page.
@@ -93,9 +95,13 @@ function InviteRedirectListener() {
   return null
 }
 
-function App() {
+function AppShell() {
+  const isDesktop = useIsDesktop()
+  const { pathname } = useLocation()
+  const wide = isDesktop && isCompanyDesktopPath(pathname)
+
   return (
-    <Router>
+    <>
       <style>{`
         html, body { margin: 0; padding: 0; }
         .tc-app-shell { min-height: 100vh; background: transparent; }
@@ -118,9 +124,23 @@ function App() {
             background: #F8FAFC;
           }
         }
+        .tc-app-shell--wide {
+          display: block;
+          padding: 0;
+          background: #F8FAFC;
+        }
+        .tc-app-frame--wide {
+          width: 100%;
+          max-width: none;
+          min-height: 100vh;
+          max-height: none;
+          border-radius: 0;
+          overflow: visible;
+          box-shadow: none;
+        }
       `}</style>
-      <div className="tc-app-shell">
-        <div className="tc-app-frame">
+      <div className={wide ? 'tc-app-shell tc-app-shell--wide' : 'tc-app-shell'}>
+        <div className={wide ? 'tc-app-frame tc-app-frame--wide' : 'tc-app-frame'}>
           <InviteRedirectListener />
           <PushNotificationSetup />
           <AppLockScreen />
@@ -145,25 +165,25 @@ function App() {
         <Route path="/add-event-center-listing" element={<AddEventCenterListing />} />
         <Route path="/add-vehicle-rental-listing" element={<AddVehicleRentalListing />} />
         <Route path="/add-flight-listing" element={<AddFlightListing />} />
-        <Route path="/my-listings" element={<MyListings />} />
+        <Route path="/my-listings" element={<CompanyLayout><MyListings /></CompanyLayout>} />
         <Route path="/hotels" element={<Hotels />} />
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/hotels/:id" element={<HotelDetails />} />
-        <Route path="/bookings-management" element={<BookingsManagement />} />
-        <Route path="/listings-management" element={<ListingsManagement />} />
+        <Route path="/bookings-management" element={<CompanyLayout><BookingsManagement /></CompanyLayout>} />
+        <Route path="/listings-management" element={<CompanyLayout><ListingsManagement /></CompanyLayout>} />
         <Route path="/services/:category" element={<Services />} />
         <Route path="/services/:category/:id" element={<ServiceDetails />} />
         <Route path="/upgrade-business-suite" element={<UpgradeBusinessSuite />} />
         <Route path="/payment-terms" element={<TermsAndConditions />} />
         <Route path="/search" element={<Search />} />
-        <Route path="/guests" element={<GuestList />} />
-        <Route path="/company-menu" element={<CompanyMenu />} />
-        <Route path="/inventory" element={<InventoryManagement />} />
-        <Route path="/inventory/:id" element={<InventoryDetail />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/promotions" element={<Promotions />} />
+        <Route path="/guests" element={<CompanyLayout><GuestList /></CompanyLayout>} />
+        <Route path="/company-menu" element={<CompanyLayout><CompanyMenu /></CompanyLayout>} />
+        <Route path="/inventory" element={<CompanyLayout><InventoryManagement /></CompanyLayout>} />
+        <Route path="/inventory/:id" element={<CompanyLayout><InventoryDetail /></CompanyLayout>} />
+        <Route path="/analytics" element={<CompanyLayout><Analytics /></CompanyLayout>} />
+        <Route path="/promotions" element={<CompanyLayout><Promotions /></CompanyLayout>} />
         <Route path="/reviews" element={<Ratings />} />
-        <Route path="/company-profile" element={<CompanyProfile />} />
+        <Route path="/company-profile" element={<CompanyLayout><CompanyProfile /></CompanyLayout>} />
         <Route path="/company/:id" element={<CompanyStorefront />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<Terms />} />
@@ -191,16 +211,24 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/my-bookings" element={<MyBookings />} />
         <Route path="/bookings" element={<MyBookings />} />
-        <Route path="/staff/create-role" element={<CreateRole onBack={() => window.history.back()} />} />
-        <Route path="/staff/manage-roles" element={<ManageRoles onBack={() => window.history.back()} onCreateRole={() => window.location.hash = '#/staff/create-role'} />} />
-        <Route path="/staff/permission-matrix" element={<PermissionMatrix onBack={() => window.history.back()} />} />
-        <Route path="/staff/activity-log" element={<ActivityLog onBack={() => window.history.back()} />} />
+        <Route path="/staff/create-role" element={<CompanyLayout><CreateRole onBack={() => window.history.back()} /></CompanyLayout>} />
+        <Route path="/staff/manage-roles" element={<CompanyLayout><ManageRoles onBack={() => window.history.back()} onCreateRole={() => window.location.hash = '#/staff/create-role'} /></CompanyLayout>} />
+        <Route path="/staff/permission-matrix" element={<CompanyLayout><PermissionMatrix onBack={() => window.history.back()} /></CompanyLayout>} />
+        <Route path="/staff/activity-log" element={<CompanyLayout><ActivityLog onBack={() => window.history.back()} /></CompanyLayout>} />
         <Route path="/staff-dashboard" element={<StaffDashboard />} />
-        <Route path="/staff" element={<CompanyStaffAccess onBack={() => window.history.back()} />} /> 
+        <Route path="/staff" element={<CompanyLayout><CompanyStaffAccess onBack={() => window.history.back()} /></CompanyLayout>} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
       </Routes>
         </div>
       </div>
+    </>
+  )
+}
+
+function App() {
+  return (
+    <Router>
+      <AppShell />
     </Router>
   )
 }
