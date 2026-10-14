@@ -5,6 +5,7 @@ import Icon from './Icons'
 import { releaseExpiredUnits } from './inventoryUtils'
 import { ListCardSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   bg: '#F8FAFC',
@@ -44,6 +45,7 @@ const DEFAULT_LABELS = { plural: 'Inventory Types', singular: 'Type', unitPlural
 
 export default function InventoryManagement() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
   const [netError, setNetError] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -341,7 +343,7 @@ export default function InventoryManagement() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+      <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? 'none' : '480px', margin: '0 auto' }}>
         <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Inventory</h1>
         </div>
@@ -354,7 +356,7 @@ export default function InventoryManagement() {
 
   if (netError) {
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+      <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? 'none' : '480px', margin: '0 auto' }}>
         <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Inventory</h1>
         </div>
@@ -377,43 +379,7 @@ export default function InventoryManagement() {
     { total: 0, available: 0, booked: 0, maintenance: 0 }
   )
 
-  return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
-
-      <div style={{
-        padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: COLORS.card, position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}>
-            <Icon name="arrowLeft" size={22} color={COLORS.text} />
-          </div>
-          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Inventory</h1>
-        </div>
-        <div
-          onClick={() => (showForm ? cancelForm() : setShowForm(true))}
-          style={{ width: '38px', height: '38px', borderRadius: '12px', background: COLORS.purple, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          <Icon name="plus" size={19} color="white" />
-        </div>
-      </div>
-
-      <div style={{ padding: '16px' }}>
-
-        <div style={{
-          background: `linear-gradient(135deg, ${COLORS.purple}, #4C1D95)`, borderRadius: '18px',
-          padding: '20px', marginBottom: '18px', color: 'white'
-        }}>
-          <p style={{ fontSize: '17px', fontWeight: 800, marginBottom: '6px' }}>Inventory Overview</p>
-          <p style={{ fontSize: '12px', color: '#DDD6FE', lineHeight: 1.5 }}>Track and manage your inventory in real-time.</p>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
-          <OverviewCard icon="box" iconBg="#F3E8FF" iconColor={COLORS.purple} label="Total Units" value={totals.total} sub="All units in inventory" />
-          <OverviewCard icon="checkCircle" iconBg="#DCFCE7" iconColor={COLORS.green} label="Available" value={totals.available} valueColor={COLORS.green} sub="Ready for booking" />
-          <OverviewCard icon="calendar" iconBg="#DBEAFE" iconColor={COLORS.primary} label="Booked" value={totals.booked} valueColor={COLORS.primary} sub="Currently booked" />
-          <OverviewCard icon="edit" iconBg="#FFEDD5" iconColor={COLORS.amber} label="Maintenance" value={totals.maintenance} valueColor={COLORS.amber} sub="Under maintenance" />
-        </div>
-
+  const holidaysCard = (
         <div style={{ background: COLORS.card, borderRadius: '16px', padding: '16px', marginBottom: '18px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
           <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
             <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#F3E8FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -459,8 +425,9 @@ export default function InventoryManagement() {
             ))
           )}
         </div>
+  )
 
-        {showForm && (
+  const formCard = showForm && (
           <div style={{ background: COLORS.card, borderRadius: '16px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px', color: COLORS.text }}>{editingId ? 'Edit' : 'Add'} {formLabels.singular}</p>
 
@@ -529,7 +496,189 @@ export default function InventoryManagement() {
               </div>
             </div>
           </div>
-        )}
+        )
+
+  // ------------------------------------------------------------------
+  // Desktop layout
+  // ------------------------------------------------------------------
+  if (isDesktop) {
+    const statCards = [
+      { icon: 'box', bg: '#F3E8FF', fg: COLORS.purple, label: 'Total Units', value: totals.total, color: '#0F172A', sub: 'All units in inventory' },
+      { icon: 'checkCircle', bg: '#DCFCE7', fg: COLORS.green, label: 'Available', value: totals.available, color: COLORS.green, sub: 'Ready for booking' },
+      { icon: 'calendar', bg: '#DBEAFE', fg: '#2563EB', label: 'Booked', value: totals.booked, color: '#2563EB', sub: 'Currently booked' },
+      { icon: 'edit', bg: '#FFEDD5', fg: COLORS.amber, label: 'Maintenance', value: totals.maintenance, color: COLORS.amber, sub: 'Under maintenance' },
+    ]
+    const th = {
+      textAlign: 'left' as const, padding: '14px 20px', fontSize: '13px', fontWeight: 600,
+      color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}`, background: '#F8FAFC',
+      whiteSpace: 'nowrap' as const,
+    }
+    const td = {
+      padding: '14px 20px', fontSize: '14px', color: COLORS.text,
+      borderBottom: `1px solid ${COLORS.border}`, verticalAlign: 'middle' as const,
+    }
+
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Inventory</h1>
+            <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>Track and manage your inventory in real-time.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => (showForm ? cancelForm() : setShowForm(true))}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px',
+              background: '#2563EB', color: 'white', border: 'none', borderRadius: '10px',
+              fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+            <Icon name="plus" size={16} color="white" />
+            {showForm ? 'Close form' : 'Add inventory'}
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          {statCards.map((c) => (
+            <div key={c.label} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '20px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
+                <Icon name={c.icon} size={22} color={c.fg} />
+              </div>
+              <p style={{ fontSize: '28px', fontWeight: 800, color: c.color, margin: 0 }}>{c.value}</p>
+              <p style={{ fontSize: '14px', fontWeight: 600, color: COLORS.text, margin: '4px 0 0' }}>{c.label}</p>
+              <p style={{ fontSize: '13px', color: COLORS.textMuted, margin: '2px 0 0' }}>{c.sub}</p>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(320px, 1fr)', gap: '24px', alignItems: 'start' }}>
+          <div>
+            {formCard}
+
+            <h2 style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, margin: '0 0 14px' }}>{formLabels.plural}</h2>
+
+            {items.length === 0 ? (
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, padding: '48px 24px', textAlign: 'center', borderRadius: '14px', color: COLORS.textMuted, fontSize: '14px' }}>
+                No {formLabels.plural.toLowerCase()} yet. Use "Add inventory" to create your first one.
+              </div>
+            ) : (
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '760px' }}>
+                    <thead>
+                      <tr>
+                        <th style={th}>Name</th>
+                        <th style={th}>Price</th>
+                        <th style={th}>Total</th>
+                        <th style={th}>Available</th>
+                        <th style={th}>Occupied</th>
+                        <th style={{ ...th, textAlign: 'right' as const }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item) => {
+                        const avail = available(item)
+                        const photo = item.image_url || item.services?.photo_url
+                        const itemLabels = (item.services?.category && CATEGORY_LABELS[item.services.category]) || DEFAULT_LABELS
+                        return (
+                          <tr key={item.id}>
+                            <td style={td}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                <div style={{ width: '56px', height: '44px', borderRadius: '8px', flexShrink: 0, overflow: 'hidden', background: photo ? '#E2E8F0' : 'linear-gradient(135deg, #F97316, #0EA5E9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  {photo ? <img src={photo} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name={itemLabels.icon} size={20} color="white" />}
+                                </div>
+                                <div>
+                                  <p style={{ fontWeight: 700, margin: 0 }}>{item.name}</p>
+                                  <p style={{ fontSize: '12.5px', color: COLORS.textMuted, margin: '2px 0 0' }}>{itemLabels.singular}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ ...td, fontWeight: 700 }}>₦{Number(item.price).toLocaleString()}</td>
+                            <td style={td}>{item.total_quantity}</td>
+                            <td style={{ ...td, fontWeight: 700, color: avail === 0 ? COLORS.red : COLORS.green }}>{avail}</td>
+                            <td style={{ ...td, color: occupiedToday(item) > 0 ? '#2563EB' : COLORS.textMuted, fontWeight: 600 }}>{occupiedToday(item)}</td>
+                            <td style={{ ...td, textAlign: 'right' as const }}>
+                              <div style={{ display: 'inline-flex', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditClick(item)}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 12px', border: `1px solid ${COLORS.border}`, borderRadius: '8px', background: COLORS.card, color: '#334155', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                                  <Icon name="edit" size={14} color={COLORS.textMuted} />
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={deletingId === item.id}
+                                  onClick={() => handleDelete(item)}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 12px', border: '1px solid #FECACA', borderRadius: '8px', background: COLORS.card, color: COLORS.red, fontSize: '13px', fontWeight: 600, cursor: deletingId === item.id ? 'default' : 'pointer', opacity: deletingId === item.id ? 0.4 : 1, fontFamily: 'inherit' }}>
+                                  <Icon name="trash" size={14} color={COLORS.red} />
+                                  Delete
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/inventory/${item.id}`)}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', border: 'none', borderRadius: '8px', background: '#2563EB', color: 'white', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                                  Manage
+                                  <Icon name="chevronRight" size={13} color="white" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>{holidaysCard}</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
+
+      <div style={{
+        padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: COLORS.card, position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}>
+            <Icon name="arrowLeft" size={22} color={COLORS.text} />
+          </div>
+          <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Inventory</h1>
+        </div>
+        <div
+          onClick={() => (showForm ? cancelForm() : setShowForm(true))}
+          style={{ width: '38px', height: '38px', borderRadius: '12px', background: COLORS.purple, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <Icon name="plus" size={19} color="white" />
+        </div>
+      </div>
+
+      <div style={{ padding: '16px' }}>
+
+        <div style={{
+          background: `linear-gradient(135deg, ${COLORS.purple}, #4C1D95)`, borderRadius: '18px',
+          padding: '20px', marginBottom: '18px', color: 'white'
+        }}>
+          <p style={{ fontSize: '17px', fontWeight: 800, marginBottom: '6px' }}>Inventory Overview</p>
+          <p style={{ fontSize: '12px', color: '#DDD6FE', lineHeight: 1.5 }}>Track and manage your inventory in real-time.</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
+          <OverviewCard icon="box" iconBg="#F3E8FF" iconColor={COLORS.purple} label="Total Units" value={totals.total} sub="All units in inventory" />
+          <OverviewCard icon="checkCircle" iconBg="#DCFCE7" iconColor={COLORS.green} label="Available" value={totals.available} valueColor={COLORS.green} sub="Ready for booking" />
+          <OverviewCard icon="calendar" iconBg="#DBEAFE" iconColor={COLORS.primary} label="Booked" value={totals.booked} valueColor={COLORS.primary} sub="Currently booked" />
+          <OverviewCard icon="edit" iconBg="#FFEDD5" iconColor={COLORS.amber} label="Maintenance" value={totals.maintenance} valueColor={COLORS.amber} sub="Under maintenance" />
+        </div>
+
+        {holidaysCard}
+
+        {formCard}
 
         <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text, marginBottom: '12px' }}>{formLabels.plural}</p>
 
