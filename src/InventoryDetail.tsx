@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   bg: '#F8FAFC',
@@ -38,6 +39,7 @@ const UNIT_ICON: Record<string, string> = { Room: 'bed', Seat: 'seat', Slot: 'ma
 
 export default function InventoryDetail() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const { id } = useParams()
   const [loading, setLoading] = useState(true)
   const [item, setItem] = useState<Item | null>(null)
@@ -273,11 +275,15 @@ export default function InventoryDetail() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '80px' }}>
+    <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? 'none' : '480px', margin: '0 auto', paddingBottom: isDesktop ? '0' : '80px' }}>
 
       <div style={{
-        padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '14px',
-        background: COLORS.card, position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+        padding: isDesktop ? '20px 24px' : '18px 20px', display: 'flex', alignItems: 'center', gap: '14px',
+        background: COLORS.card, position: isDesktop ? 'static' : 'sticky', top: 0, zIndex: 10,
+        boxShadow: isDesktop ? 'none' : '0 1px 4px rgba(0,0,0,0.05)',
+        border: isDesktop ? `1px solid ${COLORS.border}` : undefined,
+        borderRadius: isDesktop ? '14px' : undefined,
+        marginBottom: isDesktop ? '20px' : undefined,
       }}>
         <div onClick={() => navigate('/inventory')} style={{ cursor: 'pointer', display: 'flex' }}>
           <Icon name="arrowLeft" size={22} color={COLORS.text} />
@@ -291,8 +297,8 @@ export default function InventoryDetail() {
         </div>
       </div>
 
-      <div style={{ padding: '16px' }}>
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
+      <div style={{ padding: isDesktop ? '0' : '16px' }}>
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '18px', maxWidth: isDesktop ? '760px' : undefined }}>
           <TabButton icon="bed" label="Items" active={tab === 'stock'} onClick={() => setTab('stock')} />
           <TabButton icon="cash" label="Pricing" active={tab === 'pricing'} onClick={() => setTab('pricing')} />
           <TabButton icon="wrench" label="Maintenance" active={tab === 'maintenance'} onClick={() => setTab('maintenance')} />
@@ -301,13 +307,14 @@ export default function InventoryDetail() {
 
         {tab === 'stock' && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : '1fr 1fr', gap: isDesktop ? '16px' : '10px', marginBottom: '18px' }}>
               <StatCard icon="clipboard" iconBg="#F3E8FF" iconColor={COLORS.purple} value={units.length} label={`Total ${unitLabel}s`} sub={`All items in this ${unitLabel.toLowerCase()} type`} />
               <StatCard icon="checkCircle" iconBg="#DCFCE7" iconColor={COLORS.green} value={availableUnits.length} label="Available" sub="Ready for booking" />
               <StatCard icon="users" iconBg="#DBEAFE" iconColor={COLORS.primary} value={occupiedCount} label="Occupied" sub="Currently in use" />
               <StatCard icon="edit" iconBg="#FFEDD5" iconColor={COLORS.amber} value={maintenanceUnits.length} label="Maintenance" sub="Under maintenance" />
             </div>
 
+            <div style={isDesktop ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'start' } : undefined}>
             <div style={{ background: COLORS.card, borderRadius: '16px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <div>
@@ -371,6 +378,8 @@ export default function InventoryDetail() {
               )}
             </div>
 
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text }}>{unitLabel} Items ({units.length})</p>
               <div onClick={() => setSortDesc(!sortDesc)} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: COLORS.purple, fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
@@ -383,7 +392,7 @@ export default function InventoryDetail() {
                 No {unitLabel.toLowerCase()}s yet.
               </div>
             ) : (
-              sortedUnits.map((u) => {
+              <div style={isDesktop ? { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' } : undefined}>{sortedUnits.map((u) => {
                 const effectiveStatus = u.status === 'available' && occupiedTodaySet.has(u.unit_number) ? 'occupied' : u.status
                 const st = statusStyle[effectiveStatus]
                 return (
@@ -398,7 +407,7 @@ export default function InventoryDetail() {
                     <span style={{ fontSize: '10.5px', fontWeight: 700, color: st.color, background: st.bg, padding: '4px 10px', borderRadius: '8px', whiteSpace: 'nowrap' }}>{st.label}</span>
                   </div>
                 )
-              })
+              })}</div>
             )}
 
             {showTip && (
@@ -417,7 +426,7 @@ export default function InventoryDetail() {
         )}
 
         {tab === 'pricing' && (
-          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+          <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', maxWidth: isDesktop ? '640px' : undefined }}>
             <p style={{ fontSize: '13px', fontWeight: 600, color: COLORS.textMuted, marginBottom: '6px' }}>Weekday Price</p>
             <input value={weekdayInput} onChange={(e) => setWeekdayInput(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="₦25,000" inputMode="decimal" style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '14px', fontSize: '13px', boxSizing: 'border-box' }} />
 
@@ -437,12 +446,12 @@ export default function InventoryDetail() {
           <>
             <div
               onClick={() => setShowMaintForm(!showMaintForm)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: COLORS.purple, color: 'white', padding: '11px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', marginBottom: '14px' }}>
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: COLORS.purple, color: 'white', padding: '11px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', marginBottom: '14px', maxWidth: isDesktop ? '420px' : undefined }}>
               <Icon name="plus" size={15} color="white" /> Mark a {unitLabel} Under Maintenance
             </div>
 
             {showMaintForm && (
-              <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+              <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', maxWidth: isDesktop ? '560px' : undefined }}>
                 <select value={maintUnitId} onChange={(e) => setMaintUnitId(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, marginBottom: '10px', fontSize: '13px' }}>
                   <option value="">Select {unitLabel.toLowerCase()} number</option>
                   {availableUnits.map((u) => <option key={u.id} value={u.id}>{unitLabel} {u.unit_number}</option>)}
@@ -461,7 +470,7 @@ export default function InventoryDetail() {
                 No {unitLabel.toLowerCase()}s under maintenance
               </div>
             ) : (
-              maintenanceUnits.map((u) => (
+              <div style={isDesktop ? { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' } : undefined}>{maintenanceUnits.map((u) => (
                 <div key={u.id} style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '10px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
@@ -477,7 +486,7 @@ export default function InventoryDetail() {
                     </div>
                   </div>
                 </div>
-              ))
+              ))}</div>
             )}
           </>
         )}
@@ -487,7 +496,7 @@ export default function InventoryDetail() {
             <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '14px' }}>
               Tap a day to mark it Sold Out or Available. Days with no override are Available by default.
             </p>
-            {Array.from({ length: 14 }).map((_, i) => {
+            <div style={isDesktop ? { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '10px' } : undefined}>{Array.from({ length: 14 }).map((_, i) => {
               const d = new Date()
               d.setDate(d.getDate() + i)
               const dateStr = d.toISOString().split('T')[0]
@@ -502,7 +511,7 @@ export default function InventoryDetail() {
                   </div>
                 </div>
               )
-            })}
+            })}</div>
           </>
         )}
       </div>
@@ -511,7 +520,7 @@ export default function InventoryDetail() {
         <div
           onClick={load}
           style={{
-            position: 'fixed', bottom: '20px', left: '20px', width: '48px', height: '48px', borderRadius: '50%',
+            position: 'fixed', bottom: '20px', left: isDesktop ? undefined : '20px', right: isDesktop ? '28px' : undefined, width: '48px', height: '48px', borderRadius: '50%',
             background: COLORS.purple, display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', boxShadow: '0 4px 12px rgba(107,33,168,0.4)'
           }}>
