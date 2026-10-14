@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import useIsDesktop from './useIsDesktop'
@@ -210,24 +211,6 @@ let cachedCompanyName = ''
 // Styles (colours are CSS variables at the top so they are easy to change)
 // ---------------------------------------------------------------------------
 const CSS = `
-/* While the company shell is on screen, make the app frame full width.
-   This is a safety net: it works even if the phone-style frame in App.tsx
-   still thinks the page should be 430px wide. The style tag is removed when
-   the shell unmounts, so customer pages are not affected. */
-.tc-app-shell {
-  display: block !important;
-  padding: 0 !important;
-  background: #F8FAFC !important;
-}
-.tc-app-frame {
-  width: 100% !important;
-  max-width: none !important;
-  min-height: 100vh !important;
-  max-height: none !important;
-  border-radius: 0 !important;
-  overflow: visible !important;
-  box-shadow: none !important;
-}
 .tcl-root {
   --tcl-primary: #2563EB;
   --tcl-primary-soft: #EFF6FF;
@@ -235,19 +218,21 @@ const CSS = `
   --tcl-border: #E2E8F0;
   --tcl-title: #0F172A;
   --tcl-muted: #64748B;
+  /* The shell is drawn as a full-screen layer on top of the page, so it is
+     always the full width of the browser and never limited by the phone-style
+     frame that wraps the rest of the app. */
+  position: fixed;
+  inset: 0;
+  z-index: 50;
   display: flex;
-  min-height: 100vh;
   background: var(--tcl-page-bg);
   font-family: inherit;
   color: var(--tcl-title);
 }
 .tcl-sidebar {
-  position: sticky;
-  top: 0;
-  align-self: flex-start;
   width: 260px;
   flex-shrink: 0;
-  height: 100vh;
+  height: 100%;
   overflow-y: auto;
   box-sizing: border-box;
   padding: 0 14px 24px;
@@ -315,6 +300,8 @@ const CSS = `
 .tcl-main {
   flex: 1;
   min-width: 0;
+  height: 100%;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -439,10 +426,22 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
   const [companyName, setCompanyName] = useState(cachedCompanyName)
   const [menuOpen, setMenuOpen] = useState(false)
 
+  const scrollRef = useRef<HTMLDivElement>(null)
+
   // Start each page at the top when navigating between sections.
   useEffect(() => {
-    if (isDesktop) window.scrollTo(0, 0)
+    if (isDesktop) scrollRef.current?.scrollTo(0, 0)
   }, [pathname, isDesktop])
+
+  // The shell scrolls by itself, so the page behind it must not scroll.
+  useEffect(() => {
+    if (!isDesktop) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [isDesktop])
 
   // Close the account menu whenever the page changes.
   useEffect(() => {
@@ -504,7 +503,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
     navigate('/login')
   }
 
-  return (
+  return createPortal(
     <div className="tcl-root">
       <style>{CSS}</style>
 
@@ -534,7 +533,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
         ))}
       </aside>
 
-      <div className="tcl-main">
+      <div className="tcl-main" ref={scrollRef}>
         <header className="tcl-topbar">
           {showBack && (
             <button type="button" className="tcl-back" onClick={() => navigate(-1)}>
@@ -603,6 +602,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
           <div className="tcl-content-inner">{children}</div>
         </main>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
