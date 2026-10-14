@@ -5,6 +5,8 @@ import Icon from './Icons'
 import NotificationBell from './NotificationBell'
 import { releaseExpiredUnits } from './inventoryUtils'
 import HomeInviteCard from './HomeInviteCard'
+import CompanyLayout from './CompanyLayout'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -60,6 +62,19 @@ function bannerGradient(bannerType?: string) {
   }
 }
 
+type CompanyListingRow = {
+  id: string; title: string; category: string; status: string | null;
+  destination: string | null; photo_url: string | null
+}
+
+const COMPANY_CATEGORY_LABEL: Record<string, string> = {
+  hotel: 'Hotels', bus: 'Buses', train: 'Trains', flight: 'Flights',
+  tour: 'Tours', event_center: 'Event Centers', vehicle_rental: 'Vehicle Rentals',
+}
+const COMPANY_CATEGORY_ICON: Record<string, string> = {
+  hotel: 'hotel', bus: 'bus', train: 'bus', flight: 'plane', tour: 'map', event_center: 'tent',
+}
+
 function computePeriodStats(bookings: any[], filter: 'week' | 'month' | 'year') {
   const days = PERIOD_DAYS[filter]
   const now = Date.now()
@@ -104,6 +119,8 @@ function computePeriodStats(bookings: any[], filter: 'week' | 'month' | 'year') 
 
 function Home() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
+  const [companyListings, setCompanyListings] = useState<CompanyListingRow[]>([])
   const [loading, setLoading] = useState(true)
   const [accountType, setAccountType] = useState<'personal' | 'company'>('personal')
   const [displayName, setDisplayName] = useState('')
@@ -262,6 +279,15 @@ function Home() {
             completed,
             activeListings: activeListings || 0,
           })
+
+          // Latest listings for the desktop "My Listings" table
+          const { data: listingRows } = await supabase
+            .from('services')
+            .select('id, title, category, status, destination, photo_url')
+            .eq('company_id', companyId)
+            .order('created_at', { ascending: false })
+            .limit(5)
+          setCompanyListings((listingRows as CompanyListingRow[]) || [])
         }
       } else {
         const { data: hotelRows } = await supabase
@@ -434,6 +460,346 @@ if (accountType === 'company') {
     const companyHeroDiscountPct = companyCurrentSlide.type === 'banner' && companyCurrentSlide.banner.banner_type === 'discount' && companyCurrentSlide.banner.promotion_id
       ? promoPercents[companyCurrentSlide.banner.promotion_id] ?? null
       : null
+
+    // ------------------------------------------------------------------
+    // Desktop company dashboard (phones keep the layout below unchanged)
+    // ------------------------------------------------------------------
+    if (isDesktop) {
+      const isSuite = companyPlan === 'business_suite'
+      const periodLabel = timeFilter === 'week' ? 'last 7 days' : timeFilter === 'month' ? 'last 30 days' : 'last 12 months'
+      const tiles = [
+        { bg: '#EFF6FF', fg: '#2563EB' },
+        { bg: '#ECFDF5', fg: '#059669' },
+        { bg: '#FFF7ED', fg: '#EA580C' },
+        { bg: '#F5F3FF', fg: '#7C3AED' },
+        { bg: '#FDF2F8', fg: '#DB2777' },
+      ]
+      const addListingButton = (
+        <button
+          type="button"
+          onClick={() => navigate('/add-listing-router')}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 20px',
+            background: '#2563EB', color: 'white', border: 'none', borderRadius: '10px',
+            fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+          <Icon name="plus" size={16} color="white" />
+          Add Listing
+        </button>
+      )
+      const cardStyle = {
+        background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px',
+      }
+      const th = {
+        textAlign: 'left' as const, padding: '14px 20px', fontSize: '13px', fontWeight: 600,
+        color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}`, background: '#F8FAFC',
+        whiteSpace: 'nowrap' as const,
+      }
+      const td = {
+        padding: '14px 20px', fontSize: '14px', color: COLORS.text,
+        borderBottom: `1px solid ${COLORS.border}`, verticalAlign: 'middle' as const,
+      }
+      const quickActions = [
+        { icon: 'users', label: 'Staff Access', path: '/staff' },
+        { icon: 'userPlus', label: 'Add Guest', path: '/add-guest' },
+        { icon: 'barChart', label: 'Analytics', path: '/analytics' },
+        { icon: 'box', label: 'Inventory', path: '/inventory' },
+        { icon: 'megaphone', label: 'Promotions', path: '/promotions' },
+        { icon: 'star', label: 'Ratings', path: '/reviews' },
+      ]
+
+      return (
+        <CompanyLayout>
+          <div>
+            <div style={{
+              background: 'linear-gradient(100deg, #4C1D95, #6D28D9 60%, #7C3AED)',
+              borderRadius: '16px', padding: '28px 32px', color: 'white',
+              display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '28px',
+            }}>
+              <div style={{
+                width: '60px', height: '60px', borderRadius: '16px', background: 'rgba(255,255,255,0.18)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <Icon name="plane" size={28} color="white" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '24px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  Welcome back, {displayName}
+                  {isSuite && <Icon name="star" size={18} color="#FBBF24" />}
+                </p>
+                <p style={{ fontSize: '15px', color: '#DDD6FE', margin: '6px 0 0' }}>
+                  Here's what's happening with your business today.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(isSuite ? '/company-menu' : '/support')}
+                style={{
+                  padding: '12px 24px', background: 'white', color: '#4C1D95', border: 'none',
+                  borderRadius: '10px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                {isSuite ? 'Manage Plan' : 'Upgrade Plan'}
+              </button>
+            </div>
+
+            <HomeInviteCard />
+
+            {banners.length > 0 && (
+              <div style={{ marginBottom: '28px' }}>
+                <div
+                  onClick={() => {
+                    if (!companyHeroHref) return
+                    if (companyHeroHref.startsWith('http')) window.location.href = companyHeroHref
+                    else navigate(companyHeroHref)
+                  }}
+                  style={{
+                    borderRadius: '16px', height: '220px', position: 'relative', overflow: 'hidden',
+                    padding: companyHeroIsImage ? 0 : '32px 36px', boxSizing: 'border-box',
+                    background: companyCurrentSlide.type === 'default' ? bannerGradient() : bannerGradient(companyCurrentSlide.banner.banner_type),
+                    color: 'white', cursor: companyHeroHref ? 'pointer' : 'default',
+                  }}>
+                  {companyCurrentSlide.type === 'banner' && companyCurrentSlide.banner.image_url && (
+                    <img src={companyCurrentSlide.banner.image_url} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  )}
+                  {!companyHeroIsImage && (
+                    <div style={{ position: 'relative', maxWidth: '640px' }}>
+                      {companyCurrentSlide.type === 'default' ? (
+                        <>
+                          <h2 style={{ fontSize: '30px', fontWeight: 800, lineHeight: 1.25, margin: '0 0 8px' }}>Grow Your Business With Us</h2>
+                          <p style={{ fontSize: '16px', opacity: 0.9, margin: 0 }}>Reach more travelers across Nigeria on TravelerCom</p>
+                        </>
+                      ) : (
+                        <>
+                          <h2 style={{ fontSize: '26px', fontWeight: 800, lineHeight: 1.25, margin: '0 0 8px' }}>{companyCurrentSlide.banner.title}</h2>
+                          <p style={{ fontSize: '16px', opacity: 0.95, margin: 0 }}>{companyCurrentSlide.banner.message}</p>
+                          {companyCurrentSlide.banner.cta_text && (
+                            <div style={{
+                              marginTop: '18px', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                              background: 'rgba(255,255,255,0.95)', color: '#1A1A1A', padding: '10px 18px',
+                              borderRadius: '10px', fontSize: '14px', fontWeight: 800,
+                            }}>
+                              {companyCurrentSlide.banner.cta_text} <span>→</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {companyHeroSlides.length > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '12px' }}>
+                    {companyHeroSlides.map((_, i) => (
+                      <div
+                        key={i}
+                        onClick={() => setHeroSlide(i)}
+                        style={{
+                          width: i === heroSlide ? '22px' : '7px', height: '7px', borderRadius: '4px',
+                          background: i === heroSlide ? COLORS.secondary : COLORS.border,
+                          cursor: 'pointer', transition: 'width 0.2s',
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {companyApproval !== 'approved' && (
+              <div
+                onClick={() => navigate('/upload-docs')}
+                style={{
+                  background: companyApproval === 'rejected' ? '#fef2f2' : '#fff7ed',
+                  border: `1px solid ${companyApproval === 'rejected' ? '#fca5a5' : '#fdba74'}`,
+                  borderRadius: '14px', padding: '18px 22px', cursor: 'pointer', marginBottom: '28px',
+                }}>
+                <p style={{ fontSize: '15px', fontWeight: 700, color: companyApproval === 'rejected' ? '#b91c1c' : '#c2410c', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Icon name={companyApproval === 'rejected' ? 'alertCircle' : 'clock'} size={16} color={companyApproval === 'rejected' ? '#b91c1c' : '#c2410c'} />
+                  {companyApproval === 'rejected' ? 'Application Rejected' : 'Account Pending Approval'}
+                </p>
+                <p style={{ fontSize: '14px', color: companyApproval === 'rejected' ? '#991b1b' : '#9a3412', margin: 0 }}>
+                  {companyApproval === 'rejected'
+                    ? 'Please contact support for more information.'
+                    : 'Upload your CAC document to get approved and start listing your services.'}
+                </p>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Overview</h2>
+              {isSuite && (
+                <select
+                  value={timeFilter}
+                  onChange={(e) => setTimeFilter(e.target.value as 'week' | 'month' | 'year')}
+                  style={{
+                    padding: '9px 14px', borderRadius: '10px', border: `1px solid ${COLORS.border}`,
+                    background: '#EFF6FF', color: '#2563EB', fontSize: '14px', fontWeight: 700,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">Last 30 Days</option>
+                  <option value="year">Last 12 Months</option>
+                </select>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '16px', marginBottom: '32px' }}>
+              {analytics.map((a, i) => {
+                const change = a.statKey && periodStats ? periodStats.changes[a.statKey as keyof typeof periodStats.changes] : null
+                const isListings = a.label === 'Active Listings'
+                const tile = tiles[i % tiles.length]
+                return (
+                  <div
+                    key={a.label}
+                    onClick={isListings ? () => navigate('/my-listings') : undefined}
+                    style={{ ...cardStyle, padding: '20px', cursor: isListings ? 'pointer' : 'default' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: tile.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px' }}>
+                      <Icon name={a.icon} size={22} color={tile.fg} />
+                    </div>
+                    <p style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.value}</p>
+                    <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>{a.label}</p>
+                    {isSuite && change !== null && (
+                      <p style={{ fontSize: '13px', fontWeight: 700, margin: '12px 0 0', color: change >= 0 ? '#16A34A' : '#DC2626' }}>
+                        {change >= 0 ? '↑' : '↓'} {Math.abs(change)}% vs {periodLabel}
+                      </p>
+                    )}
+                    {isListings && (
+                      <p style={{ fontSize: '13px', fontWeight: 600, margin: '12px 0 0', color: '#2563EB' }}>View &amp; manage</p>
+                    )}
+                  </div>
+                )
+              })}
+              <div
+                onClick={() => navigate('/verify-booking')}
+                style={{ ...cardStyle, padding: '20px', cursor: 'pointer' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px' }}>
+                  <Icon name="camera" size={22} color="#2563EB" />
+                </div>
+                <p style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Verify</p>
+                <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>Booking</p>
+                <p style={{ fontSize: '13px', fontWeight: 600, margin: '12px 0 0', color: '#2563EB' }}>View bookings</p>
+              </div>
+            </div>
+
+            {isSuite && (
+              <div style={{ marginBottom: '32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Quick Actions</h2>
+                  {addListingButton}
+                </div>
+                <div style={{ ...cardStyle, padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '16px' }}>
+                  {quickActions.map((q) => (
+                    <button
+                      key={q.label}
+                      type="button"
+                      onClick={() => navigate(q.path)}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+                        padding: '22px 8px', background: COLORS.card, border: `1px solid ${COLORS.border}`,
+                        borderRadius: '12px', cursor: 'pointer', fontFamily: 'inherit',
+                      }}>
+                      <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#F3E8FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name={q.icon} size={22} color="#6B21A8" />
+                      </div>
+                      <span style={{ fontSize: '14px', fontWeight: 600, color: COLORS.text }}>{q.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2
+                onClick={() => navigate('/my-listings')}
+                style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A', margin: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                My Listings <Icon name="chevronRight" size={20} color="#0F172A" />
+              </h2>
+              {!isSuite && addListingButton}
+            </div>
+            {companyListings.length === 0 ? (
+              <div style={{ ...cardStyle, padding: '40px 24px', textAlign: 'center', marginBottom: '32px' }}>
+                <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: 0 }}>You haven't added any listings yet.</p>
+              </div>
+            ) : (
+              <div style={{ ...cardStyle, overflow: 'hidden', marginBottom: '32px' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '820px' }}>
+                    <thead>
+                      <tr>
+                        <th style={th}>Listing</th>
+                        <th style={th}>Type</th>
+                        <th style={th}>Location</th>
+                        <th style={th}>Status</th>
+                        <th style={{ ...th, textAlign: 'right' as const }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {companyListings.map((l) => (
+                        <tr key={l.id}>
+                          <td style={td}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                              <div style={{
+                                width: '68px', height: '48px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0,
+                                background: l.photo_url ? '#E2E8F0' : 'linear-gradient(135deg, #F97316, #0EA5E9)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                {l.photo_url ? (
+                                  <img src={l.photo_url} alt={l.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <Icon name={COMPANY_CATEGORY_ICON[l.category] || 'box'} size={22} color="white" />
+                                )}
+                              </div>
+                              <span style={{ fontWeight: 700 }}>{l.title}</span>
+                            </div>
+                          </td>
+                          <td style={{ ...td, color: '#475569' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                              <Icon name={COMPANY_CATEGORY_ICON[l.category] || 'box'} size={16} color="#2563EB" />
+                              {COMPANY_CATEGORY_LABEL[l.category] || l.category}
+                            </span>
+                          </td>
+                          <td style={{ ...td, color: '#475569' }}>{l.destination || '—'}</td>
+                          <td style={td}>
+                            <span style={{
+                              fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '999px',
+                              background: l.status === 'active' ? '#F0FDF4' : '#FEF2F2',
+                              color: l.status === 'active' ? '#16a34a' : '#dc2626',
+                            }}>
+                              {l.status === 'active' ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td style={{ ...td, textAlign: 'right' as const }}>
+                            <button
+                              type="button"
+                              onClick={() => navigate('/my-listings')}
+                              style={{
+                                padding: '8px 18px', border: `1px solid ${COLORS.border}`, borderRadius: '8px',
+                                background: COLORS.card, color: '#2563EB', fontSize: '13px', fontWeight: 600,
+                                cursor: 'pointer', fontFamily: 'inherit',
+                              }}>
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div
+              onClick={() => navigate('/bookings-management')}
+              style={{ ...cardStyle, padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+              <div>
+                <p style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Bookings Received</p>
+                <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>View and manage all bookings for your business</p>
+              </div>
+              <Icon name="chevronRight" size={20} color={COLORS.textMuted} />
+            </div>
+          </div>
+        </CompanyLayout>
+      )
+    }
 
     return (
       <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
