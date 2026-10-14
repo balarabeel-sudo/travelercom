@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -15,6 +16,9 @@ const COLORS = {
   red: '#dc2626',
   orange: '#c2410c',
 }
+
+// Desktop accent (matches the company dashboard shell)
+const DESKTOP_BLUE = '#2563EB'
 
 type Booking = {
   id: string
@@ -38,6 +42,7 @@ type FilterTab = 'all' | 'pending' | 'completed' | 'cancelled'
 
 function BookingsManagement() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
   const [bookings, setBookings] = useState<Booking[]>([])
   const [search, setSearch] = useState('')
@@ -211,6 +216,282 @@ function BookingsManagement() {
     setAssignDone(true)
   }
 
+  // Booking detail sheet (phone) / dialog (desktop). Same content and actions on both.
+  const detailOverlay = selectedBooking && (
+    <div
+      onClick={() => setSelectedBooking(null)}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
+        display: 'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent: 'center', zIndex: 50
+      }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.card,
+          borderRadius: isDesktop ? '16px' : '20px 20px 0 0',
+          padding: isDesktop ? '28px' : '20px',
+          width: '100%',
+          maxWidth: isDesktop ? '560px' : '480px',
+          maxHeight: isDesktop ? '90vh' : undefined,
+          overflowY: isDesktop ? 'auto' : undefined,
+          boxSizing: 'border-box'
+        }}>
+        {!isDesktop && (
+          <div style={{ width: '36px', height: '4px', background: COLORS.border, borderRadius: '2px', margin: '0 auto 16px' }} />
+        )}
+
+        <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '2px' }}>{selectedBooking.customer_name || 'Unknown Customer'}</p>
+        {selectedBooking.customer_phone && (
+          <p style={{ fontSize: '12.5px', color: COLORS.textMuted, marginBottom: '14px' }}>{selectedBooking.customer_phone}</p>
+        )}
+
+        <DetailRow label="Ticket Code" value={selectedBooking.ticket_code} mono />
+        <DetailRow label="Listing" value={selectedBooking.services?.title || '—'} />
+        {selectedBooking.inventory_items?.name && (
+          <DetailRow label="Room / Seat" value={`${selectedBooking.inventory_items.name}${selectedBooking.assigned_unit_number ? ` #${selectedBooking.assigned_unit_number}` : ''}`} />
+        )}
+        {(selectedBooking.check_in_date || selectedBooking.check_out_date) && (
+          <DetailRow
+            label="Dates"
+            value={`${selectedBooking.check_in_date ? new Date(selectedBooking.check_in_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'} → ${selectedBooking.check_out_date ? new Date(selectedBooking.check_out_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}`}
+          />
+        )}
+        <DetailRow label="Amount Paid" value={`₦${Number(selectedBooking.amount_paid).toLocaleString()}`} />
+        <DetailRow label="Source" value={selectedBooking.booking_source === 'offline' ? 'Offline (Add Guest)' : 'Online'} />
+        {selectedBooking.payment_method && (
+          <DetailRow label="Payment Method" value={selectedBooking.payment_method.toUpperCase()} />
+        )}
+        <DetailRow label="Booked On" value={new Date(selectedBooking.created_at).toLocaleString()} />
+
+        {getTab(selectedBooking) === 'pending' && (
+          <div
+            onClick={() => !cancelling && confirm('Cancel this booking and refund the customer?') && handleCancelBooking()}
+            style={{
+              marginTop: '14px', background: cancelling ? '#94a3b8' : '#fef2f2', color: COLORS.red, textAlign: 'center',
+              padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: cancelling ? 'not-allowed' : 'pointer',
+              border: `1px solid ${COLORS.red}`
+            }}>
+            {cancelling ? 'Cancelling...' : 'Cancel Booking & Refund Customer'}
+          </div>
+        )}
+
+        {staffList.length > 0 && !assignOpen && (
+          <div
+            onClick={openAssignPanel}
+            style={{
+              marginTop: '10px', background: '#F5F3FF', color: '#7C3AED', textAlign: 'center',
+              padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+              border: '1px solid #DDD6FE'
+            }}>
+            Assign to Staff
+          </div>
+        )}
+
+        {assignOpen && !assignDone && (
+          <div style={{ marginTop: '10px', background: '#F8FAFC', borderRadius: '10px', padding: '12px', border: `1px solid ${COLORS.border}` }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '8px' }}>Assign to Staff</p>
+
+            <select value={assignTo} onChange={(e) => setAssignTo(e.target.value)} style={{
+              width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`,
+              fontSize: '12.5px', marginBottom: '8px', background: '#fff',
+            }}>
+              {staffList.map((s) => (
+                <option key={s.id} value={s.id}>{s.full_name}</option>
+              ))}
+            </select>
+
+            <input value={assignTitle} onChange={(e) => setAssignTitle(e.target.value)} placeholder="Task title"
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '12.5px', marginBottom: '8px', boxSizing: 'border-box' }} />
+
+            <select value={assignPriority} onChange={(e) => setAssignPriority(e.target.value as any)} style={{
+              width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`,
+              fontSize: '12.5px', marginBottom: '10px', background: '#fff',
+            }}>
+              <option value="high">High priority</option>
+              <option value="medium">Medium priority</option>
+              <option value="normal">Normal priority</option>
+              <option value="low">Low priority</option>
+            </select>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <div onClick={() => setAssignOpen(false)} style={{
+                flex: 1, textAlign: 'center', padding: '10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 700,
+                color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, cursor: 'pointer',
+              }}>Cancel</div>
+              <div onClick={() => !assignSaving && handleAssignTask()} style={{
+                flex: 1, textAlign: 'center', padding: '10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 700,
+                color: '#fff', background: assignSaving ? '#94a3b8' : '#7C3AED', cursor: assignSaving ? 'not-allowed' : 'pointer',
+              }}>{assignSaving ? 'Assigning...' : 'Assign'}</div>
+            </div>
+          </div>
+        )}
+
+        {assignDone && (
+          <div style={{ marginTop: '10px', background: '#DCFCE7', color: COLORS.green, textAlign: 'center', padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Icon name="checkCircle" size={15} color={COLORS.green} /> Task assigned
+          </div>
+        )}
+
+        <div
+          onClick={() => { setSelectedBooking(null); setAssignOpen(false); setAssignDone(false) }}
+          style={{
+            marginTop: '10px', background: isDesktop ? DESKTOP_BLUE : COLORS.primary, color: 'white', textAlign: 'center',
+            padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer'
+          }}>
+          Close
+        </div>
+      </div>
+    </div>
+  )
+
+  // ------------------------------------------------------------------
+  // Desktop layout
+  // ------------------------------------------------------------------
+  if (isDesktop) {
+    const th = {
+      textAlign: 'left' as const,
+      padding: '14px 20px',
+      fontSize: '13px',
+      fontWeight: 600,
+      color: COLORS.textMuted,
+      borderBottom: `1px solid ${COLORS.border}`,
+      background: '#F8FAFC',
+      whiteSpace: 'nowrap' as const,
+    }
+    const td = {
+      padding: '16px 20px',
+      fontSize: '14px',
+      color: COLORS.text,
+      borderBottom: `1px solid ${COLORS.border}`,
+      verticalAlign: 'middle' as const,
+    }
+
+    const summary: { key: FilterTab; label: string; value: number; color: string }[] = [
+      { key: 'all', label: 'All bookings', value: counts.all, color: '#0F172A' },
+      { key: 'pending', label: 'Pending', value: counts.pending, color: COLORS.orange },
+      { key: 'completed', label: 'Completed', value: counts.completed, color: COLORS.green },
+      { key: 'cancelled', label: 'Cancelled', value: counts.cancelled, color: COLORS.red },
+    ]
+
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Bookings</h1>
+            <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>
+              Manage and track every booking for your business.
+            </p>
+          </div>
+          <input
+            type="text"
+            placeholder="Search by customer or ticket code"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              width: '340px', padding: '12px 14px', border: `1px solid ${COLORS.border}`,
+              borderRadius: '10px', fontSize: '14px', background: COLORS.card, boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+          {summary.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setFilter(s.key)}
+              style={{
+                textAlign: 'left', padding: '18px 20px', background: COLORS.card, borderRadius: '14px',
+                border: filter === s.key ? `2px solid ${DESKTOP_BLUE}` : `1px solid ${COLORS.border}`,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              <p style={{ fontSize: '28px', fontWeight: 800, color: s.color, margin: 0 }}>{s.value}</p>
+              <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>{s.label}</p>
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <p style={{ textAlign: 'center', color: COLORS.textMuted, fontSize: '14px', padding: '40px 0' }}>Loading...</p>
+        ) : filtered.length === 0 ? (
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '56px 30px', textAlign: 'center' as const }}>
+            <p style={{ fontSize: '14px', color: COLORS.textMuted }}>No bookings found</p>
+          </div>
+        ) : (
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
+                <thead>
+                  <tr>
+                    <th style={th}>Customer</th>
+                    <th style={th}>Ticket code</th>
+                    <th style={th}>Listing</th>
+                    <th style={th}>Booked on</th>
+                    <th style={th}>Stay dates</th>
+                    <th style={{ ...th, textAlign: 'right' as const }}>Amount</th>
+                    <th style={th}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((b) => {
+                    const badge = statusBadge(b)
+                    const roomType = b.inventory_items?.name
+                    return (
+                      <tr
+                        key={b.id}
+                        onClick={() => setSelectedBooking(b)}
+                        style={{ cursor: 'pointer' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
+                        <td style={td}>
+                          <p style={{ fontWeight: 700, margin: 0 }}>{b.customer_name || 'Unknown Customer'}</p>
+                          {b.customer_phone && (
+                            <p style={{ fontSize: '12.5px', color: COLORS.textMuted, margin: '2px 0 0' }}>{b.customer_phone}</p>
+                          )}
+                        </td>
+                        <td style={{ ...td, fontFamily: 'monospace', color: '#475569' }}>{b.ticket_code}</td>
+                        <td style={td}>
+                          <p style={{ margin: 0 }}>{b.services?.title || '—'}</p>
+                          {roomType && (
+                            <p style={{ fontSize: '12.5px', color: COLORS.textMuted, margin: '2px 0 0' }}>{roomType}</p>
+                          )}
+                        </td>
+                        <td style={{ ...td, color: '#475569' }}>
+                          {new Date(b.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td style={{ ...td, color: '#475569' }}>
+                          {b.check_in_date || b.check_out_date
+                            ? `${b.check_in_date ? new Date(b.check_in_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'} → ${b.check_out_date ? new Date(b.check_out_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}`
+                            : '—'}
+                        </td>
+                        <td style={{ ...td, textAlign: 'right' as const, fontWeight: 800 }}>
+                          ₦{Number(b.amount_paid).toLocaleString()}
+                        </td>
+                        <td style={td}>
+                          <span style={{
+                            fontSize: '12px', fontWeight: 700, color: badge.color, background: badge.bg,
+                            padding: '4px 12px', borderRadius: '999px',
+                          }}>
+                            {badge.text}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {detailOverlay}
+      </div>
+    )
+  }
+
+  // ------------------------------------------------------------------
+  // Mobile layout (unchanged)
+  // ------------------------------------------------------------------
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
 
@@ -335,124 +616,7 @@ function BookingsManagement() {
         )}
       </div>
 
-      {selectedBooking && (
-        <div
-          onClick={() => setSelectedBooking(null)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 50
-          }}>
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: COLORS.card, borderRadius: '20px 20px 0 0', padding: '20px',
-              width: '100%', maxWidth: '480px', boxSizing: 'border-box'
-            }}>
-            <div style={{ width: '36px', height: '4px', background: COLORS.border, borderRadius: '2px', margin: '0 auto 16px' }} />
-
-            <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, marginBottom: '2px' }}>{selectedBooking.customer_name || 'Unknown Customer'}</p>
-            {selectedBooking.customer_phone && (
-              <p style={{ fontSize: '12.5px', color: COLORS.textMuted, marginBottom: '14px' }}>{selectedBooking.customer_phone}</p>
-            )}
-
-            <DetailRow label="Ticket Code" value={selectedBooking.ticket_code} mono />
-            <DetailRow label="Listing" value={selectedBooking.services?.title || '—'} />
-            {selectedBooking.inventory_items?.name && (
-              <DetailRow label="Room / Seat" value={`${selectedBooking.inventory_items.name}${selectedBooking.assigned_unit_number ? ` #${selectedBooking.assigned_unit_number}` : ''}`} />
-            )}
-            {(selectedBooking.check_in_date || selectedBooking.check_out_date) && (
-              <DetailRow
-                label="Dates"
-                value={`${selectedBooking.check_in_date ? new Date(selectedBooking.check_in_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'} → ${selectedBooking.check_out_date ? new Date(selectedBooking.check_out_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}`}
-              />
-            )}
-            <DetailRow label="Amount Paid" value={`₦${Number(selectedBooking.amount_paid).toLocaleString()}`} />
-            <DetailRow label="Source" value={selectedBooking.booking_source === 'offline' ? 'Offline (Add Guest)' : 'Online'} />
-            {selectedBooking.payment_method && (
-              <DetailRow label="Payment Method" value={selectedBooking.payment_method.toUpperCase()} />
-            )}
-            <DetailRow label="Booked On" value={new Date(selectedBooking.created_at).toLocaleString()} />
-
-            {getTab(selectedBooking) === 'pending' && (
-              <div
-                onClick={() => !cancelling && confirm('Cancel this booking and refund the customer?') && handleCancelBooking()}
-                style={{
-                  marginTop: '14px', background: cancelling ? '#94a3b8' : '#fef2f2', color: COLORS.red, textAlign: 'center',
-                  padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: cancelling ? 'not-allowed' : 'pointer',
-                  border: `1px solid ${COLORS.red}`
-                }}>
-                {cancelling ? 'Cancelling...' : 'Cancel Booking & Refund Customer'}
-              </div>
-            )}
-
-            {staffList.length > 0 && !assignOpen && (
-              <div
-                onClick={openAssignPanel}
-                style={{
-                  marginTop: '10px', background: '#F5F3FF', color: '#7C3AED', textAlign: 'center',
-                  padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
-                  border: '1px solid #DDD6FE'
-                }}>
-                Assign to Staff
-              </div>
-            )}
-
-            {assignOpen && !assignDone && (
-              <div style={{ marginTop: '10px', background: '#F8FAFC', borderRadius: '10px', padding: '12px', border: `1px solid ${COLORS.border}` }}>
-                <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text, marginBottom: '8px' }}>Assign to Staff</p>
-
-                <select value={assignTo} onChange={(e) => setAssignTo(e.target.value)} style={{
-                  width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`,
-                  fontSize: '12.5px', marginBottom: '8px', background: '#fff',
-                }}>
-                  {staffList.map((s) => (
-                    <option key={s.id} value={s.id}>{s.full_name}</option>
-                  ))}
-                </select>
-
-                <input value={assignTitle} onChange={(e) => setAssignTitle(e.target.value)} placeholder="Task title"
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '12.5px', marginBottom: '8px' }} />
-
-                <select value={assignPriority} onChange={(e) => setAssignPriority(e.target.value as any)} style={{
-                  width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`,
-                  fontSize: '12.5px', marginBottom: '10px', background: '#fff',
-                }}>
-                  <option value="high">High priority</option>
-                  <option value="medium">Medium priority</option>
-                  <option value="normal">Normal priority</option>
-                  <option value="low">Low priority</option>
-                </select>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <div onClick={() => setAssignOpen(false)} style={{
-                    flex: 1, textAlign: 'center', padding: '10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 700,
-                    color: COLORS.textMuted, border: `1px solid ${COLORS.border}`, cursor: 'pointer',
-                  }}>Cancel</div>
-                  <div onClick={() => !assignSaving && handleAssignTask()} style={{
-                    flex: 1, textAlign: 'center', padding: '10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 700,
-                    color: '#fff', background: assignSaving ? '#94a3b8' : '#7C3AED', cursor: assignSaving ? 'not-allowed' : 'pointer',
-                  }}>{assignSaving ? 'Assigning...' : 'Assign'}</div>
-                </div>
-              </div>
-            )}
-
-            {assignDone && (
-              <div style={{ marginTop: '10px', background: '#DCFCE7', color: COLORS.green, textAlign: 'center', padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                <Icon name="checkCircle" size={15} color={COLORS.green} /> Task assigned
-              </div>
-            )}
-
-            <div
-              onClick={() => { setSelectedBooking(null); setAssignOpen(false); setAssignDone(false) }}
-              style={{
-                marginTop: '10px', background: COLORS.primary, color: 'white', textAlign: 'center',
-                padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer'
-              }}>
-              Close
-            </div>
-          </div>
-        </div>
-      )}
+      {detailOverlay}
     </div>
   )
 }
