@@ -5,6 +5,7 @@ import Icon from './Icons'
 import { findAvailableUnit } from './inventoryUtils'
 import { DetailsSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   bg: '#F8FAFC',
@@ -48,6 +49,7 @@ type InvType = { id: string; name: string; price: number; weekendPrice: number |
 
 export default function AddGuest() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
   const [netError, setNetError] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -352,7 +354,7 @@ export default function AddGuest() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+      <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '860px' : '480px', margin: '0 auto' }}>
         <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Guest</h1>
         </div>
@@ -363,7 +365,7 @@ export default function AddGuest() {
 
   if (netError) {
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+      <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '860px' : '480px', margin: '0 auto' }}>
         <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Guest</h1>
         </div>
@@ -373,11 +375,15 @@ export default function AddGuest() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
+    <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '860px' : '480px', margin: '0 auto', paddingBottom: '40px' }}>
 
       <div style={{
-        padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '14px',
-        background: COLORS.card, position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+        padding: isDesktop ? '20px 24px' : '18px 20px', display: 'flex', alignItems: 'center', gap: '14px',
+        background: COLORS.card, position: isDesktop ? 'static' : 'sticky', top: 0, zIndex: 10,
+        boxShadow: isDesktop ? 'none' : '0 1px 4px rgba(0,0,0,0.05)',
+        border: isDesktop ? `1px solid ${COLORS.border}` : undefined,
+        borderRadius: isDesktop ? '14px' : undefined,
+        marginBottom: isDesktop ? '20px' : undefined,
       }}>
         <div onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}>
           <Icon name="arrowLeft" size={22} color={COLORS.text} />
@@ -388,7 +394,7 @@ export default function AddGuest() {
         </div>
       </div>
 
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: isDesktop ? '0' : '16px' }}>
 
         {successCode && (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '14px', padding: '16px', marginBottom: '16px', textAlign: 'center' }}>
