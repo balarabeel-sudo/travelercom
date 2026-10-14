@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   bg: '#F8FAFC',
@@ -18,6 +19,7 @@ const COLORS = {
 
 export default function CompanyMenu() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [businessName, setBusinessName] = useState('')
   const [companyPlan, setCompanyPlan] = useState<'free' | 'business_suite'>('free')
 
@@ -53,6 +55,143 @@ export default function CompanyMenu() {
     { icon: 'info', iconBg: '#DBEAFE', iconColor: COLORS.primary, label: 'About Traveler.com', sub: 'Learn more about us', action: () => navigate('/about') },
   ]
 
+  const upgradeFeatures = [
+    { title: 'Manage all activities', text: 'Control bookings, inventory & pricing in one place.' },
+    { title: 'Advanced analytics', text: 'Deep insights and reports to grow your business.' },
+    { title: 'Priority support', text: 'Get faster help from our dedicated team.' },
+    { title: 'More visibility', text: 'Feature your property to more customers.' },
+  ]
+
+  // ------------------------------------------------------------------
+  // Desktop layout
+  // ------------------------------------------------------------------
+  if (isDesktop) {
+    return (
+      <div>
+        <div style={{
+          background: 'linear-gradient(100deg, #4C1D95, #6D28D9 60%, #7C3AED)',
+          borderRadius: '16px', padding: '28px 32px', color: 'white',
+          display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '32px',
+        }}>
+          <div style={{
+            width: '60px', height: '60px', borderRadius: '16px', background: 'rgba(255,255,255,0.18)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <Icon name="plane" size={28} color="white" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: '24px', fontWeight: 800, margin: 0 }}>Welcome back, {businessName || 'Company'}</p>
+            <p style={{ fontSize: '15px', color: '#DDD6FE', margin: '6px 0 0' }}>Here's what's happening with your business today.</p>
+          </div>
+          {companyPlan === 'free' && (
+            <button
+              type="button"
+              onClick={() => navigate('/support')}
+              style={{
+                padding: '12px 24px', background: 'white', color: '#4C1D95', border: 'none',
+                borderRadius: '10px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              Upgrade Plan
+            </button>
+          )}
+        </div>
+
+        <h2 style={{ fontSize: '22px', fontWeight: 800, color: COLORS.text, margin: '0 0 16px' }}>Account and support</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={item.action}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '16px', padding: '20px', textAlign: 'left',
+                background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px',
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              <div style={{
+                width: '48px', height: '48px', borderRadius: '12px', background: item.iconBg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <Icon name={item.icon} size={22} color={item.iconColor} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '15.5px', fontWeight: 700, color: COLORS.text, margin: 0 }}>{item.label}</p>
+                <p style={{ fontSize: '13px', color: COLORS.textMuted, margin: '3px 0 0' }}>{item.sub}</p>
+              </div>
+              <Icon name="chevronRight" size={18} color={COLORS.textMuted} />
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '16px', padding: '20px', textAlign: 'left',
+              background: COLORS.card, border: `1px solid #FECACA`, borderRadius: '14px',
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+            <div style={{
+              width: '48px', height: '48px', borderRadius: '12px', background: '#FEE2E2',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <Icon name="logOut" size={22} color={COLORS.red} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: '15.5px', fontWeight: 700, color: COLORS.red, margin: 0 }}>Logout</p>
+              <p style={{ fontSize: '13px', color: COLORS.textMuted, margin: '3px 0 0' }}>Sign out of your account</p>
+            </div>
+            <Icon name="chevronRight" size={18} color={COLORS.red} />
+          </button>
+        </div>
+
+        {companyPlan === 'free' && (
+          <div style={{
+            background: 'linear-gradient(135deg, #2E1065, #4C1D95)', borderRadius: '18px', padding: '32px 36px',
+            color: 'white', display: 'flex', gap: '40px', alignItems: 'center', flexWrap: 'wrap',
+          }}>
+            <div style={{ flex: '1 1 320px' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#F59E0B', color: '#2E1065',
+                fontSize: '12px', fontWeight: 800, padding: '5px 12px', borderRadius: '8px', marginBottom: '14px',
+              }}>
+                <Icon name="crown" size={13} color="#2E1065" /> PREMIUM
+              </span>
+              <p style={{ fontSize: '30px', fontWeight: 800, margin: '0 0 6px' }}>
+                Upgrade to <span style={{ color: '#F59E0B' }}>Business Suite</span>
+              </p>
+              <p style={{ fontSize: '15px', color: '#DDD6FE', margin: '0 0 22px' }}>Unlock more power. Manage better. Grow faster.</p>
+              <button
+                type="button"
+                onClick={() => navigate('/support')}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#F59E0B', color: '#2E1065',
+                  padding: '13px 28px', borderRadius: '12px', fontWeight: 800, fontSize: '15px', border: 'none',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                Upgrade Now <Icon name="chevronRight" size={16} color="#2E1065" />
+              </button>
+            </div>
+            <div style={{ flex: '2 1 480px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px 28px' }}>
+              {upgradeFeatures.map((f) => (
+                <div key={f.title} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <div style={{ flexShrink: 0, marginTop: '1px' }}>
+                    <Icon name="checkCircle" size={20} color="#F59E0B" />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '15px', fontWeight: 700, color: 'white', margin: 0 }}>{f.title}</p>
+                    <p style={{ fontSize: '13px', color: '#C4B5FD', margin: '3px 0 0', lineHeight: 1.5 }}>{f.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ------------------------------------------------------------------
+  // Mobile layout (unchanged)
+  // ------------------------------------------------------------------
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
 
