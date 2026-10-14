@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import { ListCardSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -17,6 +18,9 @@ const COLORS = {
   red: '#dc2626',
   redBg: '#FEF2F2',
 }
+
+// Desktop accent (matches the company dashboard shell)
+const DESKTOP_BLUE = '#2563EB'
 
 type Listing = {
   id: string
@@ -45,6 +49,16 @@ const CATEGORY_ICON: Record<string, string> = {
   event_center: 'tent',
 }
 
+const CATEGORY_LABEL: Record<string, string> = {
+  hotel: 'Hotels',
+  bus: 'Buses',
+  train: 'Trains',
+  flight: 'Flights',
+  tour: 'Tours',
+  event_center: 'Event Centers',
+  vehicle_rental: 'Vehicle Rentals',
+}
+
 // Bus/Train/Flight still share the original transport form; Hotel/Tour/Event Center
 // each got their own dedicated listing form once AddListing.tsx grew to cover 6
 // very different category shapes.
@@ -62,6 +76,7 @@ function formatNaira(n: number) {
 
 export default function MyListings() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [companyCategory, setCompanyCategory] = useState<string | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
@@ -69,6 +84,7 @@ export default function MyListings() {
   const [loading, setLoading] = useState(true)
   const [netError, setNetError] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -134,6 +150,196 @@ export default function MyListings() {
     load()
   }
 
+  // One line of detail per listing, shared by the desktop table.
+  const detailLine = (l: Listing): string => {
+    if (l.category === 'hotel' && roomTypeCounts[l.id]) {
+      const c = roomTypeCounts[l.id]
+      return `${c.types} room type${c.types === 1 ? '' : 's'} · ${c.rooms} rooms`
+    }
+    if ((l.category === 'bus' || l.category === 'tour' || l.category === 'event_center') && l.departure_time) {
+      return `${formatDateTime(l.departure_time)} · ${formatNaira(l.price)}`
+    }
+    return formatNaira(l.price)
+  }
+
+  // ------------------------------------------------------------------
+  // Desktop layout
+  // ------------------------------------------------------------------
+  if (isDesktop) {
+    const q = query.trim().toLowerCase()
+    const visible = listings.filter((l) =>
+      !q ||
+      l.title.toLowerCase().includes(q) ||
+      (l.destination || '').toLowerCase().includes(q) ||
+      (CATEGORY_LABEL[l.category] || l.category).toLowerCase().includes(q)
+    )
+
+    const th = {
+      textAlign: 'left' as const,
+      padding: '14px 20px',
+      fontSize: '13px',
+      fontWeight: 600,
+      color: COLORS.textMuted,
+      borderBottom: `1px solid ${COLORS.border}`,
+      background: '#F8FAFC',
+      whiteSpace: 'nowrap' as const,
+    }
+    const td = {
+      padding: '16px 20px',
+      fontSize: '14px',
+      color: COLORS.text,
+      borderBottom: `1px solid ${COLORS.border}`,
+      verticalAlign: 'middle' as const,
+    }
+
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>My Listings</h1>
+            <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>
+              {listings.length} listing{listings.length === 1 ? '' : 's'}
+            </p>
+          </div>
+          <input
+            type="text"
+            placeholder="Search listings"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{
+              width: '300px', padding: '12px 14px', border: `1px solid ${COLORS.border}`,
+              borderRadius: '10px', fontSize: '14px', background: COLORS.card, boxSizing: 'border-box',
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => navigate(addListingRouteFor(companyCategory))}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px',
+              background: DESKTOP_BLUE, color: 'white', border: 'none', borderRadius: '10px',
+              fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+            <Icon name="plus" size={16} color="white" />
+            Add Listing
+          </button>
+        </div>
+
+        {loading ? (
+          <ListCardSkeleton count={4} />
+        ) : netError ? (
+          <NetworkError onRetry={load} />
+        ) : listings.length === 0 ? (
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '60px 30px', textAlign: 'center' as const }}>
+            <p style={{ fontSize: '15px', color: COLORS.textMuted, marginBottom: '16px' }}>You haven't added any listings yet.</p>
+            <button
+              type="button"
+              onClick={() => navigate(addListingRouteFor(companyCategory))}
+              style={{
+                padding: '12px 22px', background: DESKTOP_BLUE, color: 'white', border: 'none',
+                borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              Add your first listing
+            </button>
+          </div>
+        ) : visible.length === 0 ? (
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '48px 30px', textAlign: 'center' as const }}>
+            <p style={{ fontSize: '14px', color: COLORS.textMuted }}>No listings match your search.</p>
+          </div>
+        ) : (
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+                <thead>
+                  <tr>
+                    <th style={th}>Listing</th>
+                    <th style={th}>Type</th>
+                    <th style={th}>Details</th>
+                    <th style={th}>Location</th>
+                    <th style={th}>Status</th>
+                    <th style={{ ...th, textAlign: 'right' as const }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((l) => (
+                    <tr key={l.id}>
+                      <td style={td}>
+                        <div
+                          onClick={() => navigate(`${addListingRouteFor(l.category)}?edit=${l.id}`)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer' }}>
+                          <div style={{
+                            width: '64px', height: '48px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0,
+                            background: l.photo_url ? '#E2E8F0' : 'linear-gradient(135deg, #F97316, #0EA5E9)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {l.photo_url ? (
+                              <img src={l.photo_url} alt={l.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <Icon name={CATEGORY_ICON[l.category] || 'box'} size={22} color="white" />
+                            )}
+                          </div>
+                          <span style={{ fontWeight: 700, color: COLORS.text }}>{l.title}</span>
+                        </div>
+                      </td>
+                      <td style={{ ...td, color: '#475569' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                          <Icon name={CATEGORY_ICON[l.category] || 'box'} size={16} color={DESKTOP_BLUE} />
+                          {CATEGORY_LABEL[l.category] || l.category}
+                        </span>
+                      </td>
+                      <td style={{ ...td, color: '#475569' }}>{detailLine(l)}</td>
+                      <td style={{ ...td, color: '#475569' }}>{l.destination || '—'}</td>
+                      <td style={td}>
+                        <span style={{
+                          fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '999px',
+                          background: l.status === 'active' ? COLORS.greenBg : COLORS.redBg,
+                          color: l.status === 'active' ? COLORS.green : COLORS.red,
+                        }}>
+                          {l.status === 'active' ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td style={{ ...td, textAlign: 'right' as const }}>
+                        <div style={{ display: 'inline-flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`${addListingRouteFor(l.category)}?edit=${l.id}`)}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+                              border: `1px solid ${COLORS.border}`, borderRadius: '8px', background: COLORS.card,
+                              color: '#334155', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                            }}>
+                            <Icon name="edit" size={14} color={COLORS.textMuted} />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deletingId === l.id}
+                            onClick={() => handleDelete(l)}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+                              border: `1px solid #FECACA`, borderRadius: '8px', background: COLORS.card,
+                              color: COLORS.red, fontSize: '13px', fontWeight: 600,
+                              cursor: deletingId === l.id ? 'default' : 'pointer',
+                              opacity: deletingId === l.id ? 0.4 : 1, fontFamily: 'inherit',
+                            }}>
+                            <Icon name="trash" size={14} color={COLORS.red} />
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ------------------------------------------------------------------
+  // Mobile layout (unchanged)
+  // ------------------------------------------------------------------
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
       <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
