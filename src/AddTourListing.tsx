@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useIsDesktop from './useIsDesktop'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
@@ -23,6 +24,7 @@ const AMENITIES_LIST = Object.keys(AMENITY_ICON)
 
 function AddTourListing() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [searchParams] = useSearchParams()
   const editId = searchParams.get('edit')
   const [loading, setLoading] = useState(true)
@@ -212,7 +214,7 @@ function AddTourListing() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+      <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '860px' : '480px', margin: '0 auto' }}>
         <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Tour Listing</h1>
         </div>
@@ -223,7 +225,7 @@ function AddTourListing() {
 
   if (netError) {
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
+      <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '860px' : '480px', margin: '0 auto' }}>
         <div style={{ padding: '18px 20px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Tour Listing</h1>
         </div>
@@ -234,8 +236,8 @@ function AddTourListing() {
 
   if (approvalStatus !== 'approved') {
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto' }}>
-        <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+      <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '860px' : '480px', margin: '0 auto' }}>
+        <div style={{ padding: isDesktop ? '20px 24px' : '18px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, boxShadow: isDesktop ? 'none' : '0 1px 4px rgba(0,0,0,0.05)', border: isDesktop ? `1px solid ${COLORS.border}` : undefined, borderRadius: isDesktop ? '14px' : undefined, marginBottom: isDesktop ? '20px' : undefined }}>
           <span onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Add Tour Listing</h1>
         </div>
@@ -250,7 +252,7 @@ function AddTourListing() {
 
   if (success) {
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={{ minHeight: isDesktop ? '70vh' : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '860px' : '480px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}><Icon name="checkCircle" size={44} color={COLORS.green} /></div>
           <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.green, marginBottom: '8px' }}>{editId ? 'Listing Updated!' : 'Listing Added!'}</p>
@@ -263,13 +265,13 @@ function AddTourListing() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
-      <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+    <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '860px' : '480px', margin: '0 auto', paddingBottom: '40px' }}>
+      <div style={{ padding: isDesktop ? '20px 24px' : '18px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, boxShadow: isDesktop ? 'none' : '0 1px 4px rgba(0,0,0,0.05)', border: isDesktop ? `1px solid ${COLORS.border}` : undefined, borderRadius: isDesktop ? '14px' : undefined, marginBottom: isDesktop ? '20px' : undefined }}>
         <span onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
         <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>{editId ? 'Edit Tour Listing' : 'Add Tour Listing'}</h1>
       </div>
 
-      <div style={{ padding: '20px 16px' }}>
+      <div style={{ padding: isDesktop ? '0' : '20px 16px' }}>
         <div style={{ background: COLORS.card, borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: COLORS.primary }}>
           <Icon name="map" size={14} color={COLORS.primary} /> Tour
         </div>
