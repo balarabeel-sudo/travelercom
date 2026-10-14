@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { HashRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import PushNotificationSetup from './PushNotificationSetup'
@@ -98,7 +98,19 @@ function InviteRedirectListener() {
 function AppShell() {
   const isDesktop = useIsDesktop()
   const { pathname } = useLocation()
-  const wide = isDesktop && isCompanyDesktopPath(pathname)
+  // Company accounts get the wide desktop dashboard on /home too. /home is shared with
+  // personal accounts, so the account type decides (read from the signed-in user).
+  const [isCompanyAccount, setIsCompanyAccount] = useState(false)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setIsCompanyAccount(data.session?.user?.user_metadata?.account_type === 'company')
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsCompanyAccount(session?.user?.user_metadata?.account_type === 'company')
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
+  const wide = isDesktop && (isCompanyDesktopPath(pathname) || (isCompanyAccount && pathname === '/home'))
 
   return (
     <>
@@ -195,7 +207,7 @@ function AppShell() {
        <Route path="/support" element={<Support />} />
        <Route path="/settings" element={<Settings />} />
         <Route path="/customer-settings" element={<CustomerSettings />} />
-        <Route path="/add-guest" element={<AddGuest />} />
+        <Route path="/add-guest" element={<CompanyLayout><AddGuest /></CompanyLayout>} />
         <Route path="/flights" element={<Flights />} />
         <Route path="/flight/:id" element={<FlightDetails />} />
         <Route path="/bus" element={<Bus />} />
