@@ -170,13 +170,13 @@ function AppShell() {
         <Route path="/account" element={<Account />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/add-listing-router" element={<AddListingRouter />} />
-        <Route path="/add-bus-listing" element={<AddBusListing />} />
-        <Route path="/add-listing" element={<AddListing />} />
-        <Route path="/add-hotel-listing" element={<AddHotelListing />} />
-        <Route path="/add-tour-listing" element={<AddTourListing />} />
-        <Route path="/add-event-center-listing" element={<AddEventCenterListing />} />
-        <Route path="/add-vehicle-rental-listing" element={<AddVehicleRentalListing />} />
-        <Route path="/add-flight-listing" element={<AddFlightListing />} />
+        <Route path="/add-bus-listing" element={<CompanyLayout><AddBusListing /></CompanyLayout>} />
+        <Route path="/add-listing" element={<CompanyLayout><AddListing /></CompanyLayout>} />
+        <Route path="/add-hotel-listing" element={<CompanyLayout><AddHotelListing /></CompanyLayout>} />
+        <Route path="/add-tour-listing" element={<CompanyLayout><AddTourListing /></CompanyLayout>} />
+        <Route path="/add-event-center-listing" element={<CompanyLayout><AddEventCenterListing /></CompanyLayout>} />
+        <Route path="/add-vehicle-rental-listing" element={<CompanyLayout><AddVehicleRentalListing /></CompanyLayout>} />
+        <Route path="/add-flight-listing" element={<CompanyLayout><AddFlightListing /></CompanyLayout>} />
         <Route path="/my-listings" element={<CompanyLayout><MyListings /></CompanyLayout>} />
         <Route path="/hotels" element={<Hotels />} />
         <Route path="/wallet" element={<Wallet />} />
