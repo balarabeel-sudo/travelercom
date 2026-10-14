@@ -210,6 +210,24 @@ let cachedCompanyName = ''
 // Styles (colours are CSS variables at the top so they are easy to change)
 // ---------------------------------------------------------------------------
 const CSS = `
+/* While the company shell is on screen, make the app frame full width.
+   This is a safety net: it works even if the phone-style frame in App.tsx
+   still thinks the page should be 430px wide. The style tag is removed when
+   the shell unmounts, so customer pages are not affected. */
+.tc-app-shell {
+  display: block !important;
+  padding: 0 !important;
+  background: #F8FAFC !important;
+}
+.tc-app-frame {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 100vh !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  box-shadow: none !important;
+}
 .tcl-root {
   --tcl-primary: #2563EB;
   --tcl-primary-soft: #EFF6FF;
