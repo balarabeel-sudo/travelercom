@@ -511,6 +511,17 @@ if (accountType === 'company') {
       return (
         <CompanyLayout>
           <div>
+            <style>{`
+              .tc-kpi-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 32px; }
+              .tc-qa-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+              @media (min-width: 1200px) {
+                .tc-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+                .tc-qa-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+              }
+              @media (min-width: 1560px) {
+                .tc-kpi-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+              }
+            `}</style>
             <div style={{
               background: 'linear-gradient(100deg, #4C1D95, #6D28D9 60%, #7C3AED)',
               borderRadius: '16px', padding: '28px 32px', color: 'white',
@@ -642,7 +653,7 @@ if (accountType === 'company') {
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '16px', marginBottom: '32px' }}>
+            <div className="tc-kpi-grid">
               {analytics.map((a, i) => {
                 const change = a.statKey && periodStats ? periodStats.changes[a.statKey as keyof typeof periodStats.changes] : null
                 const isListings = a.label === 'Active Listings'
@@ -686,7 +697,7 @@ if (accountType === 'company') {
                   <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Quick Actions</h2>
                   {addListingButton}
                 </div>
-                <div style={{ ...cardStyle, padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '16px' }}>
+                <div className="tc-qa-grid" style={{ ...cardStyle, padding: '20px' }}>
                   {quickActions.map((q) => (
                     <button
                       key={q.label}
