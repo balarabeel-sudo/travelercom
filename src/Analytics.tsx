@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useIsDesktop from './useIsDesktop'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
@@ -77,6 +78,7 @@ import VehicleRentalAnalytics from './VehicleRentalAnalytics'
 
 export default function Analytics() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const location = useLocation()
   const [resolving, setResolving] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -169,7 +171,7 @@ export default function Analytics() {
 
   if (resolving) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
+      <div style={{ minHeight: isDesktop ? '60vh' : '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
         Loading Analytics...
       </div>
     )
@@ -177,7 +179,7 @@ export default function Analytics() {
 
   if (!companyId) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted, padding: '20px', textAlign: 'center' as const }}>
+      <div style={{ minHeight: isDesktop ? '60vh' : '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted, padding: '20px', textAlign: 'center' as const }}>
         No company found for this account.
       </div>
     )
@@ -185,7 +187,7 @@ export default function Analytics() {
 
   if (noAccess) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted, padding: '20px', textAlign: 'center' as const }}>
+      <div style={{ minHeight: isDesktop ? '60vh' : '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted, padding: '20px', textAlign: 'center' as const }}>
         Your role does not include access to analytics for this company.
       </div>
     )
@@ -223,6 +225,7 @@ export default function Analytics() {
 // category-specific analytics page.
 function GenericAnalytics({ companyId }: { companyId: string }) {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const { goBack } = useBackTo('/home')
   const [loading, setLoading] = useState(true)
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -273,7 +276,7 @@ function GenericAnalytics({ companyId }: { companyId: string }) {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
+      <div style={{ minHeight: isDesktop ? '60vh' : '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
         Loading Analytics...
       </div>
     )
@@ -381,7 +384,7 @@ function GenericAnalytics({ companyId }: { companyId: string }) {
   const filterLabel = filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : 'Last 12 Months'
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
+    <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '1040px' : '480px', margin: '0 auto', paddingBottom: isDesktop ? '0' : '40px' }}>
 
       <div style={{
         padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
