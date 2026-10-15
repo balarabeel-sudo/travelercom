@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useIsDesktop from './useIsDesktop'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
@@ -25,6 +26,7 @@ type Listing = {
 
 function ListingsManagement() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
   const [listings, setListings] = useState<Listing[]>([])
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all')
@@ -79,6 +81,121 @@ function ListingsManagement() {
   }
 
   const filtered = listings.filter((l) => filter === 'all' || l.status === filter)
+
+
+  // ------------------------------------------------------------------
+  // Desktop layout
+  // ------------------------------------------------------------------
+  if (isDesktop) {
+    const th = {
+      textAlign: 'left' as const, padding: '14px 20px', fontSize: '13px', fontWeight: 600,
+      color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}`, background: '#F8FAFC',
+      whiteSpace: 'nowrap' as const,
+    }
+    const td = {
+      padding: '16px 20px', fontSize: '14px', color: COLORS.text,
+      borderBottom: `1px solid ${COLORS.border}`, verticalAlign: 'middle' as const,
+    }
+    const counts = {
+      all: listings.length,
+      active: listings.filter((x) => x.status === 'active').length,
+      inactive: listings.filter((x) => x.status === 'inactive').length,
+    }
+    const outlineBtn = {
+      padding: '8px 14px', border: `1px solid ${COLORS.border}`, borderRadius: '8px', background: COLORS.card,
+      color: '#334155', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+    }
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Listings Management</h1>
+            <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>Edit, pause or remove your listings.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/add-listing')}
+            style={{ padding: '12px 20px', background: '#2563EB', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            + Add Listing
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          {(['all', 'active', 'inactive'] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              style={{
+                textAlign: 'left', padding: '18px 20px', background: COLORS.card, borderRadius: '14px',
+                border: filter === f ? '2px solid #2563EB' : `1px solid ${COLORS.border}`,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              <p style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>{counts[f]}</p>
+              <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0', textTransform: 'capitalize' as const }}>{f === 'all' ? 'All listings' : f}</p>
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <p style={{ textAlign: 'center', color: COLORS.textMuted, fontSize: '14px', padding: '40px 0' }}>Loading...</p>
+        ) : filtered.length === 0 ? (
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '56px 30px', textAlign: 'center' as const }}>
+            <p style={{ fontSize: '14px', color: COLORS.textMuted }}>No listings found</p>
+          </div>
+        ) : (
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
+                <thead>
+                  <tr>
+                    <th style={th}>Listing</th>
+                    <th style={th}>Price</th>
+                    <th style={th}>Available</th>
+                    <th style={th}>Status</th>
+                    <th style={{ ...th, textAlign: 'right' as const }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((x) => (
+                    <tr key={x.id}>
+                      <td style={td}>
+                        <p style={{ fontWeight: 700, margin: 0 }}>{x.title}</p>
+                        <p style={{ fontSize: '12.5px', color: COLORS.textMuted, margin: '2px 0 0' }}>{x.destination || '—'}</p>
+                      </td>
+                      <td style={{ ...td, fontWeight: 700 }}>₦{Number(x.price).toLocaleString()}</td>
+                      <td style={{ ...td, color: '#475569' }}>{x.seats_available !== null ? x.seats_available : '—'}</td>
+                      <td style={td}>
+                        <span style={{
+                          fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '999px', textTransform: 'capitalize' as const,
+                          color: x.status === 'active' ? COLORS.green : COLORS.textMuted,
+                          background: x.status === 'active' ? '#F0FDF4' : '#F1F5F9',
+                        }}>
+                          {x.status}
+                        </span>
+                      </td>
+                      <td style={{ ...td, textAlign: 'right' as const }}>
+                        <div style={{ display: 'inline-flex', gap: '8px' }}>
+                          <button type="button" disabled={busyId === x.id} onClick={() => navigate(`/add-listing?edit=${x.id}`)} style={outlineBtn}>Edit</button>
+                          <button type="button" disabled={busyId === x.id} onClick={() => handleToggleStatus(x)} style={outlineBtn}>
+                            {x.status === 'active' ? 'Pause' : 'Activate'}
+                          </button>
+                          <button type="button" disabled={busyId === x.id} onClick={() => handleDelete(x)}
+                            style={{ ...outlineBtn, border: '1px solid #FECACA', color: COLORS.red }}>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
