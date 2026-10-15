@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useIsDesktop from './useIsDesktop'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
@@ -86,6 +87,7 @@ function aggregateByCreated(bookings: RentalBooking[], buckets: { start: Date; e
 
 export default function VehicleRentalAnalytics({ companyId, isOwner }: { companyId: string; isOwner: boolean }) {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
   const [bookings, setBookings] = useState<RentalBooking[]>([])
@@ -143,7 +145,7 @@ export default function VehicleRentalAnalytics({ companyId, isOwner }: { company
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg }}>
+      <div style={{ minHeight: isDesktop ? '60vh' : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '1040px' : undefined, margin: isDesktop ? '0 auto' : undefined }}>
         <div style={{ padding: '16px' }}>
           {[1, 2, 3].map((i) => (
             <div key={i} style={{ height: i === 1 ? '160px' : '90px', background: COLORS.card, borderRadius: '14px', marginBottom: '14px', border: `1px solid ${COLORS.border}` }} />
@@ -155,7 +157,7 @@ export default function VehicleRentalAnalytics({ companyId, isOwner }: { company
 
   if (errorMsg) {
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg, padding: '16px' }}>
+      <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, padding: isDesktop ? '0' : '16px', maxWidth: isDesktop ? '1040px' : undefined, margin: isDesktop ? '0 auto' : undefined }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
           <span onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
           <h2 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Vehicle Rental Analytics</h2>
@@ -249,8 +251,8 @@ export default function VehicleRentalAnalytics({ companyId, isOwner }: { company
   const fmtOrLocked = (v: string) => (financeAllowed ? v : '🔒')
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
-      <div style={{ padding: '16px 16px 4px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+    <div className="tc-an-root" style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '1360px' : '480px', margin: '0 auto', paddingBottom: isDesktop ? '0' : '40px' }}>
+      <div style={{ padding: isDesktop ? '0 0 4px' : '16px 16px 4px', display: 'flex', alignItems: 'center', gap: '12px' }}>
         <span onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
         <div>
           <h2 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Vehicle Rental Analytics</h2>
@@ -258,7 +260,7 @@ export default function VehicleRentalAnalytics({ companyId, isOwner }: { company
         </div>
       </div>
 
-      <div style={{ padding: '12px 16px 0' }}>
+      <div className="tc-an-grid" style={{ padding: isDesktop ? '12px 0 0' : '12px 16px 0' }}>
         <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' as const, marginBottom: '14px', paddingBottom: '2px' }}>
           {RANGE_OPTIONS.map((r) => (
             <span key={r.key} onClick={() => setRange(r.key)}
@@ -277,7 +279,7 @@ export default function VehicleRentalAnalytics({ companyId, isOwner }: { company
         )}
 
         {/* Primary KPIs */}
-        <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '10px', marginBottom: '14px' }}>
+        <div className="tc-an-kpis" style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '10px', marginBottom: '14px' }}>
           <KpiCard label="Total Revenue" value={fmtOrLocked(formatNaira(periodRevenue))}
             delta={`${pctChange(periodRevenue, prevRevenue) >= 0 ? '↑' : '↓'} ${Math.abs(pctChange(periodRevenue, prevRevenue))}% vs previous period`}
             deltaGood={pctChange(periodRevenue, prevRevenue) >= 0} />
@@ -297,7 +299,7 @@ export default function VehicleRentalAnalytics({ companyId, isOwner }: { company
         </div>
 
         {/* Trend chart */}
-        <SectionCard title="Vehicle Rental Performance">
+        <SectionCard wide title="Vehicle Rental Performance">
           <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto' as const }}>
             {METRIC_OPTIONS.map((m) => (
               <span key={m.key} onClick={() => setMetric(m.key)}
