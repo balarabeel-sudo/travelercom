@@ -6,6 +6,7 @@ import NotificationBell from './NotificationBell'
 import { releaseExpiredUnits } from './inventoryUtils'
 import HomeInviteCard from './HomeInviteCard'
 import CompanyLayout from './CompanyLayout'
+import UpgradeModal from './UpgradeModal'
 import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
@@ -121,6 +122,7 @@ function Home() {
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
   const [companyListings, setCompanyListings] = useState<CompanyListingRow[]>([])
+  const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [accountType, setAccountType] = useState<'personal' | 'company'>('personal')
   const [displayName, setDisplayName] = useState('')
@@ -522,6 +524,7 @@ if (accountType === 'company') {
                 .tc-kpi-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
               }
             `}</style>
+            {upgradeFeature && <UpgradeModal feature={upgradeFeature} onClose={() => setUpgradeFeature(null)} />}
             <div style={{
               background: 'linear-gradient(100deg, #4C1D95, #6D28D9 60%, #7C3AED)',
               borderRadius: '16px', padding: '28px 32px', color: 'white',
@@ -691,7 +694,7 @@ if (accountType === 'company') {
               </div>
             </div>
 
-            {isSuite && (
+            {(
               <div style={{ marginBottom: '32px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Quick Actions</h2>
@@ -702,7 +705,7 @@ if (accountType === 'company') {
                     <button
                       key={q.label}
                       type="button"
-                      onClick={() => navigate(q.path)}
+                      onClick={() => (isSuite ? navigate(q.path) : setUpgradeFeature(q.label))}
                       style={{
                         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
                         padding: '22px 8px', background: COLORS.card, border: `1px solid ${COLORS.border}`,
@@ -712,6 +715,11 @@ if (accountType === 'company') {
                         <Icon name={q.icon} size={22} color="#6B21A8" />
                       </div>
                       <span style={{ fontSize: '14px', fontWeight: 600, color: COLORS.text }}>{q.label}</span>
+                      {!isSuite && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', borderRadius: '999px', background: '#F3E8FF', color: '#6B21A8', fontSize: '11px', fontWeight: 800 }}>
+                          <Icon name="lock" size={11} color="#6B21A8" /> PRO
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -724,7 +732,6 @@ if (accountType === 'company') {
                 style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A', margin: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 My Listings <Icon name="chevronRight" size={20} color="#0F172A" />
               </h2>
-              {!isSuite && addListingButton}
             </div>
             {companyListings.length === 0 ? (
               <div style={{ ...cardStyle, padding: '40px 24px', textAlign: 'center', marginBottom: '32px' }}>
