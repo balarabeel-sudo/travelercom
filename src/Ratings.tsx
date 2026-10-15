@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useIsDesktop from './useIsDesktop'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
@@ -26,6 +27,7 @@ type Review = {
 
 export default function Ratings() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
   const [reviews, setReviews] = useState<Review[]>([])
 
@@ -56,7 +58,7 @@ export default function Ratings() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
+      <div style={{ minHeight: isDesktop ? '60vh' : '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
         Loading Reviews...
       </div>
     )
@@ -78,6 +80,78 @@ export default function Ratings() {
       ))}
     </div>
   )
+
+
+  // ------------------------------------------------------------------
+  // Desktop layout
+  // ------------------------------------------------------------------
+  if (isDesktop) {
+    return (
+      <div>
+        <div style={{ marginBottom: '24px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Ratings &amp; Reviews</h1>
+          <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>What travelers are saying about your business.</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '28px', position: 'sticky', top: '0' }}>
+            <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+              <p style={{ fontSize: '56px', fontWeight: 800, color: COLORS.text, lineHeight: 1, margin: 0 }}>
+                {rated.length > 0 ? avgRating.toFixed(1) : '—'}
+              </p>
+              {rated.length > 0 && <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>{renderStars(avgRating, 20)}</div>}
+              <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '8px 0 0' }}>
+                {rated.length} review{rated.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            {distribution.map((d) => (
+              <div key={d.star} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                <p style={{ fontSize: '13px', color: COLORS.textMuted, width: '12px', margin: 0 }}>{d.star}</p>
+                <div style={{ flex: 1, height: '8px', background: '#F1F5F9', borderRadius: '4px' }}>
+                  <div style={{ width: `${d.pct}%`, height: '100%', background: COLORS.gold, borderRadius: '4px' }} />
+                </div>
+                <p style={{ fontSize: '12.5px', color: COLORS.textMuted, width: '56px', textAlign: 'right', margin: 0 }}>{d.count} ({d.pct}%)</p>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, margin: '0 0 14px' }}>All Reviews</h2>
+            {reviews.length === 0 ? (
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, padding: '48px 20px', textAlign: 'center', borderRadius: '14px', color: COLORS.textMuted, fontSize: '14px' }}>
+                No reviews yet.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                {reviews.map((rv) => (
+                  <div key={rv.id} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 800, flexShrink: 0 }}>
+                          {(rv.profiles?.full_name || 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontSize: '14.5px', fontWeight: 700, color: COLORS.text, margin: 0 }}>{rv.profiles?.full_name || 'Traveler'}</p>
+                          {rv.services?.title && (
+                            <p style={{ fontSize: '12.5px', color: COLORS.textMuted, margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rv.services.title}</p>
+                          )}
+                        </div>
+                      </div>
+                      <p style={{ fontSize: '12.5px', color: COLORS.textMuted, whiteSpace: 'nowrap', margin: 0 }}>
+                        {new Date(rv.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      </p>
+                    </div>
+                    {rv.rating != null && <div style={{ marginBottom: '10px' }}>{renderStars(Number(rv.rating), 15)}</div>}
+                    {rv.comment && <p style={{ fontSize: '14px', color: COLORS.text, lineHeight: 1.55, margin: 0 }}>{rv.comment}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
