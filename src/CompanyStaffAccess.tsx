@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import useIsDesktop from './useIsDesktop'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
@@ -101,6 +102,7 @@ export default function CompanyStaffAccess({
 }) {
   const [companyId, setCompanyId] = useState<string | null>(companyIdProp || null)
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -281,9 +283,9 @@ export default function CompanyStaffAccess({
   }
 
   return (
-    <div style={{ background: COLORS.bg, minHeight: '100vh', paddingBottom: 32 }}>
+    <div style={isDesktop ? { background: 'transparent', maxWidth: 1100, margin: '0 auto' } : { background: COLORS.bg, minHeight: '100vh', paddingBottom: 32 }}>
       {/* Header */}
-      <div style={{ background: COLORS.card, padding: '16px 16px 20px', borderBottom: `1px solid ${COLORS.border}` }}>
+      <div style={isDesktop ? { background: COLORS.card, padding: '20px 24px', border: `1px solid ${COLORS.border}`, borderRadius: 14, marginBottom: 20 } : { background: COLORS.card, padding: '16px 16px 20px', borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button onClick={onBack} style={iconBtnStyle}><Icon name="arrowLeft" size={18} color={COLORS.text} /></button>
@@ -319,7 +321,7 @@ export default function CompanyStaffAccess({
       )}
 
       {/* Summary stats — horizontal scroll on narrow screens */}
-      <div style={{ display: 'flex', overflowX: 'auto', gap: 0, padding: '16px', background: COLORS.card, marginBottom: 12 }}>
+      <div style={isDesktop ? { display: 'flex', justifyContent: 'space-around', gap: 0, padding: '20px', background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 14, marginBottom: 20 } : { display: 'flex', overflowX: 'auto', gap: 0, padding: '16px', background: COLORS.card, marginBottom: 12 }}>
         <StatCard icon="users" value={totalStaff} label="Total Staff" color={COLORS.purple} bg={COLORS.purpleBg} />
         <Divider />
         <StatCard icon="checkCircle" value={activeCount} label="Active" color={COLORS.green} bg={COLORS.greenBg} />
@@ -332,7 +334,7 @@ export default function CompanyStaffAccess({
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: isDesktop ? 0 : '0 16px', marginBottom: 16 }}>
         <div style={{ display: 'flex', flex: 1, background: COLORS.card, borderRadius: 999, padding: 4, border: `1px solid ${COLORS.border}` }}>
           {(['all', 'pending', 'suspended'] as const).map((t) => (
             <button
@@ -360,7 +362,7 @@ export default function CompanyStaffAccess({
       </div>
 
       {/* List */}
-      <div style={{ padding: '0 16px' }}>
+      <div style={{ padding: isDesktop ? 0 : '0 16px' }}>
         <div style={{ fontSize: 15, fontWeight: 800, color: COLORS.text, marginBottom: 10 }}>
           {tab === 'all' && `Active Staff (${activeCount})`}
           {tab === 'pending' && `Pending Invitations (${pendingCount})`}
@@ -755,6 +757,7 @@ function ManageAccessSheet({
   onClose: () => void
   runStaffAction: (action: string, extra?: Record<string, unknown>) => Promise<boolean>
 }) {
+  const isDesktop = useIsDesktop()
   const [allPerms, setAllPerms] = useState<{ key: string; module: string; description: string; risk_level: string }[]>([])
   const [templateKeys, setTemplateKeys] = useState<Set<string>>(new Set())
   const [overrides, setOverrides] = useState<Record<string, boolean>>({})
@@ -793,8 +796,8 @@ function ManageAccessSheet({
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 20, display: 'flex', alignItems: 'flex-end' }}>
-      <div style={{ background: COLORS.card, width: '100%', maxHeight: '85vh', overflowY: 'auto', borderRadius: '20px 20px 0 0', padding: 16 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60, display: 'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent: 'center' }}>
+      <div style={{ background: COLORS.card, width: '100%', maxWidth: isDesktop ? 640 : undefined, maxHeight: '85vh', overflowY: 'auto', borderRadius: isDesktop ? 16 : '20px 20px 0 0', padding: isDesktop ? 24 : 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontWeight: 800, fontSize: 16, color: COLORS.text }}>Manage Access</div>
           <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={18} color={COLORS.textMuted} /></span>
@@ -864,6 +867,7 @@ function ChangeRoleSheet({
   onClose: () => void
   runStaffAction: (action: string, extra?: Record<string, unknown>) => Promise<boolean>
 }) {
+  const isDesktop = useIsDesktop()
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([])
   const [templateId, setTemplateId] = useState('')
   // Custom grants/revokes belong to the old role, so by default they are reset.
@@ -890,8 +894,8 @@ function ChangeRoleSheet({
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 20, display: 'flex', alignItems: 'flex-end' }}>
-      <div style={{ background: COLORS.card, width: '100%', borderRadius: '20px 20px 0 0', padding: 20 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60, display: 'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent: 'center' }}>
+      <div style={{ background: COLORS.card, width: '100%', maxWidth: isDesktop ? 520 : undefined, borderRadius: isDesktop ? 16 : '20px 20px 0 0', padding: isDesktop ? 24 : 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontWeight: 800, fontSize: 16 }}>Change Role</div>
           <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={18} color={COLORS.textMuted} /></span>
@@ -931,6 +935,7 @@ function ChangeRoleSheet({
 
 // ---------------- Invite Staff bottom sheet ----------------
 function InviteStaffSheet({ companyId, onClose, onInvited }: { companyId: string; onClose: () => void; onInvited: () => void }) {
+  const isDesktop = useIsDesktop()
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([])
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
@@ -961,8 +966,8 @@ function InviteStaffSheet({ companyId, onClose, onInvited }: { companyId: string
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 20, display: 'flex', alignItems: 'flex-end' }}>
-      <div style={{ background: COLORS.card, width: '100%', borderRadius: '20px 20px 0 0', padding: 20 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60, display: 'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent: 'center' }}>
+      <div style={{ background: COLORS.card, width: '100%', maxWidth: isDesktop ? 520 : undefined, borderRadius: isDesktop ? 16 : '20px 20px 0 0', padding: isDesktop ? 24 : 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={{ fontWeight: 800, fontSize: 16 }}>Invite Staff</div>
           <span onClick={onClose} style={{ cursor: 'pointer', display: 'flex' }}><Icon name="x" size={18} color={COLORS.textMuted} /></span>
