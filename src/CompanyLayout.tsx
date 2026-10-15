@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import useIsDesktop from './useIsDesktop'
 import NotificationBell from './NotificationBell'
-import UpgradeModal from './UpgradeModal'
+import UpgradeModal, { UpgradeGate } from './UpgradeModal'
 
 // ---------------------------------------------------------------------------
 // Which routes get the desktop company shell.
@@ -97,6 +97,18 @@ const NAV_GROUPS: NavGroup[] = [
 
 function isActive(pathname: string, path: string): boolean {
   return pathname === path || pathname.startsWith(path + '/')
+}
+
+// Business Suite pages. A Free-plan company who opens one of these directly (for
+// example by typing the address) sees the upgrade screen instead of the page.
+const PREMIUM_ROUTES: { label: string; path: string }[] = [
+  ...NAV_GROUPS.flatMap((g) => g.items.filter((i) => i.premium)).map((i) => ({ label: i.label, path: i.path })),
+  { label: 'Add Guest', path: '/add-guest' },
+]
+
+function premiumFeatureFor(pathname: string): string | null {
+  const hit = PREMIUM_ROUTES.find((r) => isActive(pathname, r.path))
+  return hit ? hit.label : null
 }
 
 function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
@@ -479,6 +491,8 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
   // '' until the plan is known. Nothing is shown as locked while it is unknown.
   const [plan, setPlan] = useState(cachedCompanyPlan)
   const [upgradeFor, setUpgradeFor] = useState<string | null>(null)
+  const [planChecked, setPlanChecked] = useState(cachedCompanyPlan !== '')
+  const premiumFeature = premiumFeatureFor(pathname)
   const [menuOpen, setMenuOpen] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -503,15 +517,19 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
     setMenuOpen(false)
   }, [pathname])
 
-  // Load the company name for the top bar (desktop only, so phones make no
-  // extra requests). Owners are found by owner_id, staff by company_staff.
+  // Load the company name, logo and plan. Desktop always needs them for the top bar;
+  // phones only load them on a Business Suite page whose plan is not known yet.
+  // Owners are found by owner_id, staff by company_staff.
   useEffect(() => {
-    if (!isDesktop) return
+    if (!isDesktop && !(premiumFeature && !planChecked)) return
     let cancelled = false
     const load = async () => {
       const { data: userData } = await supabase.auth.getUser()
       const uid = userData.user?.id
-      if (!uid) return
+      if (!uid) {
+        if (!cancelled) setPlanChecked(true)
+        return
+      }
       let name = ''
       let logo = ''
       let companyPlan = ''
@@ -549,15 +567,31 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
       if (!cancelled && name) setCompanyName(name)
       if (!cancelled) setLogoUrl(logo)
       if (!cancelled && companyPlan) setPlan(companyPlan)
+      if (!cancelled) setPlanChecked(true)
     }
-    load()
+    load().catch(() => {
+      if (!cancelled) setPlanChecked(true)
+    })
     return () => {
       cancelled = true
     }
-  }, [isDesktop])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDesktop, premiumFeature])
+
+  // Free-plan companies never get a Business Suite page mounted: they see the upgrade
+  // screen. While the plan is still being checked nothing from the page is loaded either.
+  const gated = !!premiumFeature && plan === 'free'
+  const waiting = !!premiumFeature && plan === '' && !planChecked
+  const body = gated ? (
+    <UpgradeGate feature={premiumFeature as string} />
+  ) : waiting ? (
+    <p style={{ textAlign: 'center', color: '#64748B', fontSize: '14px', padding: '60px 0' }}>Loading...</p>
+  ) : (
+    children
+  )
 
   if (!isDesktop) {
-    return <>{children}</>
+    return <>{body}</>
   }
 
   const showBack = pathname !== '/home' && pathname !== '/company-menu'
@@ -683,7 +717,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
         </header>
 
         <main className="tcl-content">
-          <div className="tcl-content-inner">{children}</div>
+          <div className="tcl-content-inner">{body}</div>
         </main>
       </div>
     </div>,
