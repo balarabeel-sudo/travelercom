@@ -166,21 +166,56 @@ export function buildBuckets(range: RangeKey, now: Date): Bucket[] {
   return buckets
 }
 
+
+// ---------- Desktop layout (container-query based) ----------
+// Pages put className="tc-an-root" on their outer wrapper, "tc-an-grid" on the content
+// wrapper and "tc-an-kpis" on the KPI row. Below 800px of available width nothing here
+// applies, so the phone layout is unchanged.
+const ANALYTICS_CSS = `
+.tc-an-root { container-type: inline-size; }
+@container (min-width: 800px) {
+  .tc-an-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    align-items: start;
+  }
+  .tc-an-grid > * { margin-bottom: 0 !important; }
+  .tc-an-grid > :not(.tc-an-card) { grid-column: 1 / -1; }
+  .tc-an-grid > .tc-an-wide { grid-column: 1 / -1; }
+  .tc-an-kpis {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px !important;
+  }
+  .tc-an-kpi { padding: 18px 20px !important; }
+  .tc-an-kpi-label { font-size: 13px !important; }
+  .tc-an-kpi-value { font-size: 26px !important; }
+  .tc-an-card { padding: 22px !important; }
+}
+`
+if (typeof document !== 'undefined' && !document.getElementById('tc-analytics-css')) {
+  const el = document.createElement('style')
+  el.id = 'tc-analytics-css'
+  el.textContent = ANALYTICS_CSS
+  document.head.appendChild(el)
+}
+
 // ---------- Small UI atoms ----------
 export function KpiCard({ label, value, delta, deltaGood, sub }: { label: string; value: string; delta?: string; deltaGood?: boolean; sub?: string }) {
   return (
-    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '13px', flex: '1 1 45%', minWidth: '135px' }}>
-      <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '6px' }}>{label}</p>
-      <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text, lineHeight: 1.1 }}>{value}</p>
+    <div className="tc-an-kpi" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '13px', flex: '1 1 45%', minWidth: '135px' }}>
+      <p className="tc-an-kpi-label" style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '6px' }}>{label}</p>
+      <p className="tc-an-kpi-value" style={{ fontSize: '18px', fontWeight: 800, color: COLORS.text, lineHeight: 1.1 }}>{value}</p>
       {delta && <p style={{ fontSize: '10.5px', fontWeight: 700, color: deltaGood ? COLORS.green : COLORS.red, marginTop: '5px' }}>{delta}</p>}
       {sub && <p style={{ fontSize: '10px', color: COLORS.textMuted, marginTop: '3px' }}>{sub}</p>}
     </div>
   )
 }
 
-export function SectionCard({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+export function SectionCard({ title, action, children, wide }: { title: string; action?: React.ReactNode; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '16px', marginBottom: '14px' }}>
+    <div className={wide ? 'tc-an-card tc-an-wide' : 'tc-an-card'} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '16px', marginBottom: '14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>{title}</p>
         {action}
@@ -207,6 +242,11 @@ function timeKey(d: Date) {
   return `${y}-${m}-${day}`
 }
 
+// Taller chart when there is plenty of horizontal room (desktop), standard height on phones.
+function chartHeightFor(width: number) {
+  return width >= 700 ? 300 : 220
+}
+
 export function TrendChart({
   buckets, series, activeMetric, valueFormatter, renderTooltipRows,
 }: {
@@ -230,7 +270,7 @@ export function TrendChart({
     if (!containerRef.current) return
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
-      height: 220,
+      height: chartHeightFor(containerRef.current.clientWidth),
       layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: COLORS.textMuted, fontSize: 10, attributionLogo: true },
       grid: { vertLines: { visible: false }, horzLines: { color: COLORS.border, style: 1 } },
       rightPriceScale: { borderColor: COLORS.border },
@@ -261,7 +301,7 @@ export function TrendChart({
     })
 
     const ro = new ResizeObserver(() => {
-      if (containerRef.current) chart.resize(containerRef.current.clientWidth, 220)
+      if (containerRef.current) chart.resize(containerRef.current.clientWidth, chartHeightFor(containerRef.current.clientWidth))
     })
     ro.observe(containerRef.current)
 
