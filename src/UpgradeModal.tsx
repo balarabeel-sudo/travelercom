@@ -13,6 +13,74 @@ const BENEFITS = [
   { title: 'Promotions and visibility', text: 'Run offers and feature your property to more travelers.' },
 ]
 
+// Shown in place of a Business Suite page when a Free-plan company opens it directly
+// (for example by typing the address). The page itself is never mounted, so nothing
+// from it is loaded.
+export function UpgradeGate({ feature }: { feature: string }) {
+  const navigate = useNavigate()
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 16px' }}>
+      <div style={{
+        width: '100%', maxWidth: '560px', background: '#FFFFFF', border: '1px solid #E2E8F0',
+        borderRadius: '18px', overflow: 'hidden',
+      }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #2E1065, #4C1D95)', color: 'white', padding: '32px 28px 26px',
+        }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#F59E0B', color: '#2E1065',
+            fontSize: '12px', fontWeight: 800, padding: '5px 12px', borderRadius: '8px', marginBottom: '14px',
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+            </svg>
+            BUSINESS SUITE
+          </span>
+          <p style={{ fontSize: '26px', fontWeight: 800, margin: '0 0 8px', lineHeight: 1.25 }}>{feature} is locked</p>
+          <p style={{ fontSize: '14.5px', color: '#DDD6FE', margin: 0, lineHeight: 1.5 }}>
+            Your company is on the Free plan. Upgrade to Business Suite to use {feature}.
+          </p>
+        </div>
+        <div style={{ padding: '24px 28px 8px' }}>
+          {BENEFITS.map((b) => (
+            <div key={b.title} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }}>
+                <circle cx="12" cy="12" r="9" />
+                <path d="M8 12.5l3 3 5-6" />
+              </svg>
+              <div>
+                <p style={{ fontSize: '14.5px', fontWeight: 700, color: '#0F172A', margin: 0 }}>{b.title}</p>
+                <p style={{ fontSize: '13px', color: '#64748B', margin: '2px 0 0', lineHeight: 1.5 }}>{b.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: '8px 28px 28px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => navigate('/home')}
+            style={{
+              flex: '1 1 140px', padding: '13px', background: '#FFFFFF', color: '#334155', border: '1px solid #E2E8F0',
+              borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+            Back to Overview
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(UPGRADE_ROUTE)}
+            style={{
+              flex: '1.4 1 200px', padding: '13px', background: '#F59E0B', color: '#2E1065', border: 'none',
+              borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+            Upgrade to Business Suite
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function UpgradeModal({ feature, onClose }: { feature: string; onClose: () => void }) {
   const navigate = useNavigate()
 
