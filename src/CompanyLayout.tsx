@@ -19,6 +19,8 @@ const COMPANY_DESKTOP_BASES = [
   '/listings-management',
   '/bookings-management',
   '/guests',
+  '/reviews',
+  '/settings',
   '/add-guest',
   '/add-bus-listing',
   '/add-listing',
@@ -55,6 +57,8 @@ type IconName =
   | 'shield'
   | 'building'
   | 'back'
+  | 'star'
+  | 'wallet'
   | 'chevronDown'
   | 'logout'
   | 'settings'
@@ -73,6 +77,9 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Analytics', path: '/analytics', icon: 'chart' },
       { label: 'Staff Access', path: '/staff', icon: 'shield' },
       { label: 'Promotions', path: '/promotions', icon: 'tag' },
+      { label: 'Ratings', path: '/reviews', icon: 'star' },
+      { label: 'Wallet', path: '/wallet', icon: 'wallet' },
+      { label: 'Settings', path: '/settings', icon: 'settings' },
     ],
   },
   {
@@ -179,6 +186,20 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
           <path d="M7 8h2M7 12h2M7 16h2M15 13h2M15 17h2" />
         </svg>
       )
+    case 'star':
+      return (
+        <svg {...common}>
+          <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" />
+        </svg>
+      )
+    case 'wallet':
+      return (
+        <svg {...common}>
+          <path d="M3 7a2 2 0 0 1 2-2h13v4" />
+          <path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-1z" />
+          <circle cx="16.5" cy="14" r="1.2" />
+        </svg>
+      )
     case 'back':
       return (
         <svg {...common}>
@@ -213,6 +234,7 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
 // Company name is remembered between page changes so the top bar does not
 // flicker empty every time a new company page mounts.
 let cachedCompanyName = ''
+let cachedCompanyLogo = ''
 
 // ---------------------------------------------------------------------------
 // Styles (colours are CSS variables at the top so they are easy to change)
@@ -431,6 +453,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const [companyName, setCompanyName] = useState(cachedCompanyName)
+  const [logoUrl, setLogoUrl] = useState(cachedCompanyLogo)
   const [menuOpen, setMenuOpen] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -465,13 +488,15 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
       const uid = userData.user?.id
       if (!uid) return
       let name = ''
+      let logo = ''
       const { data: own } = await supabase
         .from('companies')
-        .select('business_name')
+        .select('business_name, logo_url')
         .eq('owner_id', uid)
         .limit(1)
       if (own && own.length > 0) {
         name = own[0].business_name || ''
+        logo = own[0].logo_url || ''
       } else {
         const { data: staff } = await supabase
           .from('company_staff')
@@ -483,14 +508,17 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
         if (cid) {
           const { data: comp } = await supabase
             .from('companies')
-            .select('business_name')
+            .select('business_name, logo_url')
             .eq('id', cid)
             .limit(1)
           name = comp && comp.length > 0 ? comp[0].business_name || '' : ''
+          logo = comp && comp.length > 0 ? comp[0].logo_url || '' : ''
         }
       }
       if (name) cachedCompanyName = name
+      cachedCompanyLogo = logo
       if (!cancelled && name) setCompanyName(name)
+      if (!cancelled) setLogoUrl(logo)
     }
     load()
     return () => {
@@ -565,7 +593,13 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
               aria-haspopup="menu"
               aria-expanded={menuOpen}
             >
-              <span className="tcl-avatar">{initial}</span>
+              <span className="tcl-avatar" style={logoUrl ? { background: '#E2E8F0', overflow: 'hidden' } : undefined}>
+                {logoUrl ? (
+                  <img src={logoUrl} alt={companyName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  initial
+                )}
+              </span>
               <Icon name="chevronDown" size={16} />
             </button>
             {menuOpen && (
