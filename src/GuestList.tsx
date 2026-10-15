@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useIsDesktop from './useIsDesktop'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
@@ -11,6 +12,7 @@ type Guest = { name: string; bookings: number; totalSpent: number; lastBooking: 
 
 function GuestList() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
   const [guests, setGuests] = useState<Guest[]>([])
   const [search, setSearch] = useState('')
@@ -56,6 +58,98 @@ function GuestList() {
   }, [navigate])
 
   const filtered = guests.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
+
+
+  // ------------------------------------------------------------------
+  // Desktop layout
+  // ------------------------------------------------------------------
+  if (isDesktop) {
+    const th = {
+      textAlign: 'left' as const, padding: '14px 20px', fontSize: '13px', fontWeight: 600,
+      color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}`, background: '#F8FAFC',
+      whiteSpace: 'nowrap' as const,
+    }
+    const td = {
+      padding: '16px 20px', fontSize: '14px', color: COLORS.text,
+      borderBottom: `1px solid ${COLORS.border}`, verticalAlign: 'middle' as const,
+    }
+    const totalBookings = guests.reduce((sum, x) => sum + x.bookings, 0)
+    const totalSpent = guests.reduce((sum, x) => sum + x.totalSpent, 0)
+    const summary = [
+      { label: 'Total guests', value: guests.length.toLocaleString() },
+      { label: 'Total bookings', value: totalBookings.toLocaleString() },
+      { label: 'Total spent', value: '₦' + totalSpent.toLocaleString() },
+    ]
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Guests</h1>
+            <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>Everyone who has booked with your business.</p>
+          </div>
+          <input
+            type="text" placeholder="Search guests" value={search} onChange={(e) => setSearch(e.target.value)}
+            style={{ width: '300px', padding: '12px 14px', border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontSize: '14px', background: COLORS.card, boxSizing: 'border-box' }}
+          />
+          <button
+            type="button"
+            onClick={() => navigate('/add-guest')}
+            style={{ padding: '12px 20px', background: '#2563EB', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            + Add Guest
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          {summary.map((c) => (
+            <div key={c.label} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '20px' }}>
+              <p style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.value}</p>
+              <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>{c.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {loading ? (
+          <p style={{ textAlign: 'center', color: COLORS.textMuted, fontSize: '14px', padding: '40px 0' }}>Loading...</p>
+        ) : filtered.length === 0 ? (
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '56px 30px', textAlign: 'center' as const }}>
+            <p style={{ fontSize: '14px', color: COLORS.textMuted }}>No guests yet</p>
+          </div>
+        ) : (
+          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '640px' }}>
+                <thead>
+                  <tr>
+                    <th style={th}>Guest</th>
+                    <th style={th}>Bookings</th>
+                    <th style={th}>Last booking</th>
+                    <th style={{ ...th, textAlign: 'right' as const }}>Total spent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((x) => (
+                    <tr key={x.name}>
+                      <td style={td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.primary, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '16px', flexShrink: 0 }}>
+                            {x.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span style={{ fontWeight: 700 }}>{x.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ ...td, color: '#475569' }}>{x.bookings}</td>
+                      <td style={{ ...td, color: '#475569' }}>{new Date(x.lastBooking).toLocaleDateString()}</td>
+                      <td style={{ ...td, textAlign: 'right' as const, fontWeight: 800 }}>₦{x.totalSpent.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
