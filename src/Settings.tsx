@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useIsDesktop from './useIsDesktop'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
@@ -17,6 +18,7 @@ const COLORS = {
 
 export default function Settings() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [companyPlan, setCompanyPlan] = useState<'free' | 'business_suite'>('free')
@@ -170,18 +172,21 @@ export default function Settings() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
+      <div style={{ minHeight: isDesktop ? '60vh' : '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
         Loading...
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
+    <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '1100px' : '480px', margin: '0 auto', paddingBottom: isDesktop ? '0' : '40px' }}>
 
       <div style={{
-        padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '14px',
-        background: COLORS.card, position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+        padding: isDesktop ? '20px 24px' : '18px 20px', display: 'flex', alignItems: 'center', gap: '14px',
+        background: COLORS.card, position: isDesktop ? 'static' : 'sticky', top: 0, zIndex: 10,
+        boxShadow: isDesktop ? 'none' : '0 1px 4px rgba(0,0,0,0.05)',
+        border: isDesktop ? `1px solid ${COLORS.border}` : undefined,
+        borderRadius: isDesktop ? '14px' : undefined, marginBottom: isDesktop ? '20px' : undefined,
       }}>
         <div onClick={() => navigate(-1)} style={{ cursor: 'pointer', display: 'flex' }}>
           <Icon name="arrowLeft" size={22} color={COLORS.text} />
@@ -189,7 +194,14 @@ export default function Settings() {
         <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Settings</h1>
       </div>
 
-      <div style={{ padding: '16px' }}>
+      <div className={isDesktop ? 'tc-set-cols' : undefined} style={{ padding: isDesktop ? '0' : '16px' }}>
+        {isDesktop && (
+          <style>{`
+            .tc-set-cols { column-count: 2; column-gap: 24px; }
+            .tc-set-cols > p { break-after: avoid; }
+            .tc-set-cols > div { break-inside: avoid; }
+          `}</style>
+        )}
 
         <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.textMuted, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Account</p>
         <div style={{ background: COLORS.card, borderRadius: '16px', padding: '18px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
