@@ -194,7 +194,7 @@ function AppShell() {
         <Route path="/inventory/:id" element={<CompanyLayout><InventoryDetail /></CompanyLayout>} />
         <Route path="/analytics" element={<CompanyLayout><Analytics /></CompanyLayout>} />
         <Route path="/promotions" element={<CompanyLayout><Promotions /></CompanyLayout>} />
-        <Route path="/reviews" element={<Ratings />} />
+        <Route path="/reviews" element={<CompanyLayout><Ratings /></CompanyLayout>} />
         <Route path="/company-profile" element={<CompanyLayout><CompanyProfile /></CompanyLayout>} />
         <Route path="/company/:id" element={<CompanyStorefront />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -205,7 +205,7 @@ function AppShell() {
         <Route path="/about" element={<About />} />
        <Route path="/notifications" element={<Notifications />} />
        <Route path="/support" element={<Support />} />
-       <Route path="/settings" element={<Settings />} />
+       <Route path="/settings" element={<CompanyLayout><Settings /></CompanyLayout>} />
         <Route path="/customer-settings" element={<CustomerSettings />} />
         <Route path="/add-guest" element={<CompanyLayout><AddGuest /></CompanyLayout>} />
         <Route path="/flights" element={<Flights />} />
