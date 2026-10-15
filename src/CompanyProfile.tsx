@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useIsDesktop from './useIsDesktop'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
@@ -44,6 +45,7 @@ const CATEGORY_ICON: Record<string, string> = {
 
 export default function CompanyProfile() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
   const [company, setCompany] = useState<Company | null>(null)
   const [services, setServices] = useState<ServiceRow[]>([])
@@ -158,7 +160,7 @@ export default function CompanyProfile() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
+      <div style={{ minHeight: isDesktop ? '60vh' : '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
         Loading...
       </div>
     )
@@ -166,18 +168,18 @@ export default function CompanyProfile() {
 
   if (!company) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
+      <div style={{ minHeight: isDesktop ? '60vh' : '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, color: COLORS.textMuted }}>
         No company profile found.
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '90px' }}>
+    <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '1000px' : '480px', margin: '0 auto', paddingBottom: isDesktop ? '0' : '90px' }}>
 
       <div style={{
-        padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: COLORS.card, position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+        padding: isDesktop ? '20px 24px' : '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: COLORS.card, position: isDesktop ? 'static' : 'sticky', top: 0, zIndex: 10, boxShadow: isDesktop ? 'none' : '0 1px 4px rgba(0,0,0,0.05)', border: isDesktop ? `1px solid ${COLORS.border}` : undefined, borderRadius: isDesktop ? '14px' : undefined, marginBottom: isDesktop ? '20px' : undefined
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}>
@@ -190,7 +192,7 @@ export default function CompanyProfile() {
         </div>
       </div>
 
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: isDesktop ? '0' : '16px' }}>
 
         <div style={{
           height: '140px', borderRadius: '16px', marginBottom: '16px', position: 'relative', overflow: 'hidden',
