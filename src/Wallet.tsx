@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import useIsDesktop from './useIsDesktop'
+import CompanyLayout from './CompanyLayout'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import NotificationBell from './NotificationBell'
@@ -32,6 +34,7 @@ type Transaction = {
 
 function Wallet() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -265,6 +268,165 @@ function Wallet() {
           </button>
         </div>
       </div>
+    )
+  }
+
+
+  // ------------------------------------------------------------------
+  // Desktop company wallet (personal accounts and phones keep the layout below)
+  // ------------------------------------------------------------------
+  if (isDesktop && accountType === 'company') {
+    const th = {
+      textAlign: 'left' as const, padding: '14px 20px', fontSize: '13px', fontWeight: 600,
+      color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}`, background: '#F8FAFC',
+      whiteSpace: 'nowrap' as const,
+    }
+    const td = {
+      padding: '14px 20px', fontSize: '14px', color: COLORS.text,
+      borderBottom: `1px solid ${COLORS.border}`, verticalAlign: 'middle' as const,
+    }
+    const cards = [
+      { label: 'Available Balance', value: balance, highlight: true },
+      { label: 'Pending (Escrow)', value: pendingEscrow, highlight: false },
+      { label: 'Total Earnings', value: totalEarnings, highlight: false },
+      { label: 'Total Withdrawn', value: totalWithdrawn, highlight: false },
+    ]
+    return (
+      <CompanyLayout>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '240px' }}>
+              <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Wallet</h1>
+              <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>Your earnings, escrow and withdrawals.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setShowWithdraw(!showWithdraw); setWithdrawMsg(null) }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 22px',
+                background: showWithdraw ? '#64748B' : COLORS.secondary, color: 'white', border: 'none',
+                borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              <Icon name="cash" size={16} color="white" /> {showWithdraw ? 'Cancel' : 'Withdraw Funds'}
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            {cards.map((c) => (
+              <div key={c.label} style={{
+                background: c.highlight ? `linear-gradient(135deg, ${COLORS.primary}, #0369a1)` : COLORS.card,
+                border: c.highlight ? 'none' : `1px solid ${COLORS.border}`,
+                borderRadius: '14px', padding: '22px',
+              }}>
+                <p style={{ fontSize: '14px', color: c.highlight ? 'rgba(255,255,255,0.85)' : COLORS.textMuted, margin: '0 0 8px' }}>{c.label}</p>
+                <p style={{ fontSize: '28px', fontWeight: 800, color: c.highlight ? 'white' : '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  ₦{c.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {withdrawMsg && !showWithdraw && (
+            <div style={{
+              background: withdrawMsg.type === 'success' ? '#f0fdf4' : '#fef2f2',
+              border: `1px solid ${withdrawMsg.type === 'success' ? '#86efac' : '#fca5a5'}`,
+              borderRadius: '12px', padding: '14px 18px', marginBottom: '24px',
+            }}>
+              <p style={{ fontSize: '14px', color: withdrawMsg.type === 'success' ? COLORS.green : COLORS.red, margin: 0 }}>{withdrawMsg.text}</p>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: showWithdraw ? 'minmax(0, 2fr) minmax(340px, 1fr)' : 'minmax(0, 1fr)', gap: '24px', alignItems: 'start' }}>
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, margin: '0 0 14px' }}>Transaction History</h2>
+              {transactions.length === 0 ? (
+                <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '48px 24px', textAlign: 'center', color: COLORS.textMuted, fontSize: '14px' }}>
+                  No transactions yet
+                </div>
+              ) : (
+                <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', overflow: 'hidden' }}>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '620px' }}>
+                      <thead>
+                        <tr>
+                          <th style={th}>Type</th>
+                          <th style={th}>Date</th>
+                          <th style={th}>Status</th>
+                          <th style={{ ...th, textAlign: 'right' as const }}>Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transactions.map((tx) => {
+                          const isCredit = tx.transaction_type === 'topup' || tx.transaction_type === 'refund' || tx.transaction_type === 'commission_payout'
+                          const statusColor = tx.status === 'successful' ? { bg: '#dcfce7', fg: COLORS.green }
+                            : tx.status === 'pending' ? { bg: '#fef3c7', fg: '#b45309' }
+                            : { bg: '#fee2e2', fg: COLORS.red }
+                          return (
+                            <tr key={tx.id}>
+                              <td style={td}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{
+                                    width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
+                                    background: isCredit ? '#dcfce7' : '#fff1e6', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  }}>
+                                    <Icon name={isCredit ? 'plus' : 'minus'} size={16} color={isCredit ? COLORS.green : COLORS.secondary} />
+                                  </div>
+                                  <span style={{ fontWeight: 700, textTransform: 'capitalize' as const }}>{tx.transaction_type.replace('_', ' ')}</span>
+                                </div>
+                              </td>
+                              <td style={{ ...td, color: '#475569' }}>
+                                {new Date(tx.created_at).toLocaleDateString()} • {new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td style={td}>
+                                <span style={{ display: 'inline-block', padding: '4px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: 700, textTransform: 'capitalize' as const, background: statusColor.bg, color: statusColor.fg }}>
+                                  {tx.status}
+                                </span>
+                              </td>
+                              <td style={{ ...td, textAlign: 'right' as const, fontWeight: 800, color: isCredit ? COLORS.green : COLORS.red }}>
+                                {isCredit ? '+' : '-'}₦{Number(tx.amount || 0).toLocaleString()}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {showWithdraw && (
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '22px' }}>
+                <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, margin: '0 0 14px' }}>Bank Details</p>
+
+                {withdrawMsg && (
+                  <p style={{ fontSize: '13px', color: COLORS.red, margin: '0 0 12px' }}>{withdrawMsg.text}</p>
+                )}
+
+                <input type="text" placeholder="Bank Name" value={bankName} onChange={(e) => setBankName(e.target.value)} style={inputStyle} />
+                <input type="text" placeholder="Account Number" value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} style={{ ...inputStyle, marginTop: '12px' }} />
+                <input type="text" placeholder="Account Name" value={bankAccountName} onChange={(e) => setBankAccountName(e.target.value)} style={{ ...inputStyle, marginTop: '12px' }} />
+                <input type="number" placeholder="Amount to withdraw (₦)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} style={{ ...inputStyle, marginTop: '12px' }} />
+
+                <button
+                  onClick={handleWithdrawRequest}
+                  disabled={withdrawing}
+                  style={{
+                    width: '100%', marginTop: '16px', padding: '13px',
+                    background: withdrawing ? '#94a3b8' : COLORS.green, color: 'white', border: 'none',
+                    borderRadius: '10px', fontWeight: 'bold', fontSize: '14px',
+                    cursor: withdrawing ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                  }}>
+                  {withdrawing ? 'Submitting...' : 'Submit Withdrawal Request'}
+                </button>
+                <p style={{ fontSize: '12px', color: COLORS.textMuted, margin: '10px 0 0' }}>
+                  Withdrawals are processed manually within 24–48 hours.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </CompanyLayout>
     )
   }
 
