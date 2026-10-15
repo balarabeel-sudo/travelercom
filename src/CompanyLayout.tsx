@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import useIsDesktop from './useIsDesktop'
 import NotificationBell from './NotificationBell'
+import UpgradeModal from './UpgradeModal'
 
 // ---------------------------------------------------------------------------
 // Which routes get the desktop company shell.
@@ -59,11 +60,12 @@ type IconName =
   | 'back'
   | 'star'
   | 'wallet'
+  | 'lock'
   | 'chevronDown'
   | 'logout'
   | 'settings'
 
-type NavItem = { label: string; path: string; icon: IconName }
+type NavItem = { label: string; path: string; icon: IconName; premium?: boolean }
 type NavGroup = { title: string | null; items: NavItem[] }
 
 const NAV_GROUPS: NavGroup[] = [
@@ -73,11 +75,11 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Overview', path: '/home', icon: 'grid' },
       { label: 'Bookings', path: '/bookings-management', icon: 'calendar' },
       { label: 'Listings', path: '/my-listings', icon: 'list' },
-      { label: 'Inventory', path: '/inventory', icon: 'box' },
-      { label: 'Analytics', path: '/analytics', icon: 'chart' },
-      { label: 'Staff Access', path: '/staff', icon: 'shield' },
-      { label: 'Promotions', path: '/promotions', icon: 'tag' },
-      { label: 'Ratings', path: '/reviews', icon: 'star' },
+      { label: 'Inventory', path: '/inventory', icon: 'box', premium: true },
+      { label: 'Analytics', path: '/analytics', icon: 'chart', premium: true },
+      { label: 'Staff Access', path: '/staff', icon: 'shield', premium: true },
+      { label: 'Promotions', path: '/promotions', icon: 'tag', premium: true },
+      { label: 'Ratings', path: '/reviews', icon: 'star', premium: true },
       { label: 'Wallet', path: '/wallet', icon: 'wallet' },
       { label: 'Settings', path: '/settings', icon: 'settings' },
     ],
@@ -86,7 +88,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'More',
     items: [
       { label: 'Listings Management', path: '/listings-management', icon: 'sliders' },
-      { label: 'Guests', path: '/guests', icon: 'users' },
+      { label: 'Guests', path: '/guests', icon: 'users', premium: true },
       { label: 'Company Profile', path: '/company-profile', icon: 'building' },
       { label: 'Account & Support', path: '/company-menu', icon: 'settings' },
     ],
@@ -200,6 +202,13 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
           <circle cx="16.5" cy="14" r="1.2" />
         </svg>
       )
+    case 'lock':
+      return (
+        <svg {...common}>
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+        </svg>
+      )
     case 'back':
       return (
         <svg {...common}>
@@ -235,6 +244,7 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
 // flicker empty every time a new company page mounts.
 let cachedCompanyName = ''
 let cachedCompanyLogo = ''
+let cachedCompanyPlan = ''
 
 // ---------------------------------------------------------------------------
 // Styles (colours are CSS variables at the top so they are easy to change)
@@ -313,6 +323,18 @@ const CSS = `
 .tcl-nav-btn:hover {
   background: #F1F5F9;
   color: var(--tcl-title);
+}
+.tcl-pro {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #F3E8FF;
+  color: #6B21A8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
 }
 .tcl-nav-btn.tcl-active {
   background: var(--tcl-primary-soft);
@@ -454,6 +476,9 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const [companyName, setCompanyName] = useState(cachedCompanyName)
   const [logoUrl, setLogoUrl] = useState(cachedCompanyLogo)
+  // '' until the plan is known. Nothing is shown as locked while it is unknown.
+  const [plan, setPlan] = useState(cachedCompanyPlan)
+  const [upgradeFor, setUpgradeFor] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -489,14 +514,16 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
       if (!uid) return
       let name = ''
       let logo = ''
+      let companyPlan = ''
       const { data: own } = await supabase
         .from('companies')
-        .select('business_name, logo_url')
+        .select('business_name, logo_url, plan')
         .eq('owner_id', uid)
         .limit(1)
       if (own && own.length > 0) {
         name = own[0].business_name || ''
         logo = own[0].logo_url || ''
+        companyPlan = own[0].plan || 'free'
       } else {
         const { data: staff } = await supabase
           .from('company_staff')
@@ -508,17 +535,20 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
         if (cid) {
           const { data: comp } = await supabase
             .from('companies')
-            .select('business_name, logo_url')
+            .select('business_name, logo_url, plan')
             .eq('id', cid)
             .limit(1)
           name = comp && comp.length > 0 ? comp[0].business_name || '' : ''
           logo = comp && comp.length > 0 ? comp[0].logo_url || '' : ''
+          companyPlan = comp && comp.length > 0 ? comp[0].plan || 'free' : ''
         }
       }
       if (name) cachedCompanyName = name
       cachedCompanyLogo = logo
+      if (companyPlan) cachedCompanyPlan = companyPlan
       if (!cancelled && name) setCompanyName(name)
       if (!cancelled) setLogoUrl(logo)
+      if (!cancelled && companyPlan) setPlan(companyPlan)
     }
     load()
     return () => {
@@ -541,6 +571,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
   return createPortal(
     <div className="tcl-root">
       <style>{CSS}</style>
+      {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
 
       <aside className="tcl-sidebar">
         <div className="tcl-brand" onClick={() => navigate('/home')}>
@@ -551,19 +582,31 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
         {NAV_GROUPS.map((group, gi) => (
           <div key={group.title || 'main-' + gi}>
             {group.title && <div className="tcl-group-title">{group.title}</div>}
-            {group.items.map((item) => (
-              <button
-                key={item.path}
-                type="button"
-                className={
-                  'tcl-nav-btn' + (isActive(pathname, item.path) ? ' tcl-active' : '')
-                }
-                onClick={() => navigate(item.path)}
-              >
-                <Icon name={item.icon} />
-                <span>{item.label}</span>
-              </button>
-            ))}
+            {group.items.map((item) => {
+              // Premium items stay visible for Free companies. Tapping one explains
+              // the Business Suite plan instead of opening the page.
+              const locked = !!item.premium && plan === 'free'
+              return (
+                <button
+                  key={item.path}
+                  type="button"
+                  className={
+                    'tcl-nav-btn' + (isActive(pathname, item.path) ? ' tcl-active' : '')
+                  }
+                  onClick={() => (locked ? setUpgradeFor(item.label) : navigate(item.path))}
+                  aria-label={locked ? item.label + ' (Business Suite feature)' : undefined}
+                >
+                  <Icon name={item.icon} />
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  {locked && (
+                    <span className="tcl-pro">
+                      <Icon name="lock" size={12} />
+                      PRO
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
         ))}
       </aside>
