@@ -3,6 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import NotificationBell from './NotificationBell'
+import VerifyBooking from './VerifyBooking'
+import GuestList from './GuestList'
+import Promotions from './Promotions'
+import Analytics from './Analytics'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -50,14 +54,14 @@ const NAV: NavItem[] = [
   { key: 'overview', label: 'Overview', icon: 'home', group: 'Workspace', kind: 'section' },
   { key: 'tasks', label: 'My Tasks', icon: 'checkCircle', group: 'Workspace', kind: 'section' },
   { key: 'bookings', label: 'Bookings', icon: 'ticket', group: 'Workspace', kind: 'section', requires: ['bookings.view'] },
-  { key: 'tickets', label: 'Tickets & Check-in', icon: 'clipboard', group: 'Workspace', kind: 'route', route: '/verify-booking', modules: ['tickets', 'verification'] },
-  { key: 'guests', label: 'Guests', icon: 'users', group: 'Workspace', kind: 'route', route: '/guests', modules: ['customers'] },
+  { key: 'tickets', label: 'Tickets & Check-in', icon: 'clipboard', group: 'Workspace', kind: 'section', modules: ['tickets', 'verification'] },
+  { key: 'guests', label: 'Guests', icon: 'users', group: 'Workspace', kind: 'section', modules: ['customers'] },
   { key: 'support', label: 'Support', icon: 'headphones', group: 'Workspace', kind: 'section', requires: ['support.view'] },
 
   { key: 'finance', label: 'Finance', icon: 'cash', group: 'Company', kind: 'section', requires: ['finance.view', 'finance.transactions'] },
   { key: 'refunds', label: 'Refunds', icon: 'refresh', group: 'Company', kind: 'section', requires: ['refunds.view'] },
-  { key: 'analytics', label: 'Analytics', icon: 'barChart', group: 'Company', kind: 'route', route: '/analytics', requires: ['finance.view'] },
-  { key: 'marketing', label: 'Marketing', icon: 'megaphone', group: 'Company', kind: 'route', route: '/promotions', modules: ['marketing'] },
+  { key: 'analytics', label: 'Analytics', icon: 'barChart', group: 'Company', kind: 'section', requires: ['finance.view'] },
+  { key: 'marketing', label: 'Marketing', icon: 'megaphone', group: 'Company', kind: 'section', modules: ['marketing'] },
   { key: 'team', label: 'Team', icon: 'users', group: 'Company', kind: 'section', requires: ['staff.view'] },
   { key: 'operations', label: 'Operations', icon: 'calendar', group: 'Company', kind: 'section', requires: ['operations.view', 'operations.manage', 'availability.manage', 'schedules.manage'] },
   { key: 'company', label: 'Company Profile', icon: 'briefcase', group: 'Company', kind: 'section', requires: ['company.view', 'company.edit', 'company.settings'] },
@@ -1006,6 +1010,11 @@ export default function StaffDashboard() {
       navigate(item.route, { state: { backTo: `/staff-dashboard?company=${staff?.company_id || ''}`, companyId: staff?.company_id } })
       return
     }
+    if (item.key === 'analytics') {
+      // The Analytics pages read the company and their back target from the navigation state.
+      const target = `/staff-dashboard?company=${staff?.company_id || ''}`
+      navigate(target, { replace: true, state: { backTo: target, companyId: staff?.company_id } })
+    }
     setSection(item.key)
   }
 
@@ -1116,6 +1125,10 @@ export default function StaffDashboard() {
     overview: { title: `${greeting()}, ${userName}`, subtitle: companyName || '' },
     tasks: { title: 'My Tasks', subtitle: 'Tasks assigned to you' },
     bookings: { title: 'Bookings', subtitle: 'Latest bookings for your company' },
+    analytics: { title: 'Analytics', subtitle: 'How your listings are performing' },
+    marketing: { title: 'Marketing', subtitle: 'Promotions for your listings' },
+    guests: { title: 'Guests', subtitle: 'Everyone who has booked with your company' },
+    tickets: { title: 'Tickets & Check-in', subtitle: 'Verify a customer ticket and check them in' },
     support: { title: 'Support', subtitle: 'Your company tickets with TravelerCom support' },
     finance: { title: 'Finance', subtitle: 'Only the parts your role allows' },
     refunds: { title: 'Refunds', subtitle: 'Refund requests on your company bookings' },
@@ -1193,6 +1206,26 @@ export default function StaffDashboard() {
             go={go}
           />
         )
+
+      case 'tickets':
+        return <VerifyBooking companyId={companyId} embedded />
+
+      case 'analytics':
+        return <Analytics />
+
+      case 'marketing':
+        return (
+          <Promotions
+            companyId={companyId}
+            companyName={companyName || ''}
+            embedded
+            canManage={effective.has('promotions.manage')}
+            canDelete={effective.has('marketing.delete')}
+          />
+        )
+
+      case 'guests':
+        return <GuestList companyId={companyId} embedded hideAmounts={!effective.has('finance.view')} />
 
       case 'support':
         return <SupportPage companyId={companyId} go={go} />
