@@ -10,7 +10,10 @@ const COLORS = {
 
 type Guest = { name: string; bookings: number; totalSpent: number; lastBooking: string }
 
-function GuestList() {
+// companyId: when given (staff dashboard), list guests of exactly that company.
+// embedded: render inside another layout (no page title, no Add Guest shortcut).
+// hideAmounts: hide money figures (for staff without finance access).
+function GuestList({ companyId: companyIdProp, embedded = false, hideAmounts = false }: { companyId?: string; embedded?: boolean; hideAmounts?: boolean } = {}) {
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
@@ -22,10 +25,12 @@ function GuestList() {
       const { data: userData } = await supabase.auth.getUser()
       if (!userData.user) { navigate('/login'); return }
 
-      const { data: company } = await supabase
-        .from('companies').select('id').eq('owner_id', userData.user.id).maybeSingle()
-
-      let companyId: string | null = company?.id || null
+      let companyId: string | null = companyIdProp || null
+      if (!companyId) {
+        const { data: company } = await supabase
+          .from('companies').select('id').eq('owner_id', userData.user.id).maybeSingle()
+        companyId = company?.id || null
+      }
       if (!companyId) {
         const { data: staffRow } = await supabase
           .from('company_staff')
@@ -55,7 +60,7 @@ function GuestList() {
       setLoading(false)
     }
     load()
-  }, [navigate])
+  }, [navigate, companyIdProp])
 
   const filtered = guests.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
 
@@ -78,28 +83,30 @@ function GuestList() {
     const summary = [
       { label: 'Total guests', value: guests.length.toLocaleString() },
       { label: 'Total bookings', value: totalBookings.toLocaleString() },
-      { label: 'Total spent', value: '₦' + totalSpent.toLocaleString() },
+      ...(hideAmounts ? [] : [{ label: 'Total spent', value: '₦' + totalSpent.toLocaleString() }]),
     ]
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '240px' }}>
-            <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Guests</h1>
-            <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>Everyone who has booked with your business.</p>
+            {!embedded && <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Guests</h1>}
+            <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: embedded ? 0 : '4px 0 0' }}>Everyone who has booked with your business.</p>
           </div>
           <input
             type="text" placeholder="Search guests" value={search} onChange={(e) => setSearch(e.target.value)}
             style={{ width: '300px', padding: '12px 14px', border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontSize: '14px', background: COLORS.card, boxSizing: 'border-box' }}
           />
-          <button
-            type="button"
-            onClick={() => navigate('/add-guest')}
-            style={{ padding: '12px 20px', background: '#2563EB', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-            + Add Guest
-          </button>
+          {!embedded && (
+            <button
+              type="button"
+              onClick={() => navigate('/add-guest')}
+              style={{ padding: '12px 20px', background: '#2563EB', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              + Add Guest
+            </button>
+          )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${summary.length}, minmax(0, 1fr))`, gap: '16px', marginBottom: '24px' }}>
           {summary.map((c) => (
             <div key={c.label} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '20px' }}>
               <p style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.value}</p>
@@ -123,7 +130,7 @@ function GuestList() {
                     <th style={th}>Guest</th>
                     <th style={th}>Bookings</th>
                     <th style={th}>Last booking</th>
-                    <th style={{ ...th, textAlign: 'right' as const }}>Total spent</th>
+                    {!hideAmounts && <th style={{ ...th, textAlign: 'right' as const }}>Total spent</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -139,7 +146,7 @@ function GuestList() {
                       </td>
                       <td style={{ ...td, color: '#475569' }}>{x.bookings}</td>
                       <td style={{ ...td, color: '#475569' }}>{new Date(x.lastBooking).toLocaleDateString()}</td>
-                      <td style={{ ...td, textAlign: 'right' as const, fontWeight: 800 }}>₦{x.totalSpent.toLocaleString()}</td>
+                      {!hideAmounts && <td style={{ ...td, textAlign: 'right' as const, fontWeight: 800 }}>₦{x.totalSpent.toLocaleString()}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -152,17 +159,17 @@ function GuestList() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
-      <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+    <div style={embedded ? {} : { minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
+      {!embedded && <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: COLORS.card, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
         <span onClick={() => navigate(-1)} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
         <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text, flex: 1 }}>Guests</h1>
         <span onClick={() => navigate('/add-guest')} style={{
           fontSize: '12.5px', fontWeight: 700, color: '#fff', background: COLORS.primary,
           padding: '8px 14px', borderRadius: '20px', cursor: 'pointer',
         }}>+ Add Guest</span>
-      </div>
+      </div>}
 
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: embedded ? 0 : '16px' }}>
         <input
           type="text" placeholder="Search guests" value={search} onChange={(e) => setSearch(e.target.value)}
           style={{ width: '100%', padding: '11px', border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontSize: '13.5px', marginBottom: '16px', boxSizing: 'border-box', background: COLORS.card }}
@@ -185,7 +192,7 @@ function GuestList() {
                   <p style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.text }}>{g.name}</p>
                   <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{g.bookings} booking{g.bookings > 1 ? 's' : ''} • Last: {new Date(g.lastBooking).toLocaleDateString()}</p>
                 </div>
-                <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.primary }}>₦{g.totalSpent.toLocaleString()}</p>
+                {!hideAmounts && <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.primary }}>₦{g.totalSpent.toLocaleString()}</p>}
               </div>
             ))}
           </div>
