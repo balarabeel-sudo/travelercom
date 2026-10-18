@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabaseClient'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   bg: '#F8FAFC', card: '#FFFFFF', text: '#1A1A1A', textMuted: '#64748B',
@@ -22,6 +23,7 @@ async function resolveEdgeError(data: any, error: any): Promise<string> {
 }
 
 export default function ManageRoles({ companyId, onBack, onCreateRole }: { companyId?: string; onBack?: () => void; onCreateRole?: () => void }) {
+  const isDesktop = useIsDesktop()
   const [resolvedCompanyId, setResolvedCompanyId] = useState<string | null>(companyId || null)
   const [templates, setTemplates] = useState<Template[]>([])
   const [staffCounts, setStaffCounts] = useState<Record<string, number>>({})
@@ -65,8 +67,10 @@ export default function ManageRoles({ companyId, onBack, onCreateRole }: { compa
   useEffect(() => { load() }, [load])
 
   return (
-    <div style={{ background: COLORS.bg, minHeight: '100vh', paddingBottom: 32 }}>
-      <div style={{ background: COLORS.card, padding: 16, borderBottom: `1px solid ${COLORS.border}` }}>
+    <div style={isDesktop ? { background: 'transparent', maxWidth: 1100, margin: '0 auto' } : { background: COLORS.bg, minHeight: '100vh', paddingBottom: 32 }}>
+      <div style={isDesktop
+        ? { background: COLORS.card, padding: '20px 24px', border: `1px solid ${COLORS.border}`, borderRadius: 14, marginBottom: 20 }
+        : { background: COLORS.card, padding: 16, borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button onClick={onBack} style={iconBtn}>‹</button>
@@ -79,15 +83,17 @@ export default function ManageRoles({ companyId, onBack, onCreateRole }: { compa
         </div>
       </div>
 
-      <div style={{ padding: 16 }}>
+      <div style={{ padding: isDesktop ? 0 : 16 }}>
         {loading && <div style={{ textAlign: 'center', color: COLORS.textMuted, padding: 30 }}>Loading…</div>}
 
         {!loading && (
           <>
             <SectionLabel text="Default Roles (shared, read-only)" />
-            {templates.filter((t) => t.company_id === null).map((t) => (
-              <RoleCard key={t.id} t={t} count={staffCounts[t.id] || 0} editable={false} onEdit={() => {}} />
-            ))}
+            <div style={isDesktop ? { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 } : undefined}>
+              {templates.filter((t) => t.company_id === null).map((t) => (
+                <RoleCard key={t.id} t={t} count={staffCounts[t.id] || 0} editable={false} onEdit={() => {}} />
+              ))}
+            </div>
 
             <SectionLabel text="Your Custom Roles" />
             {templates.filter((t) => t.company_id !== null).length === 0 ? (
@@ -95,9 +101,11 @@ export default function ManageRoles({ companyId, onBack, onCreateRole }: { compa
                 No custom roles yet. Tap + to create one.
               </div>
             ) : (
-              templates.filter((t) => t.company_id !== null).map((t) => (
-                <RoleCard key={t.id} t={t} count={staffCounts[t.id] || 0} editable onEdit={() => setEditing(t)} />
-              ))
+              <div style={isDesktop ? { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 } : undefined}>
+                {templates.filter((t) => t.company_id !== null).map((t) => (
+                  <RoleCard key={t.id} t={t} count={staffCounts[t.id] || 0} editable onEdit={() => setEditing(t)} />
+                ))}
+              </div>
             )}
           </>
         )}
@@ -120,12 +128,13 @@ function SectionLabel({ text }: { text: string }) {
 }
 
 function RoleCard({ t, count, editable, onEdit }: { t: Template; count: number; editable: boolean; onEdit: () => void }) {
+  const isDesktop = useIsDesktop()
   return (
     <div
       onClick={editable ? onEdit : undefined}
       style={{
         background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 13,
-        marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: isDesktop ? 0 : 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         cursor: editable ? 'pointer' : 'default',
       }}
     >
@@ -140,6 +149,7 @@ function RoleCard({ t, count, editable, onEdit }: { t: Template; count: number; 
 }
 
 function EditRoleSheet({ template, companyId, onClose, onSaved }: { template: Template; companyId: string; onClose: () => void; onSaved: () => void }) {
+  const isDesktop = useIsDesktop()
   const [perms, setPerms] = useState<Perm[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [error, setError] = useState('')
@@ -180,8 +190,8 @@ function EditRoleSheet({ template, companyId, onClose, onSaved }: { template: Te
   const modules = [...new Set(perms.map((p) => p.module))]
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 20, display: 'flex', alignItems: 'flex-end' }}>
-      <div style={{ background: COLORS.card, width: '100%', maxHeight: '85vh', overflowY: 'auto', borderRadius: '20px 20px 0 0', padding: 16 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: isDesktop ? 60 : 20, display: 'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent: 'center' }}>
+      <div style={{ background: COLORS.card, width: '100%', maxWidth: isDesktop ? 640 : undefined, maxHeight: '85vh', overflowY: 'auto', borderRadius: isDesktop ? 16 : '20px 20px 0 0', padding: isDesktop ? 24 : 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontWeight: 800, fontSize: 16 }}>Edit "{template.name}"</div>
           <span onClick={onClose} style={{ cursor: 'pointer', fontSize: 18, color: COLORS.textMuted }}>✕</span>
