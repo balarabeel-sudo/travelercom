@@ -57,7 +57,9 @@ function Login() {
         <span onClick={() => navigate(-1)} style={{ cursor: 'pointer', display: 'inline-flex', marginBottom: '14px' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
 
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <Logo size={48} />
+          <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+            <Logo size={48} />
+          </div>
           <h1 style={{ fontSize: '21px', fontWeight: 800, color: COLORS.text, marginTop: '12px' }}>Welcome Back</h1>
           <p style={{ color: COLORS.textMuted, fontSize: '13px', marginTop: '4px' }}>Login to your account</p>
         </div>
