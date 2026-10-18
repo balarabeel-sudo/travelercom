@@ -110,7 +110,7 @@ function AppShell() {
     })
     return () => listener.subscription.unsubscribe()
   }, [])
-  const wide = isDesktop && (isCompanyDesktopPath(pathname) || (isCompanyAccount && pathname === '/home'))
+  const wide = isDesktop && (isCompanyDesktopPath(pathname) || pathname === '/login' || (isCompanyAccount && pathname === '/home'))
 
   return (
     <>
