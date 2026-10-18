@@ -40,7 +40,23 @@ type Booking = {
 
 type FilterTab = 'all' | 'pending' | 'completed' | 'cancelled'
 
-function BookingsManagement() {
+// companyId: when given (staff dashboard), manage exactly that company's bookings.
+// embedded: render inside another layout (no page title / back arrow).
+// canCancel / canAssign / showAmounts: what the signed-in staff member is allowed to do and see.
+// Company owners use the page with no props and keep full access.
+function BookingsManagement({
+  companyId: companyIdProp,
+  embedded = false,
+  canCancel = true,
+  canAssign = true,
+  showAmounts = true,
+}: {
+  companyId?: string
+  embedded?: boolean
+  canCancel?: boolean
+  canAssign?: boolean
+  showAmounts?: boolean
+} = {}) {
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
@@ -67,13 +83,15 @@ function BookingsManagement() {
         return
       }
 
-      const { data: company } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('owner_id', userData.user.id)
-        .maybeSingle()
-
-      let companyId: string | null = company?.id || null
+      let companyId: string | null = companyIdProp || null
+      if (!companyId) {
+        const { data: company } = await supabase
+          .from('companies')
+          .select('id')
+          .eq('owner_id', userData.user.id)
+          .maybeSingle()
+        companyId = company?.id || null
+      }
       if (!companyId) {
         const { data: staffRow } = await supabase
           .from('company_staff')
@@ -119,7 +137,7 @@ function BookingsManagement() {
       setLoading(false)
     }
     load()
-  }, [navigate])
+  }, [navigate, companyIdProp])
 
   const getTab = (b: Booking): FilterTab => {
     if (b.booking_status === 'cancelled') return 'cancelled'
@@ -256,14 +274,14 @@ function BookingsManagement() {
             value={`${selectedBooking.check_in_date ? new Date(selectedBooking.check_in_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'} → ${selectedBooking.check_out_date ? new Date(selectedBooking.check_out_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}`}
           />
         )}
-        <DetailRow label="Amount Paid" value={`₦${Number(selectedBooking.amount_paid).toLocaleString()}`} />
+        {showAmounts && <DetailRow label="Amount Paid" value={`₦${Number(selectedBooking.amount_paid).toLocaleString()}`} />}
         <DetailRow label="Source" value={selectedBooking.booking_source === 'offline' ? 'Offline (Add Guest)' : 'Online'} />
         {selectedBooking.payment_method && (
           <DetailRow label="Payment Method" value={selectedBooking.payment_method.toUpperCase()} />
         )}
         <DetailRow label="Booked On" value={new Date(selectedBooking.created_at).toLocaleString()} />
 
-        {getTab(selectedBooking) === 'pending' && (
+        {canCancel && getTab(selectedBooking) === 'pending' && (
           <div
             onClick={() => !cancelling && confirm('Cancel this booking and refund the customer?') && handleCancelBooking()}
             style={{
@@ -275,7 +293,7 @@ function BookingsManagement() {
           </div>
         )}
 
-        {staffList.length > 0 && !assignOpen && (
+        {canAssign && staffList.length > 0 && !assignOpen && (
           <div
             onClick={openAssignPanel}
             style={{
@@ -377,8 +395,8 @@ function BookingsManagement() {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '240px' }}>
-            <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Bookings</h1>
-            <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>
+            {!embedded && <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', margin: 0 }}>Bookings</h1>}
+            <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: embedded ? 0 : '4px 0 0' }}>
               Manage and track every booking for your business.
             </p>
           </div>
@@ -428,7 +446,7 @@ function BookingsManagement() {
                     <th style={th}>Listing</th>
                     <th style={th}>Booked on</th>
                     <th style={th}>Stay dates</th>
-                    <th style={{ ...th, textAlign: 'right' as const }}>Amount</th>
+                    {showAmounts && <th style={{ ...th, textAlign: 'right' as const }}>Amount</th>}
                     <th style={th}>Status</th>
                   </tr>
                 </thead>
@@ -464,9 +482,11 @@ function BookingsManagement() {
                             ? `${b.check_in_date ? new Date(b.check_in_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'} → ${b.check_out_date ? new Date(b.check_out_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}`
                             : '—'}
                         </td>
-                        <td style={{ ...td, textAlign: 'right' as const, fontWeight: 800 }}>
-                          ₦{Number(b.amount_paid).toLocaleString()}
-                        </td>
+                        {showAmounts && (
+                          <td style={{ ...td, textAlign: 'right' as const, fontWeight: 800 }}>
+                            ₦{Number(b.amount_paid).toLocaleString()}
+                          </td>
+                        )}
                         <td style={td}>
                           <span style={{
                             fontSize: '12px', fontWeight: 700, color: badge.color, background: badge.bg,
@@ -493,9 +513,9 @@ function BookingsManagement() {
   // Mobile layout (unchanged)
   // ------------------------------------------------------------------
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
+    <div style={embedded ? {} : { minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
 
-      <div style={{
+      {!embedded && <div style={{
         padding: '18px 20px',
         display: 'flex',
         alignItems: 'center',
@@ -508,9 +528,9 @@ function BookingsManagement() {
       }}>
         <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
         <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Bookings Management</h1>
-      </div>
+      </div>}
 
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: embedded ? 0 : '16px' }}>
         <input
           type="text"
           placeholder="Search by customer or ticket code"
@@ -606,7 +626,7 @@ function BookingsManagement() {
                         <p style={{ fontSize: '11px', color: COLORS.textMuted, fontFamily: 'monospace' }}>{b.ticket_code}</p>
                         <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{new Date(b.created_at).toLocaleDateString()}</p>
                       </div>
-                      <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.primary }}>₦{Number(b.amount_paid).toLocaleString()}</p>
+                      {showAmounts && <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.primary }}>₦{Number(b.amount_paid).toLocaleString()}</p>}
                     </div>
                   )}
                 </div>
