@@ -2,9 +2,11 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { Logo } from './AuthComponents'
+import useIsDesktop from './useIsDesktop'
 
 function SplashScreen() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
 
   useEffect(() => {
     let cancelled = false
@@ -58,8 +60,8 @@ function SplashScreen() {
         position: 'absolute',
         top: '50%',
         left: '50%',
-        width: '260px',
-        height: '260px',
+        width: isDesktop ? '340px' : '260px',
+        height: isDesktop ? '340px' : '260px',
         transform: 'translate(-50%, -50%)',
         background: 'radial-gradient(circle, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0) 72%)',
         borderRadius: '50%',
@@ -67,7 +69,7 @@ function SplashScreen() {
       }} />
 
       <div className="splash-logo">
-        <Logo size={130} />
+        <Logo size={isDesktop ? 160 : 130} />
       </div>
     </div>
   )
