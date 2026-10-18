@@ -166,7 +166,7 @@ function AppShell() {
         <Route path="/verify-otp" element={<VerifyOTP />} />
         <Route path="/upload-docs" element={<UploadDocs />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
-        <Route path="/verify-booking" element={<VerifyBooking />} />
+        <Route path="/verify-booking" element={<CompanyLayout><VerifyBooking /></CompanyLayout>} />
         <Route path="/account" element={<Account />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/add-listing-router" element={<AddListingRouter />} />
