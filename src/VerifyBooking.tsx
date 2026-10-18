@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -32,6 +33,7 @@ type BookingResult = {
 
 function VerifyBooking() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
@@ -171,21 +173,25 @@ function VerifyBooking() {
   const isValid = result && result.booking_status === 'confirmed' && !result.checked_in
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
+    <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '1000px' : '480px', margin: '0 auto', paddingBottom: isDesktop ? '0' : '40px' }}>
 
       <div style={{
-        padding: '18px 20px',
+        padding: isDesktop ? '20px 24px' : '18px 20px',
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
         background: COLORS.card,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+        boxShadow: isDesktop ? 'none' : '0 1px 4px rgba(0,0,0,0.05)',
+        border: isDesktop ? `1px solid ${COLORS.border}` : undefined,
+        borderRadius: isDesktop ? '14px' : undefined,
+        marginBottom: isDesktop ? '20px' : undefined
       }}>
         <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
         <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Verify Booking</h1>
       </div>
 
-      <div style={{ padding: '20px 16px' }}>
+      <div style={isDesktop ? { display: 'grid', gridTemplateColumns: '380px 1fr', gap: '20px', alignItems: 'start' } : { padding: '20px 16px' }}>
+        <div>
         <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '16px' }}>
           Enter the customer's ticket serial number to verify their booking.
         </p>
@@ -231,6 +237,9 @@ function VerifyBooking() {
           </button>
         </div>
 
+        </div>
+
+        <div>
         {searched && !result && (
           <div style={{
             background: COLORS.redBg,
@@ -386,6 +395,20 @@ function VerifyBooking() {
             )}
           </div>
         )}
+
+        {isDesktop && !searched && !result && (
+          <div style={{
+            border: `1px dashed ${COLORS.border}`,
+            borderRadius: '14px',
+            padding: '40px 20px',
+            textAlign: 'center',
+            color: COLORS.textMuted,
+            fontSize: '13px'
+          }}>
+            Ticket details will appear here after you verify a code.
+          </div>
+        )}
+        </div>
       </div>
     </div>
   )
