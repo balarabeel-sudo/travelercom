@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   bg: '#F8FAFC', card: '#FFFFFF', text: '#1A1A1A', textMuted: '#64748B',
@@ -20,7 +21,8 @@ async function resolveEdgeError(data: any, error: any): Promise<string> {
   return error?.message || 'Action failed'
 }
 
-export default function CreateRole({ companyId, onBack, onCreated }: { companyId?: string; onBack?: () => void; onCreated?: () => void }) {
+export default function CreateRole({ companyId, onBack, onCreated, embedded = false }: { companyId?: string; onBack?: () => void; onCreated?: () => void; embedded?: boolean }) {
+  const isDesktop = useIsDesktop()
   const [resolvedCompanyId, setResolvedCompanyId] = useState<string | null>(companyId || null)
   const [perms, setPerms] = useState<Perm[]>([])
   const [name, setName] = useState('')
@@ -84,7 +86,7 @@ export default function CreateRole({ companyId, onBack, onCreated }: { companyId
 
   if (success) {
     return (
-      <div style={{ background: COLORS.bg, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={embedded ? { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px' } : { background: COLORS.bg, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
         <div style={{ fontSize: 17, fontWeight: 800, color: COLORS.text, marginBottom: 6 }}>Role created</div>
         <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 20, textAlign: 'center' }}>
@@ -98,8 +100,8 @@ export default function CreateRole({ companyId, onBack, onCreated }: { companyId
   }
 
   return (
-    <div style={{ background: COLORS.bg, minHeight: '100vh', paddingBottom: 100 }}>
-      <div style={{ background: COLORS.card, padding: 16, borderBottom: `1px solid ${COLORS.border}` }}>
+    <div style={isDesktop ? { background: 'transparent', maxWidth: 760, margin: '0 auto', paddingBottom: 40 } : embedded ? { paddingBottom: 32 } : { background: COLORS.bg, minHeight: '100vh', paddingBottom: 100 }}>
+      <div style={isDesktop ? { background: COLORS.card, padding: '20px 24px', border: `1px solid ${COLORS.border}`, borderRadius: 14, marginBottom: 20 } : { background: COLORS.card, padding: 16, borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={onBack} style={iconBtn}>‹</button>
           <div>
@@ -109,7 +111,7 @@ export default function CreateRole({ companyId, onBack, onCreated }: { companyId
         </div>
       </div>
 
-      <div style={{ padding: 16 }}>
+      <div style={{ padding: isDesktop ? 0 : 16 }}>
         {error && <div style={{ background: COLORS.redBg, color: COLORS.red, padding: 12, borderRadius: 10, fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
         <label style={label}>Role Name</label>
