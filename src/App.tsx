@@ -95,8 +95,17 @@ function InviteRedirectListener() {
   return null
 }
 
-// Entry screens that use the full desktop width (splash, account type, login).
-const AUTH_WIDE_PATHS = ['/', '/account-type', '/login']
+// Entry screens that use the full desktop width (splash, sign-up and login flow).
+const AUTH_WIDE_PATHS = [
+  '/',
+  '/account-type',
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/verify-otp',
+  '/upload-docs',
+  '/pending-approval',
+]
 
 function AppShell() {
   const isDesktop = useIsDesktop()
