@@ -96,13 +96,26 @@ type ActivityRow = {
 export default function CompanyStaffAccess({
   companyId: companyIdProp,
   onBack,
+  embedded = false,
+  onOpenPage,
+  hiddenPages = [],
 }: {
   companyId?: string
   onBack?: () => void
+  // embedded: render inside another layout (staff dashboard) without its own page header.
+  embedded?: boolean
+  // onOpenPage: open a sub-page inside the host layout instead of navigating to /staff/...
+  onOpenPage?: (page: 'create-role' | 'permission-matrix' | 'manage-roles' | 'activity-log') => void
+  // hiddenPages: quick actions the host layout cannot show yet.
+  hiddenPages?: string[]
 }) {
   const [companyId, setCompanyId] = useState<string | null>(companyIdProp || null)
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
+  const openPage = (page: 'create-role' | 'permission-matrix' | 'manage-roles' | 'activity-log', route: string) => {
+    if (onOpenPage) onOpenPage(page)
+    else navigate(route)
+  }
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -283,9 +296,9 @@ export default function CompanyStaffAccess({
   }
 
   return (
-    <div style={isDesktop ? { background: 'transparent', maxWidth: 1100, margin: '0 auto' } : { background: COLORS.bg, minHeight: '100vh', paddingBottom: 32 }}>
+    <div style={isDesktop ? { background: 'transparent', maxWidth: 1100, margin: '0 auto' } : embedded ? { background: COLORS.bg } : { background: COLORS.bg, minHeight: '100vh', paddingBottom: 32 }}>
       {/* Header */}
-      <div style={isDesktop ? { background: COLORS.card, padding: '20px 24px', border: `1px solid ${COLORS.border}`, borderRadius: 14, marginBottom: 20 } : { background: COLORS.card, padding: '16px 16px 20px', borderBottom: `1px solid ${COLORS.border}` }}>
+      {!embedded && <div style={isDesktop ? { background: COLORS.card, padding: '20px 24px', border: `1px solid ${COLORS.border}`, borderRadius: 14, marginBottom: 20 } : { background: COLORS.card, padding: '16px 16px 20px', borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button onClick={onBack} style={iconBtnStyle}><Icon name="arrowLeft" size={18} color={COLORS.text} /></button>
@@ -306,7 +319,7 @@ export default function CompanyStaffAccess({
             )}
           </div>
         </div>
-      </div>
+      </div>}
 
       {errorMsg && (
         <div style={{ margin: 16, padding: 12, background: COLORS.redBg, color: COLORS.red, borderRadius: 10, fontSize: 13 }}>
@@ -604,10 +617,10 @@ export default function CompanyStaffAccess({
         <div style={{ fontSize: 15, fontWeight: 800, color: COLORS.text, marginBottom: 10 }}>Quick Actions</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))', gap: 10 }}>
           {can('staff.invite') && <QuickAction icon="userPlus" label="Invite Staff" onClick={() => setShowInvite(true)} />}
-          {can('staff.edit') && <QuickAction icon="shield" label="Create Role" onClick={() => navigate('/staff/create-role')} />}
-          <QuickAction icon="clipboard" label="Permission Matrix" onClick={() => navigate('/staff/permission-matrix')} />
-          {can('staff.edit') && <QuickAction icon="crown" label="Manage Roles" onClick={() => navigate('/staff/manage-roles')} />}
-          <QuickAction icon="fileText" label="Activity Log" onClick={() => navigate('/staff/activity-log')} />
+          {can('staff.edit') && !hiddenPages.includes('create-role') && <QuickAction icon="shield" label="Create Role" onClick={() => openPage('create-role', '/staff/create-role')} />}
+          {!hiddenPages.includes('permission-matrix') && <QuickAction icon="clipboard" label="Permission Matrix" onClick={() => openPage('permission-matrix', '/staff/permission-matrix')} />}
+          {can('staff.edit') && !hiddenPages.includes('manage-roles') && <QuickAction icon="crown" label="Manage Roles" onClick={() => openPage('manage-roles', '/staff/manage-roles')} />}
+          {!hiddenPages.includes('activity-log') && <QuickAction icon="fileText" label="Activity Log" onClick={() => openPage('activity-log', '/staff/activity-log')} />}
         </div>
       </div>
 
