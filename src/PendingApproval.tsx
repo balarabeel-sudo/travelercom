@@ -1,4 +1,7 @@
+import useIsDesktop from './useIsDesktop'
+
 function PendingApproval() {
+  const isDesktop = useIsDesktop()
 
   return (
     <div style={{
@@ -15,7 +18,7 @@ function PendingApproval() {
 
       <h1 style={{
         color: 'white',
-        fontSize: '26px',
+        fontSize: isDesktop ? '32px' : '26px',
         fontWeight: 'bold',
         marginBottom: '16px'
       }}>
@@ -27,7 +30,7 @@ function PendingApproval() {
         fontSize: '15px',
         lineHeight: '1.6',
         marginBottom: '32px',
-        maxWidth: '300px'
+        maxWidth: isDesktop ? '440px' : '300px'
       }}>
         Your company documents are under review. We will notify you via email within 24-48 hours.
       </p>
@@ -36,7 +39,7 @@ function PendingApproval() {
         background: 'rgba(255,255,255,0.2)',
         borderRadius: '16px',
         padding: '20px',
-        maxWidth: '300px',
+        maxWidth: isDesktop ? '440px' : '300px',
         width: '100%',
         marginBottom: '32px'
       }}>
@@ -51,7 +54,7 @@ function PendingApproval() {
         </p>
       </div>
 
-      <a href="/login" style={{
+      <a href="#/login" style={{
         padding: '14px 48px',
         background: 'white',
         color: '#f97316',
