@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   bg: '#F8FAFC', card: '#FFFFFF', text: '#1A1A1A', textMuted: '#64748B',
@@ -10,7 +11,8 @@ const COLORS = {
 type Perm = { key: string; module: string; description: string; risk_level: string }
 type Template = { id: string; name: string }
 
-export default function PermissionMatrix({ onBack }: { onBack?: () => void }) {
+export default function PermissionMatrix({ onBack, embedded = false }: { onBack?: () => void; embedded?: boolean }) {
+  const isDesktop = useIsDesktop()
   const [perms, setPerms] = useState<Perm[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [grid, setGrid] = useState<Record<string, Set<string>>>({}) // template_id -> set of permission_key
@@ -38,8 +40,8 @@ export default function PermissionMatrix({ onBack }: { onBack?: () => void }) {
   const modules = [...new Set(perms.map((p) => p.module))]
 
   return (
-    <div style={{ background: COLORS.bg, minHeight: '100vh', paddingBottom: 32 }}>
-      <div style={{ background: COLORS.card, padding: 16, borderBottom: `1px solid ${COLORS.border}` }}>
+    <div style={isDesktop ? { background: 'transparent', maxWidth: 1100, margin: '0 auto' } : embedded ? {} : { background: COLORS.bg, minHeight: '100vh', paddingBottom: 32 }}>
+      <div style={isDesktop ? { background: COLORS.card, padding: '20px 24px', border: `1px solid ${COLORS.border}`, borderRadius: 14, marginBottom: 20 } : { background: COLORS.card, padding: 16, borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={onBack} style={iconBtn}>‹</button>
           <div>
@@ -52,7 +54,7 @@ export default function PermissionMatrix({ onBack }: { onBack?: () => void }) {
       {loading ? (
         <div style={{ textAlign: 'center', color: COLORS.textMuted, padding: 40 }}>Loading…</div>
       ) : (
-        <div style={{ padding: '16px', overflowX: 'auto' }}>
+        <div style={{ padding: isDesktop ? 0 : '16px', overflowX: 'auto' }}>
           <div style={{ minWidth: templates.length * 92 + 170 }}>
             {/* Header row */}
             <div style={{ display: 'flex', position: 'sticky', top: 0, background: COLORS.bg, zIndex: 2, paddingBottom: 8 }}>
