@@ -19,6 +19,7 @@ const COMPANY_DESKTOP_BASES = [
   '/my-listings',
   '/listings-management',
   '/bookings-management',
+  '/verify-booking',
   '/guests',
   '/reviews',
   '/settings',
