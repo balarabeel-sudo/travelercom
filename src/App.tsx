@@ -122,7 +122,7 @@ function AppShell() {
     })
     return () => listener.subscription.unsubscribe()
   }, [])
-  const wide = isDesktop && (isCompanyDesktopPath(pathname) || AUTH_WIDE_PATHS.includes(pathname) || (isCompanyAccount && pathname === '/home'))
+  const wide = isDesktop && (isCompanyDesktopPath(pathname) || AUTH_WIDE_PATHS.includes(pathname) || pathname === '/staff-dashboard' || (isCompanyAccount && pathname === '/home'))
 
   return (
     <>
