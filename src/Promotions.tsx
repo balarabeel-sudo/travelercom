@@ -36,7 +36,23 @@ type Promotion = {
 
 type FilterTab = 'all' | 'active' | 'paused' | 'completed'
 
-export default function Promotions() {
+// companyId / companyName: when given (staff dashboard), work on exactly that company.
+// embedded: render inside another layout (no page header, no back arrow).
+// canManage: may create / pause promotions. canDelete: may delete promotions.
+// Company owners use the page with no props and keep full access.
+export default function Promotions({
+  companyId: companyIdProp,
+  companyName: companyNameProp,
+  embedded = false,
+  canManage = true,
+  canDelete = true,
+}: {
+  companyId?: string
+  companyName?: string
+  embedded?: boolean
+  canManage?: boolean
+  canDelete?: boolean
+} = {}) {
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
   const [loading, setLoading] = useState(true)
@@ -63,11 +79,14 @@ export default function Promotions() {
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) { navigate('/login'); return }
 
-    const { data: company } = await supabase
-      .from('companies')
-      .select('id, business_name')
-      .eq('owner_id', userData.user.id)
-      .maybeSingle()
+    const { data: ownCompany } = companyIdProp
+      ? { data: null }
+      : await supabase
+          .from('companies')
+          .select('id, business_name')
+          .eq('owner_id', userData.user.id)
+          .maybeSingle()
+    const company = companyIdProp ? { id: companyIdProp, business_name: companyNameProp || '' } : ownCompany
 
     if (!company) { setLoading(false); return }
     setCompanyId(company.id)
@@ -104,7 +123,7 @@ export default function Promotions() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [companyIdProp])
 
   const handleAdd = async () => {
     if (!companyId || !serviceId || !title.trim() || !discountValue) return
@@ -209,8 +228,9 @@ export default function Promotions() {
   })
 
   return (
-    <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '1000px' : '480px', margin: '0 auto', paddingBottom: isDesktop ? '0' : '90px' }}>
+    <div style={embedded ? { margin: '0 auto', maxWidth: isDesktop ? '1000px' : undefined } : { minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '1000px' : '480px', margin: '0 auto', paddingBottom: isDesktop ? '0' : '90px' }}>
 
+      {!embedded && (
       <div style={{
         padding: isDesktop ? '20px 24px' : '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: COLORS.card, position: isDesktop ? 'static' : 'sticky', top: 0, zIndex: 10, boxShadow: isDesktop ? 'none' : '0 1px 4px rgba(0,0,0,0.05)', border: isDesktop ? `1px solid ${COLORS.border}` : undefined, borderRadius: isDesktop ? '14px' : undefined, marginBottom: isDesktop ? '20px' : undefined
@@ -231,8 +251,20 @@ export default function Promotions() {
           <span style={{ fontSize: '12px', fontWeight: 700 }}>Create</span>
         </div>
       </div>
+      )}
 
-      <div style={{ padding: isDesktop ? '0' : '16px' }}>
+      {embedded && canManage && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+          <div
+            onClick={() => setShowForm(!showForm)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: COLORS.purple, color: 'white', padding: '8px 12px', borderRadius: '10px', cursor: 'pointer' }}>
+            <Icon name="plus" size={15} color="white" />
+            <span style={{ fontSize: '12px', fontWeight: 700 }}>Create</span>
+          </div>
+        </div>
+      )}
+
+      <div style={{ padding: (isDesktop || embedded) ? '0' : '16px' }}>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>
           <StatBox icon="megaphone" color={COLORS.purple} value={activeCount} label="Active" />
@@ -241,7 +273,7 @@ export default function Promotions() {
           <StatBox icon="star" color={COLORS.primary} value={avgDiscount != null ? `${avgDiscount}%` : '—'} label="Avg Discount" />
         </div>
 
-        {showForm && (
+        {showForm && canManage && (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '14px', fontWeight: 700, marginBottom: '12px', color: COLORS.text }}>New Promotion</p>
 
@@ -302,7 +334,7 @@ export default function Promotions() {
 
         {filtered.length === 0 ? (
           <div style={{ background: COLORS.card, padding: '32px 20px', textAlign: 'center', borderRadius: '14px', color: COLORS.textMuted }}>
-            {promotions.length === 0 ? 'No promotions yet. Tap Create to add your first one.' : 'No promotions match this filter.'}
+            {promotions.length === 0 ? (canManage ? 'No promotions yet. Tap Create to add your first one.' : 'No promotions yet.') : 'No promotions match this filter.'}
           </div>
         ) : (
           filtered.map((promo) => {
@@ -325,9 +357,11 @@ export default function Promotions() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <p style={{ fontSize: '14px', fontWeight: 800, color: COLORS.text }}>{promo.title}</p>
-                      <div onClick={() => deletePromotion(promo.id)} style={{ cursor: 'pointer', flexShrink: 0 }}>
-                        <Icon name="trash" size={15} color={COLORS.red} />
-                      </div>
+                      {canDelete && (
+                        <div onClick={() => deletePromotion(promo.id)} style={{ cursor: 'pointer', flexShrink: 0 }}>
+                          <Icon name="trash" size={15} color={COLORS.red} />
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
                       <Icon name="crown" size={11} color={COLORS.purple} />
@@ -354,7 +388,7 @@ export default function Promotions() {
                   }}>
                     {status === 'completed' ? 'Completed' : status === 'active' ? 'Active' : 'Paused'}
                   </span>
-                  {status !== 'completed' && (
+                  {canManage && status !== 'completed' && (
                     <div onClick={() => toggleActive(promo)} style={{ background: '#f1f5f9', color: COLORS.purple, fontSize: '11.5px', fontWeight: 700, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer' }}>
                       {promo.active ? 'Pause' : 'Activate'}
                     </div>
