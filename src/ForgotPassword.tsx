@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import useIsDesktop from './useIsDesktop'
+import AuthBrandPanel from './AuthBrandPanel'
 import Icon from './Icons'
 import { Logo, PrimaryButton, InputField, PasswordField, FormError, COLORS } from './AuthComponents'
 
@@ -16,6 +18,7 @@ const MIN_PASSWORD_LENGTH = 8
 
 function ForgotPassword() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const location = useLocation()
   const prefill = (location.state as { email?: string } | null)?.email || ''
 
@@ -116,7 +119,9 @@ function ForgotPassword() {
     'You can now log in with your new password.'
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+    <div style={isDesktop ? { minHeight: '100vh', background: '#F8FAFC', display: 'flex', flexDirection: 'row', alignItems: 'stretch' } : { minHeight: '100vh', background: COLORS.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      {isDesktop && <AuthBrandPanel />}
+      <div style={isDesktop ? { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' } : { width: '100%', display: 'flex', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: '400px', background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
 
         {(step === 'email' || step === 'code') && (
@@ -186,6 +191,7 @@ function ForgotPassword() {
         {step === 'done' && (
           <PrimaryButton onClick={() => navigate('/login', { replace: true })} color={color} loading={false}>Back to Login</PrimaryButton>
         )}
+      </div>
       </div>
     </div>
   )
