@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import useIsDesktop from './useIsDesktop'
+import AuthBrandPanel from './AuthBrandPanel'
 
 function VerifyOTP() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [searchParams] = useSearchParams()
   const email = searchParams.get('email') || ''
   const accountType = searchParams.get('type') || 'personal'
@@ -37,7 +40,7 @@ function VerifyOTP() {
   const color = accountType === 'personal' ? '#0ea5e9' : '#f97316'
 
   return (
-    <div style={{
+    <div style={isDesktop ? { minHeight: '100vh', background: '#F8FAFC', display: 'flex', flexDirection: 'row', alignItems: 'stretch' } : {
       minHeight: '100vh',
       background: '#f8fafc',
       display: 'flex',
@@ -46,6 +49,8 @@ function VerifyOTP() {
       justifyContent: 'center',
       padding: '20px'
     }}>
+      {isDesktop && <AuthBrandPanel />}
+      <div style={isDesktop ? { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' } : { width: '100%', display: 'flex', justifyContent: 'center' }}>
       <div style={{
         width: '100%',
         maxWidth: '400px',
@@ -120,6 +125,7 @@ function VerifyOTP() {
             Resend
           </span>
         </p>
+      </div>
       </div>
     </div>
   )
