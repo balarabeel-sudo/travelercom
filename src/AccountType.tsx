@@ -1,11 +1,20 @@
 import { useNavigate } from 'react-router-dom'
 import { AccountTypeCard, COLORS } from './AuthComponents'
+import useIsDesktop from './useIsDesktop'
+import AuthBrandPanel from './AuthBrandPanel'
 
 function AccountType() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
 
   return (
-    <div style={{
+    <div style={isDesktop ? {
+      minHeight: '100vh',
+      background: COLORS.bg,
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'stretch',
+    } : {
       minHeight: '100vh',
       background: COLORS.bg,
       display: 'flex',
@@ -15,6 +24,21 @@ function AccountType() {
       padding: '24px',
       textAlign: 'center',
     }}>
+      {isDesktop && <AuthBrandPanel />}
+      <div style={isDesktop ? {
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '40px',
+        textAlign: 'center',
+      } : {
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+      }}>
       <h1 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '4px', marginTop: '14px' }}>
         Welcome to<br />
         <span style={{ color: COLORS.primary, fontSize: '15px' }}>traveler</span><span style={{ color: COLORS.secondary, fontSize: '15px' }}>.com</span>
@@ -58,6 +82,7 @@ function AccountType() {
       <p style={{ color: '#94a3b8', fontSize: '11px', marginTop: '14px' }}>
         By continuing, you agree to our Terms and Privacy Policy
       </p>
+      </div>
     </div>
   )
 }
