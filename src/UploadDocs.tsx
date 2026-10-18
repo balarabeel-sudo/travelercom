@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import useIsDesktop from './useIsDesktop'
+import AuthBrandPanel from './AuthBrandPanel'
 import Icon from './Icons'
 
 const COLORS = {
@@ -17,6 +19,7 @@ const COLORS = {
 
 function UploadDocs() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [cacDoc, setCacDoc] = useState<File | null>(null)
   const [idDoc, setIdDoc] = useState<File | null>(null)
   const [cacNumber, setCacNumber] = useState('')
@@ -109,7 +112,7 @@ function UploadDocs() {
   }
 
   return (
-    <div style={{
+    <div style={isDesktop ? { minHeight: '100vh', background: '#F8FAFC', display: 'flex', flexDirection: 'row', alignItems: 'stretch' } : {
       minHeight: '100vh',
       background: COLORS.bg,
       display: 'flex',
@@ -118,6 +121,8 @@ function UploadDocs() {
       justifyContent: 'center',
       padding: '20px'
     }}>
+      {isDesktop && <AuthBrandPanel />}
+      <div style={isDesktop ? { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' } : { width: '100%', display: 'flex', justifyContent: 'center' }}>
       <div style={{
         width: '100%',
         maxWidth: '400px',
@@ -221,6 +226,7 @@ function UploadDocs() {
           }}>
           {submitting ? 'Submitting...' : (<><Icon name="checkCircle" size={16} color="white" /> Submit for Review</>)}
         </button>
+      </div>
       </div>
     </div>
   )
