@@ -79,7 +79,7 @@ export default function ManageRoles({ companyId, onBack, onCreateRole }: { compa
               <div style={{ fontSize: 12, color: COLORS.textMuted }}>Default & custom roles for your team</div>
             </div>
           </div>
-          <button onClick={onCreateRole} style={{ ...iconBtn, background: COLORS.purple, color: '#fff' }}>+</button>
+          {onCreateRole && <button onClick={onCreateRole} style={{ ...iconBtn, background: COLORS.purple, color: '#fff' }}>+</button>}
         </div>
       </div>
 
@@ -98,7 +98,7 @@ export default function ManageRoles({ companyId, onBack, onCreateRole }: { compa
             <SectionLabel text="Your Custom Roles" />
             {templates.filter((t) => t.company_id !== null).length === 0 ? (
               <div style={{ fontSize: 12.5, color: COLORS.textMuted, padding: '10px 0 20px' }}>
-                No custom roles yet. Tap + to create one.
+                No custom roles yet.{onCreateRole ? ' Tap + to create one.' : ''}
               </div>
             ) : (
               <div style={isDesktop ? { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 } : undefined}>
