@@ -7,6 +7,12 @@ import VerifyBooking from './VerifyBooking'
 import GuestList from './GuestList'
 import Promotions from './Promotions'
 import Analytics from './Analytics'
+import CompanyStaffAccess from './CompanyStaffAccess'
+import ManageRoles from './ManageRoles'
+import CreateRole from './CreateRole'
+import PermissionMatrix from './PermissionMatrix'
+import ActivityLog from './ActivityLog'
+import BookingsManagement from './BookingsManagement'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -257,8 +263,8 @@ const searchInput: React.CSSProperties = {
 // what their permissions allow. Row-level security in the database is the real
 // gate; these pages simply never ask for data the role cannot see.
 // ---------------------------------------------------------------------------
-function BookingsPage({ companyId, canSeeAmounts, canManage, go }: {
-  companyId: string; canSeeAmounts: boolean; canManage: boolean; go: (route: string) => void
+function BookingsPage({ companyId, canSeeAmounts }: {
+  companyId: string; canSeeAmounts: boolean
 }) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -312,7 +318,6 @@ function BookingsPage({ companyId, canSeeAmounts, canManage, go }: {
         />
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const }}>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search customer or ticket" style={searchInput} />
-          {canManage && <LinkButton label="Open Bookings Management" onClick={() => go('/bookings-management')} />}
         </div>
       </div>
       {loading ? (
@@ -481,88 +486,6 @@ function RefundsPage() {
   )
 }
 
-function TeamPage({ companyId, canManage, go }: { companyId: string; canManage: boolean; go: (route: string) => void }) {
-  const [rows, setRows] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    (async () => {
-      const { data: staffRows, error: err } = await supabase
-        .from('company_staff')
-        .select('id, user_id, template_id, role_label, status, joined_at, last_active_at')
-        .eq('company_id', companyId)
-        .order('joined_at', { ascending: true })
-      if (err) { setError(err.message); setLoading(false); return }
-      const list = staffRows || []
-      const userIds = list.map((s: any) => s.user_id)
-      const [{ data: profs }, { data: templates }] = await Promise.all([
-        userIds.length ? supabase.from('profiles').select('id, full_name').in('id', userIds) : Promise.resolve({ data: [] } as any),
-        supabase.from('company_role_templates').select('id, name'),
-      ])
-      const nameById: Record<string, string> = {}
-      for (const p of (profs || []) as any[]) nameById[p.id] = p.full_name
-      const tplById: Record<string, string> = {}
-      for (const t of (templates || []) as any[]) tplById[t.id] = t.name
-      setRows(list.map((s: any) => ({
-        ...s,
-        name: nameById[s.user_id] || 'Team member',
-        role: (s.template_id && tplById[s.template_id]) || s.role_label || 'Staff',
-      })))
-      setLoading(false)
-    })()
-  }, [companyId])
-
-  return (
-    <Card pad={0}>
-      {canManage && (
-        <div style={{ padding: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' as const }}>
-          <p style={{ fontSize: 13, color: COLORS.textMuted }}>Manage roles, permissions and invitations.</p>
-          <LinkButton label="Open Staff & Access" onClick={() => go(`/staff?company=${companyId}`)} />
-        </div>
-      )}
-      {loading ? (
-        <p style={{ padding: 24, fontSize: 13, color: COLORS.textMuted }}>Loading team...</p>
-      ) : error ? (
-        <p style={{ padding: 24, fontSize: 13, color: COLORS.red }}>{error}</p>
-      ) : (
-        <DataTable
-          cols={[
-            { label: 'Name', render: (r) => (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Avatar label={r.name} size={30} />
-                <span style={{ fontWeight: 700 }}>{r.name}</span>
-              </div>
-            ) },
-            { label: 'Role', render: (r) => r.role },
-            { label: 'Status', render: (r) => <Pill status={r.status} /> },
-            { label: 'Joined', render: (r) => fmtDate(r.joined_at) },
-            { label: 'Last active', render: (r) => fmtDate(r.last_active_at) },
-          ]}
-          rows={rows} emptyIcon="users" emptyTitle="No team members" emptyText="Staff added to your company will appear here."
-        />
-      )}
-    </Card>
-  )
-}
-
-const fieldLabel: React.CSSProperties = { fontSize: 11.5, fontWeight: 800, color: COLORS.textMuted, letterSpacing: 0.4, marginBottom: 5, display: 'block' }
-const fieldInput: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10,
-  border: `1px solid ${COLORS.border}`, fontSize: 13, background: '#fff', outline: 'none', color: COLORS.text,
-}
-const primaryBtn: React.CSSProperties = {
-  border: 'none', background: COLORS.primary, color: '#fff', borderRadius: 10,
-  padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-}
-
-const toLocalInput = (iso?: string | null) => {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-}
-
-// Operations: availability and schedules for the company's listings.
 function OperationsPage({ companyId, canAvailability, canSchedule }: { companyId: string; canAvailability: boolean; canSchedule: boolean }) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -855,6 +778,7 @@ export default function StaffDashboard() {
   const [userName, setUserName] = useState('')
   const [staff, setStaff] = useState<StaffInfo | null>(null)
   const [companyName, setCompanyName] = useState('')
+  const [teamView, setTeamView] = useState<'main' | 'roles' | 'create-role' | 'matrix' | 'log'>('main')
   const [roleName, setRoleName] = useState('')
 
   const [catalog, setCatalog] = useState<PermRow[]>([])
@@ -1010,6 +934,7 @@ export default function StaffDashboard() {
       navigate(item.route, { state: { backTo: `/staff-dashboard?company=${staff?.company_id || ''}`, companyId: staff?.company_id } })
       return
     }
+    if (item.key === 'team') setTeamView('main')
     if (item.key === 'analytics') {
       // The Analytics pages read the company and their back target from the navigation state.
       const target = `/staff-dashboard?company=${staff?.company_id || ''}`
@@ -1197,15 +1122,20 @@ export default function StaffDashboard() {
           <Card><TasksList tasks={tasks} onDone={markTaskDone} /></Card>
         )
 
-      case 'bookings':
-        return (
-          <BookingsPage
+      case 'bookings': {
+        const canManageBookings = effective.has('bookings.edit') || effective.has('bookings.create') || effective.has('bookings.cancel')
+        return canManageBookings ? (
+          <BookingsManagement
             companyId={companyId}
-            canSeeAmounts={effective.has('finance.view')}
-            canManage={effective.has('bookings.edit') || effective.has('bookings.create') || effective.has('bookings.cancel')}
-            go={go}
+            embedded
+            canCancel={effective.has('bookings.cancel')}
+            canAssign={effective.has('bookings.edit')}
+            showAmounts={effective.has('finance.view')}
           />
+        ) : (
+          <BookingsPage companyId={companyId} canSeeAmounts={effective.has('finance.view')} />
         )
+      }
 
       case 'tickets':
         return <VerifyBooking companyId={companyId} embedded />
@@ -1237,7 +1167,30 @@ export default function StaffDashboard() {
         return <RefundsPage />
 
       case 'team':
-        return <TeamPage companyId={companyId} canManage={effective.has('staff.edit') || effective.has('staff.invite')} go={go} />
+        if (teamView === 'roles') {
+          return <ManageRoles companyId={companyId} onBack={() => setTeamView('main')} onCreateRole={() => setTeamView('create-role')} />
+        }
+        if (teamView === 'create-role') {
+          return <CreateRole companyId={companyId} embedded onBack={() => setTeamView('roles')} />
+        }
+        if (teamView === 'matrix') {
+          return <PermissionMatrix embedded onBack={() => setTeamView('main')} />
+        }
+        if (teamView === 'log') {
+          return <ActivityLog companyId={companyId} embedded onBack={() => setTeamView('main')} />
+        }
+        return (
+          <CompanyStaffAccess
+            companyId={companyId}
+            embedded
+            onOpenPage={(page) => {
+              if (page === 'manage-roles') setTeamView('roles')
+              else if (page === 'create-role') setTeamView('create-role')
+              else if (page === 'permission-matrix') setTeamView('matrix')
+              else if (page === 'activity-log') setTeamView('log')
+            }}
+          />
+        )
 
       case 'operations':
         return (
