@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 import { Logo, PrimaryButton, InputField, PasswordField, FormError, SocialLoginButtons, COLORS } from './AuthComponents'
 
 function Login() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [toggle, setToggle] = useState<'personal' | 'company'>('personal')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -46,14 +48,43 @@ function Login() {
   const color = toggle === 'personal' ? COLORS.primary : COLORS.secondary
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+    <div style={isDesktop
+      ? { minHeight: '100vh', background: COLORS.bg, display: 'flex', flexDirection: 'row', alignItems: 'stretch' }
+      : { minHeight: '100vh', background: COLORS.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       {toast && (
         <div style={{ position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)', background: '#0B1E3D', color: 'white', fontSize: '12.5px', fontWeight: 600, padding: '10px 18px', borderRadius: '10px', zIndex: 50 }}>
           {toast}
         </div>
       )}
 
-      <div style={{ width: '100%', maxWidth: '400px', background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+      {isDesktop && (
+        <div style={{
+          flex: 1,
+          background: `linear-gradient(135deg, #0B1E3D 0%, ${COLORS.primary} 100%)`,
+          color: 'white',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          padding: '64px'
+        }}>
+          <h2 style={{ fontSize: '38px', fontWeight: 800, margin: 0 }}>TravelerCom</h2>
+          <p style={{ fontSize: '17px', marginTop: '12px', maxWidth: '420px', lineHeight: 1.5, opacity: 0.92 }}>
+            Travel and booking across Nigeria, all in one place.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '28px', maxWidth: '460px' }}>
+            {['Hotels', 'Flights', 'Buses', 'Trains', 'Tours', 'Event Centers', 'Vehicle Rentals'].map((label) => (
+              <span key={label} style={{ background: 'rgba(255,255,255,0.16)', padding: '8px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={isDesktop
+        ? { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }
+        : { width: '100%', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: isDesktop ? '420px' : '400px', background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
         <span onClick={() => navigate(-1)} style={{ cursor: 'pointer', display: 'inline-flex', marginBottom: '14px' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
 
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
@@ -103,6 +134,7 @@ function Login() {
             Sign Up
           </span>
         </p>
+      </div>
       </div>
     </div>
   )
