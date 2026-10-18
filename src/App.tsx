@@ -143,6 +143,15 @@ function AppShell() {
           display: block;
           padding: 0;
           background: #F8FAFC;
+          /* Pin the wide layout to the whole browser window so it never depends on the
+             size of #root/body (those can shrink the page into a narrow centered column). */
+          position: fixed;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          left: 0;
+          overflow-y: auto;
+          overflow-x: hidden;
         }
         .tc-app-frame--wide {
           width: 100%;
