@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import useIsDesktop from './useIsDesktop'
+import AuthBrandPanel from './AuthBrandPanel'
 import { Logo, PrimaryButton, InputField, PasswordField, FormError, SocialLoginButtons, COLORS } from './AuthComponents'
 
 function Login() {
@@ -57,29 +58,7 @@ function Login() {
         </div>
       )}
 
-      {isDesktop && (
-        <div style={{
-          flex: 1,
-          background: `linear-gradient(135deg, #0B1E3D 0%, ${COLORS.primary} 100%)`,
-          color: 'white',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          padding: '64px'
-        }}>
-          <h2 style={{ fontSize: '38px', fontWeight: 800, margin: 0 }}>TravelerCom</h2>
-          <p style={{ fontSize: '17px', marginTop: '12px', maxWidth: '420px', lineHeight: 1.5, opacity: 0.92 }}>
-            Travel and booking across Nigeria, all in one place.
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '28px', maxWidth: '460px' }}>
-            {['Hotels', 'Flights', 'Buses', 'Trains', 'Tours', 'Event Centers', 'Vehicle Rentals'].map((label) => (
-              <span key={label} style={{ background: 'rgba(255,255,255,0.16)', padding: '8px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
-                {label}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      {isDesktop && <AuthBrandPanel />}
 
       <div style={isDesktop
         ? { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }
