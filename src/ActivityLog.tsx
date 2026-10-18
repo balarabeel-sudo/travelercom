@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   primary: '#7c3aed', bg: '#F8FAFC', card: '#FFFFFF', text: '#1A1A1A',
@@ -93,7 +94,8 @@ function actionLabel(a: string) {
   return map[a] || humanize(a)
 }
 
-export default function ActivityLog({ companyId, onBack }: { companyId?: string; onBack?: () => void }) {
+export default function ActivityLog({ companyId, onBack, embedded = false }: { companyId?: string; onBack?: () => void; embedded?: boolean }) {
+  const isDesktop = useIsDesktop()
   const [resolvedCompanyId, setResolvedCompanyId] = useState<string | null>(companyId || null)
   const [logs, setLogs] = useState<LogRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -167,8 +169,8 @@ export default function ActivityLog({ companyId, onBack }: { companyId?: string;
   }
 
   return (
-    <div style={{ background: COLORS.bg, minHeight: '100vh', paddingBottom: 32 }}>
-      <div style={{ background: COLORS.card, padding: '16px', borderBottom: `1px solid ${COLORS.border}` }}>
+    <div style={isDesktop ? { background: 'transparent', maxWidth: 1000, margin: '0 auto' } : embedded ? {} : { background: COLORS.bg, minHeight: '100vh', paddingBottom: 32 }}>
+      <div style={isDesktop ? { background: COLORS.card, padding: '20px 24px', border: `1px solid ${COLORS.border}`, borderRadius: 14, marginBottom: 20 } : { background: COLORS.card, padding: '16px', borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={onBack} style={iconBtn}><Icon name="arrowLeft" size={18} color={COLORS.text} /></button>
           <div>
@@ -204,7 +206,7 @@ export default function ActivityLog({ companyId, onBack }: { companyId?: string;
         </div>
       </div>
 
-      <div style={{ padding: 16 }}>
+      <div style={{ padding: isDesktop ? 0 : 16 }}>
         {loading && <div style={{ textAlign: 'center', color: COLORS.textMuted, padding: 30 }}>Loading…</div>}
         {!loading && filtered.length === 0 && (
           <div style={{ textAlign: 'center', color: COLORS.textMuted, padding: 40, fontSize: 13 }}>No activity found.</div>
