@@ -3,6 +3,7 @@ import useIsDesktop from './useIsDesktop'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import VerifiedBadge from './VerifiedBadge'
 
 const COLORS = {
   bg: '#F8FAFC',
@@ -242,7 +243,7 @@ export default function CompanyProfile() {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <p style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>{company.business_name}</p>
-              {company.approval_status === 'approved' && <Icon name="checkCircle" size={16} color={COLORS.primary} />}
+              {company.plan === 'business_suite' && <VerifiedBadge size={18} />}
             </div>
             {company.plan === 'business_suite' && (
               <span style={{
