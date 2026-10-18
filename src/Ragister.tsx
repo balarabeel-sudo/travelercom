@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import useIsDesktop from './useIsDesktop'
+import AuthBrandPanel from './AuthBrandPanel'
 import Icon from './Icons'
 import { Logo, PrimaryButton, InputField, PhoneField, PasswordField, FormError, COLORS } from './AuthComponents'
 
@@ -21,6 +23,7 @@ function isEmailValid(email: string) {
 
 function Register() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [searchParams] = useSearchParams()
   const accountType = searchParams.get('type') || 'personal'
   const isPersonal = accountType === 'personal'
@@ -81,7 +84,9 @@ function Register() {
 
   if (registered) {
     return (
-      <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={isDesktop ? { minHeight: '100vh', background: '#F8FAFC', display: 'flex', flexDirection: 'row', alignItems: 'stretch' } : { minHeight: '100vh', background: COLORS.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      {isDesktop && <AuthBrandPanel />}
+      <div style={isDesktop ? { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' } : { width: '100%', display: 'flex', justifyContent: 'center' }}>
         <div style={{ width: '100%', maxWidth: '400px', background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}><Icon name="mail" size={44} color={color} /></div>
           <h1 style={{ fontSize: '21px', fontWeight: 800, color, marginBottom: '10px' }}>Check Your Email</h1>
@@ -92,12 +97,15 @@ function Register() {
           </p>
           <PrimaryButton onClick={() => navigate('/login')} color={color}>Go to Login</PrimaryButton>
         </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+    <div style={isDesktop ? { minHeight: '100vh', background: '#F8FAFC', display: 'flex', flexDirection: 'row', alignItems: 'stretch' } : { minHeight: '100vh', background: COLORS.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      {isDesktop && <AuthBrandPanel />}
+      <div style={isDesktop ? { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' } : { width: '100%', display: 'flex', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: '400px', background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
         <span onClick={() => navigate(-1)} style={{ cursor: 'pointer', display: 'inline-flex', marginBottom: '14px' }}><Icon name="arrowLeft" size={20} color={COLORS.text} /></span>
 
@@ -165,6 +173,7 @@ function Register() {
           Already have an account?{' '}
           <span onClick={() => navigate('/login')} style={{ color, cursor: 'pointer', fontWeight: 700 }}>Login</span>
         </p>
+      </div>
       </div>
     </div>
   )
