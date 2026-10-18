@@ -31,7 +31,9 @@ type BookingResult = {
   commission_rate: number
 } | null
 
-function VerifyBooking() {
+// companyId: when given (staff dashboard), verify against exactly that company.
+// embedded: render without its own page header/shell, to sit inside another layout.
+function VerifyBooking({ companyId: companyIdProp, embedded = false }: { companyId?: string; embedded?: boolean } = {}) {
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
   const [code, setCode] = useState('')
@@ -59,13 +61,15 @@ function VerifyBooking() {
       return
     }
 
-    const { data: company } = await supabase
-      .from('companies')
-      .select('id')
-      .eq('owner_id', userData.user.id)
-      .maybeSingle()
-
-    let companyId: string | null = company?.id || null
+    let companyId: string | null = companyIdProp || null
+    if (!companyId) {
+      const { data: company } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('owner_id', userData.user.id)
+        .maybeSingle()
+      companyId = company?.id || null
+    }
     if (!companyId) {
       const { data: staffRow } = await supabase
         .from('company_staff')
@@ -173,9 +177,9 @@ function VerifyBooking() {
   const isValid = result && result.booking_status === 'confirmed' && !result.checked_in
 
   return (
-    <div style={{ minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '1000px' : '480px', margin: '0 auto', paddingBottom: isDesktop ? '0' : '40px' }}>
+    <div style={embedded ? { margin: '0 auto', maxWidth: isDesktop ? '1000px' : undefined } : { minHeight: isDesktop ? undefined : '100vh', background: isDesktop ? 'transparent' : COLORS.bg, maxWidth: isDesktop ? '1000px' : '480px', margin: '0 auto', paddingBottom: isDesktop ? '0' : '40px' }}>
 
-      <div style={{
+      {!embedded && <div style={{
         padding: isDesktop ? '20px 24px' : '18px 20px',
         display: 'flex',
         alignItems: 'center',
@@ -188,9 +192,9 @@ function VerifyBooking() {
       }}>
         <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
         <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>Verify Booking</h1>
-      </div>
+      </div>}
 
-      <div style={isDesktop ? { display: 'grid', gridTemplateColumns: '380px 1fr', gap: '20px', alignItems: 'start' } : { padding: '20px 16px' }}>
+      <div style={isDesktop ? { display: 'grid', gridTemplateColumns: '380px 1fr', gap: '20px', alignItems: 'start' } : { padding: embedded ? 0 : '20px 16px' }}>
         <div>
         <p style={{ fontSize: '13px', color: COLORS.textMuted, marginBottom: '16px' }}>
           Enter the customer's ticket serial number to verify their booking.
