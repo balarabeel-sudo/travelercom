@@ -77,6 +77,7 @@ import VehicleRentals from './VehicleRentals'
 import VehicleRentalDetails from './VehicleRentalDetails'
 import CompanyLayout, { isCompanyDesktopPath } from './CompanyLayout'
 import useIsDesktop from './useIsDesktop'
+import PlatformGate from './PlatformGate'
 
 // Listens for the auth session created when an invited staff member clicks
 // their invite email link, and routes them to the Accept Invite page.
@@ -122,7 +123,7 @@ function AppShell() {
     })
     return () => listener.subscription.unsubscribe()
   }, [])
-  const wide = isDesktop && (isCompanyDesktopPath(pathname) || AUTH_WIDE_PATHS.includes(pathname) || pathname === '/staff-dashboard' || (isCompanyAccount && pathname === '/home'))
+  const wide = isDesktop && (isCompanyDesktopPath(pathname) || AUTH_WIDE_PATHS.includes(pathname) || pathname === '/staff-dashboard' || pathname === '/admin' || (isCompanyAccount && pathname === '/home'))
 
   return (
     <>
@@ -177,6 +178,7 @@ function AppShell() {
           <InviteRedirectListener />
           <PushNotificationSetup />
           <AppLockScreen />
+          <PlatformGate>
           <Routes>
             <Route path="/" element={<SplashScreen />} />
         <Route path="/account-type" element={<AccountType />} />
@@ -252,6 +254,7 @@ function AppShell() {
         <Route path="/staff" element={<CompanyLayout><CompanyStaffAccess onBack={() => window.history.back()} /></CompanyLayout>} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
       </Routes>
+          </PlatformGate>
         </div>
       </div>
     </>
