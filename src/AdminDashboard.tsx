@@ -27,6 +27,7 @@ import AdminApprovals from './AdminApprovals'
 import AdminReviews from './AdminReviews'
 import StaffOverview from './StaffOverview'
 import FounderNotifications from './FounderNotifications'
+import FounderOverview from './FounderOverview'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -262,7 +263,8 @@ function AdminDashboard() {
 
   const sectionContent = (
     <>
-      {section === 'overview' && <StaffOverview isSuperAdmin={isSuperAdmin} permissions={permissions} onNavigate={(key) => setSection(key as SectionKey)} />}
+      {section === 'overview' && isSuperAdmin && <FounderOverview onNavigate={(key) => setSection(key as SectionKey)} />}
+      {section === 'overview' && !isSuperAdmin && <StaffOverview isSuperAdmin={isSuperAdmin} permissions={permissions} onNavigate={(key) => setSection(key as SectionKey)} />}
       {section === 'users' && <AdminUsers />}
       {section === 'companies' && <AdminCompanies />}
       {section === 'hotels' && <AdminHotels />}
