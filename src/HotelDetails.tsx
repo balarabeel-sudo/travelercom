@@ -73,7 +73,7 @@ function HotelDetails() {
   const [loading, setLoading] = useState(true)
   const [netError, setNetError] = useState(false)
   const [service, setService] = useState<ServiceDetail | null>(null)
-  const [userId, setUserId] = useState('')
+  const [, setUserId] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [walletBalance, setWalletBalance] = useState(0)
 
@@ -344,104 +344,48 @@ function HotelDetails() {
     }
 
     setBooking(true)
-    let assignedUnitId: string | null = null
-    let assignedNumber = ''
 
-    if (selectedRoom) {
-      const { data: claimedRows } = selectedUnitId
-        ? await supabase.rpc('claim_specific_unit_for_dates', {
-            p_unit_id: selectedUnitId, p_check_in: checkInDate, p_check_out: checkOutDate,
-          })
-        : await supabase.rpc('claim_inventory_unit_for_dates', {
-            p_item_id: selectedRoom.id, p_check_in: checkInDate, p_check_out: checkOutDate,
-          })
-      const claimed = claimedRows && claimedRows.length > 0 ? claimedRows[0] : null
+    // Everything below happens inside the database in ONE safe step: the price is
+    // recalculated there, the room is claimed, the wallet is charged and the booking
+    // is saved together. If any part fails, nothing is saved and no money is taken.
+    const { data: result, error: bookErr } = await supabase.rpc('book_hotel_with_wallet', {
+      p_service_id: service.id,
+      p_inventory_item_id: selectedRoom?.id || null,
+      p_unit_id: selectedUnitId || null,
+      p_check_in: checkInDate,
+      p_check_out: checkOutDate,
+      p_promotion_id: activePromo?.id || null,
+      p_customer_name: displayName || null,
+      p_expected_amount: activePrice,
+    })
 
-      if (!claimed) {
-        setBooking(false)
+    if (bookErr || !result) {
+      setBooking(false)
+      const errText = bookErr?.message || 'Booking failed. Please try again.'
+      if (selectedRoom && errText.startsWith('No available rooms')) {
         setRoomTypes((prev) => prev.map((r) => r.id === selectedRoom.id ? { ...r, available: 0, availableUnits: [] } : r))
         setSelectedUnitId(null)
-        setMessage({
-          type: 'error',
-          text: selectedUnitId
-            ? 'That room was just booked by someone else. Please choose another room or different dates.'
-            : 'No available rooms for your check-in dates. Please try different dates or another room type.',
-        })
-        return
       }
-      assignedUnitId = claimed.id
-      assignedNumber = claimed.unit_number
-    }
-
-    const { data: newBooking, error: bookingErr } = await supabase.from('bookings').insert({
-      user_id: userId,
-      service_id: service.id,
-      company_id: service.company_id,
-      inventory_item_id: selectedRoom?.id || null,
-      quantity: 1,
-      amount_paid: activePrice,
-      commission_amount: 0,
-      booking_status: 'confirmed',
-      customer_name: displayName || null,
-      check_in_date: checkInDate,
-      check_out_date: checkOutDate,
-      promotion_id: activePromo?.id || null,
-      assigned_unit_number: assignedNumber || null,
-    }).select('id, ticket_code').single()
-
-    if (bookingErr) {
-      if (assignedUnitId) {
-        await supabase.from('inventory_units').update({ status: 'available' }).eq('id', assignedUnitId)
-      }
-      setBooking(false)
-      setMessage({ type: 'error', text: 'Booking failed: ' + bookingErr.message })
+      setMessage({ type: 'error', text: errText })
       return
     }
 
-    if (assignedUnitId) {
-      await supabase
-        .from('inventory_units')
-        .update({ booking_id: newBooking?.id || null })
-        .eq('id', assignedUnitId)
-    } else if (!usingRoomTypes && service.seats_available !== null && service.seats_available > 0) {
-      const { data: newCount, error: decErr } = await supabase.rpc('decrement_seats', { p_service_id: service.id })
-      if (!decErr && newCount !== null) {
-        setService({ ...service, seats_available: newCount })
-      }
+    const confirmed = result as {
+      ticket_code: string | null
+      assigned_unit_number: string | null
+      transaction_id: string | null
+      new_balance: number
     }
-
-    const newBalance = walletBalance - activePrice
-    const { error: walletErr } = await supabase
-      .from('wallets')
-      .update({ balance: newBalance })
-      .eq('user_id', userId)
-
-    if (walletErr) {
-      setBooking(false)
-      setMessage({ type: 'error', text: 'Payment failed: ' + walletErr.message })
-      return
-    }
-
-    const { data: walletRow } = await supabase
-      .from('wallets')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    const { data: txnRow } = await supabase.from('transactions').insert({
-      user_id: userId,
-      wallet_id: walletRow?.id,
-      transaction_type: 'payment',
-      amount: activePrice,
-      status: 'successful',
-    }).select('id').single()
 
     setBooking(false)
-    setWalletBalance(newBalance)
-    setAssignedUnitNumber(assignedNumber)
+    setWalletBalance(Number(confirmed.new_balance))
+    if (!usingRoomTypes && service.seats_available !== null && service.seats_available > 0) {
+      setService({ ...service, seats_available: service.seats_available - 1 })
+    }
+    setAssignedUnitNumber(confirmed.assigned_unit_number || '')
     // The ticket code is created by the database; always show that exact code.
-    setTicketCode(newBooking?.ticket_code || 'Open My Bookings')
-    setTransactionId(txnRow?.id || '')
+    setTicketCode(confirmed.ticket_code || 'Open My Bookings')
+    setTransactionId(confirmed.transaction_id || '')
     setMessage({ type: 'success', text: 'Booking confirmed!' })
   }
 
