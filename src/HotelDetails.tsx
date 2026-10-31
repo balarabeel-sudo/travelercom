@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
@@ -86,6 +87,7 @@ function HotelDetails() {
   const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
   const [reviews, setReviews] = useState<{ id: string; rating: number; comment: string | null; created_at: string; full_name: string | null }[]>([])
   const [photoIndex, setPhotoIndex] = useState(0)
+  const sliderRef = useRef<HTMLDivElement | null>(null)
 
   const [booking, setBooking] = useState(false)
   const [confirmingPin, setConfirmingPin] = useState(false)
@@ -515,14 +517,55 @@ function HotelDetails() {
             const photos = service.photo_urls && service.photo_urls.length > 0 ? service.photo_urls : (service.photo_url ? [service.photo_url] : [])
             if (photos.length === 0) return <Icon name="hotel" size={56} color="white" />
             const idx = Math.min(photoIndex, photos.length - 1)
+            const goToPhoto = (i: number) => {
+              const el = sliderRef.current
+              if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+            }
+            const sliderStyle = {
+              display: 'flex', width: '100%', height: '100%', overflowX: 'auto', overflowY: 'hidden',
+              scrollSnapType: 'x mandatory', scrollbarWidth: 'none', msOverflowStyle: 'none',
+              WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y',
+            } as CSSProperties
+            const arrowStyle = {
+              position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: '30px', height: '30px',
+              borderRadius: '50%', background: 'rgba(15,23,42,0.45)', color: 'white', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', fontSize: '20px', lineHeight: 1, cursor: 'pointer',
+            } as CSSProperties
             return (
               <>
-                <img src={photos[idx]} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {/* Swipe left or right to move between photos; each photo snaps into place. */}
+                <div
+                  ref={sliderRef}
+                  style={sliderStyle}
+                  onScroll={(e) => {
+                    const el = e.currentTarget
+                    if (el.clientWidth === 0) return
+                    const i = Math.round(el.scrollLeft / el.clientWidth)
+                    if (i !== photoIndex) setPhotoIndex(i)
+                  }}>
+                  {photos.map((src, i) => (
+                    <img
+                      key={i}
+                      src={src}
+                      alt={`${service.title} photo ${i + 1}`}
+                      loading={i === 0 ? 'eager' : 'lazy'}
+                      draggable={false}
+                      style={{ flex: '0 0 100%', width: '100%', height: '100%', objectFit: 'cover', scrollSnapAlign: 'start', scrollSnapStop: 'always' } as CSSProperties}
+                    />
+                  ))}
+                </div>
                 {photos.length > 1 && (
                   <>
-                    <div onClick={() => setPhotoIndex((idx - 1 + photos.length) % photos.length)} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '40%', cursor: 'pointer' }} />
-                    <div onClick={() => setPhotoIndex((idx + 1) % photos.length)} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '40%', cursor: 'pointer' }} />
-                    <div style={{ position: 'absolute', bottom: '10px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '5px' }}>
+                    <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(15,23,42,0.55)', color: 'white', fontSize: '11.5px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px' }}>
+                      {idx + 1} / {photos.length}
+                    </div>
+                    {idx > 0 && (
+                      <div onClick={() => goToPhoto(idx - 1)} style={{ ...arrowStyle, left: '8px' }}>&#8249;</div>
+                    )}
+                    {idx < photos.length - 1 && (
+                      <div onClick={() => goToPhoto(idx + 1)} style={{ ...arrowStyle, right: '8px' }}>&#8250;</div>
+                    )}
+                    <div style={{ position: 'absolute', bottom: '10px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '5px', pointerEvents: 'none' }}>
                       {photos.map((_, i) => (
                         <div key={i} style={{ width: i === idx ? '16px' : '5px', height: '5px', borderRadius: '3px', background: i === idx ? 'white' : 'rgba(255,255,255,0.5)', transition: 'width 0.2s' }} />
                       ))}
