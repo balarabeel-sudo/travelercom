@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   primary: '#0EA5E9',
+  bg: '#F8FAFC',
   card: '#FFFFFF',
   text: '#1A1A1A',
   textMuted: '#64748B',
@@ -38,14 +40,24 @@ function StatusBadge({ status }: { status: WithdrawalRequest['status'] }) {
   return (
     <span style={{
       fontSize: '10.5px', fontWeight: 700, color: s.color, background: s.bg,
-      padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.3px',
+      padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.3px', whiteSpace: 'nowrap' as const,
     }}>
       {s.label}
     </span>
   )
 }
 
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '14px 16px' }}>
+      <p style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 700, letterSpacing: '0.4px' }}>{label.toUpperCase()}</p>
+      <p style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, marginTop: '4px' }}>{value}</p>
+    </div>
+  )
+}
+
 export default function AdminWithdrawals() {
+  const isDesktop = useIsDesktop()
   const [requests, setRequests] = useState<WithdrawalRequest[]>([])
   const [filter, setFilter] = useState<FilterKey>('pending')
   const [loading, setLoading] = useState(true)
@@ -127,6 +139,12 @@ export default function AdminWithdrawals() {
     fetchRequests()
   }
 
+  function openRequest(r: WithdrawalRequest) {
+    setSelected(r)
+    setAdminNote(r.admin_note || '')
+    setError('')
+  }
+
   const tabs: Array<{ key: FilterKey; label: string }> = [
     { key: 'pending', label: 'Pending' },
     { key: 'approved', label: 'Approved' },
@@ -134,11 +152,31 @@ export default function AdminWithdrawals() {
     { key: 'all', label: 'All' },
   ]
 
+  const totalAmount = requests.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+
+  const cellBase = { padding: '13px 14px', fontSize: '12.5px', color: COLORS.text, borderBottom: `1px solid ${COLORS.border}`, verticalAlign: 'middle' as const }
+
+  const headers: Array<{ label: string; align: 'left' | 'right' }> = [
+    { label: 'REQUESTED', align: 'left' },
+    { label: 'BANK', align: 'left' },
+    { label: 'ACCOUNT NUMBER', align: 'left' },
+    { label: 'ACCOUNT NAME', align: 'left' },
+    { label: 'AMOUNT', align: 'right' },
+    { label: 'STATUS', align: 'left' },
+  ]
+
   return (
-    <div style={{ padding: '16px' }}>
-      <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '10px', letterSpacing: '0.4px' }}>
-        WITHDRAWAL REQUESTS
-      </p>
+    <div style={{ padding: isDesktop ? '24px 28px' : '16px', maxWidth: isDesktop ? '1400px' : undefined, margin: '0 auto' }}>
+      {isDesktop ? (
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text }}>Withdrawal Requests</h2>
+          <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>Company payout requests awaiting review.</p>
+        </div>
+      ) : (
+        <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '10px', letterSpacing: '0.4px' }}>
+          WITHDRAWAL REQUESTS
+        </p>
+      )}
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' as const }}>
         {tabs.map((t) => (
@@ -158,6 +196,13 @@ export default function AdminWithdrawals() {
         ))}
       </div>
 
+      {isDesktop && !loading && requests.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px', maxWidth: '640px' }}>
+          <SummaryCard label="Requests in this view" value={requests.length.toLocaleString()} />
+          <SummaryCard label="Total amount in this view" value={`₦${totalAmount.toLocaleString()}`} />
+        </div>
+      )}
+
       {error && (
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', padding: '10px', marginBottom: '12px' }}>
           <p style={{ fontSize: '12px', color: COLORS.red }}>{error}</p>
@@ -173,12 +218,47 @@ export default function AdminWithdrawals() {
           </div>
           <p style={{ fontSize: '13px', color: COLORS.textMuted }}>No {filter !== 'all' ? filter : ''} withdrawal requests.</p>
         </div>
+      ) : isDesktop ? (
+        <div style={{ background: COLORS.card, borderRadius: '14px', border: `1px solid ${COLORS.border}`, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' as const }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' as const, minWidth: '760px' }}>
+              <thead>
+                <tr style={{ background: COLORS.bg }}>
+                  {headers.map((h) => (
+                    <th
+                      key={h.label}
+                      style={{ textAlign: h.align, padding: '11px 14px', fontSize: '10.5px', fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.4px', borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap' as const }}>
+                      {h.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((r) => (
+                  <tr
+                    key={r.id}
+                    onClick={() => openRequest(r)}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = COLORS.bg }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                    style={{ cursor: 'pointer' }}>
+                    <td style={{ ...cellBase, color: COLORS.textMuted, whiteSpace: 'nowrap' as const }}>{new Date(r.created_at).toLocaleString()}</td>
+                    <td style={{ ...cellBase, fontWeight: 600 }}>{r.bank_name}</td>
+                    <td style={{ ...cellBase, whiteSpace: 'nowrap' as const }}>{r.account_number}</td>
+                    <td style={cellBase}>{r.account_name}</td>
+                    <td style={{ ...cellBase, textAlign: 'right' as const, fontWeight: 800, whiteSpace: 'nowrap' as const }}>₦{r.amount.toLocaleString()}</td>
+                    <td style={cellBase}><StatusBadge status={r.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
           {requests.map((r) => (
             <div
               key={r.id}
-              onClick={() => { setSelected(r); setAdminNote(r.admin_note || ''); setError('') }}
+              onClick={() => openRequest(r)}
               style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '14px', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -202,19 +282,25 @@ export default function AdminWithdrawals() {
 
       {selected && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 40 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent: 'center', zIndex: 40, padding: isDesktop ? '20px' : 0 }}
           onClick={() => !processing && setSelected(null)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: COLORS.card, borderTopLeftRadius: '18px', borderTopRightRadius: '18px', padding: '20px', width: '100%', maxWidth: '480px' }}
+            style={{
+              background: COLORS.card,
+              borderTopLeftRadius: '18px', borderTopRightRadius: '18px',
+              borderBottomLeftRadius: isDesktop ? '18px' : 0, borderBottomRightRadius: isDesktop ? '18px' : 0,
+              padding: '20px', width: '100%', maxWidth: isDesktop ? '520px' : '480px',
+              maxHeight: '90vh', overflowY: 'auto' as const,
+            }}
           >
             <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text, marginBottom: '10px' }}>Withdrawal Request</p>
             <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>₦{selected.amount.toLocaleString()}</p>
             <p style={{ fontSize: '12.5px', color: COLORS.textMuted, marginTop: '8px' }}>Bank: {selected.bank_name}</p>
             <p style={{ fontSize: '12.5px', color: COLORS.textMuted }}>Account No: {selected.account_number}</p>
             <p style={{ fontSize: '12.5px', color: COLORS.textMuted }}>Account Name: {selected.account_name}</p>
-            <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '8px' }}>Company ID: {selected.company_id}</p>
+            <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '8px', wordBreak: 'break-all' as const }}>Company ID: {selected.company_id}</p>
 
             {selected.status === 'pending' ? (
               canApprove ? (
@@ -223,7 +309,7 @@ export default function AdminWithdrawals() {
                     value={adminNote}
                     onChange={(e) => setAdminNote(e.target.value)}
                     placeholder="Reason (required for Reject, optional for Approve)"
-                    style={{ width: '100%', marginTop: '12px', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '64px', color: COLORS.text }}
+                    style={{ width: '100%', marginTop: '12px', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '64px', color: COLORS.text, boxSizing: 'border-box' as const }}
                   />
                   <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
                     <div
