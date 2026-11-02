@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -42,7 +43,34 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 
 const PAGE_SIZE = 30
 
+function formatNaira(n: number | null | undefined) {
+  return '₦' + Number(n || 0).toLocaleString()
+}
+
+function isCreditType(type: string | null) {
+  return type === 'deposit' || type === 'refund' || type === 'cashback'
+}
+
+function StatusPill({ status }: { status: string }) {
+  const style = STATUS_STYLE[status] || STATUS_STYLE.pending
+  return (
+    <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px', background: style.bg, color: style.color, whiteSpace: 'nowrap' as const }}>
+      {status.toUpperCase()}
+    </span>
+  )
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '14px 16px' }}>
+      <p style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 700, letterSpacing: '0.4px' }}>{label.toUpperCase()}</p>
+      <p style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, marginTop: '4px' }}>{value}</p>
+    </div>
+  )
+}
+
 export default function AdminWallet() {
+  const isDesktop = useIsDesktop()
   const [search, setSearch] = useState('')
   const [txns, setTxns] = useState<Txn[]>([])
   const [loading, setLoading] = useState(true)
@@ -90,46 +118,142 @@ export default function AdminWallet() {
     )
   }
 
-  return (
-    <div style={{ padding: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '9px', background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '10px 13px', marginBottom: '12px' }}>
-        <Icon name="search" size={15} color={COLORS.textMuted} />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && fetchTxns()}
-          placeholder="Filter by name or email..."
-          style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', background: 'transparent' }}
-        />
-        {search && <span onClick={fetchTxns} style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.primary, cursor: 'pointer' }}>Filter</span>}
-      </div>
+  const moneyIn = txns.filter((t) => isCreditType(t.transaction_type)).reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+  const otherTotal = txns.filter((t) => !isCreditType(t.transaction_type)).reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
 
-      <div style={{ display: 'flex', gap: '7px', marginBottom: '14px', overflowX: 'auto' as const }}>
-        {(['all', 'deposit', 'payment', 'refund'] as const).map((f) => (
-          <span
-            key={f}
-            onClick={() => setTypeFilter(f)}
-            style={{
-              flexShrink: 0, padding: '7px 13px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer',
-              background: typeFilter === f ? COLORS.primary : COLORS.card,
-              color: typeFilter === f ? 'white' : COLORS.text,
-              border: `1px solid ${typeFilter === f ? COLORS.primary : COLORS.border}`,
-            }}>
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </span>
-        ))}
-      </div>
+  const searchBox = (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: '9px', background: COLORS.card,
+        border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '10px 13px',
+        marginBottom: isDesktop ? 0 : '12px',
+        flex: isDesktop ? 1 : undefined, maxWidth: isDesktop ? '440px' : undefined,
+      }}>
+      <Icon name="search" size={15} color={COLORS.textMuted} />
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && fetchTxns()}
+        placeholder="Filter by name or email..."
+        style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', background: 'transparent' }}
+      />
+      {search && <span onClick={fetchTxns} style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.primary, cursor: 'pointer' }}>Filter</span>}
+    </div>
+  )
+
+  const filterChips = (
+    <div style={{ display: 'flex', gap: '7px', marginBottom: isDesktop ? 0 : '14px', overflowX: 'auto' as const }}>
+      {(['all', 'deposit', 'payment', 'refund'] as const).map((f) => (
+        <span
+          key={f}
+          onClick={() => setTypeFilter(f)}
+          style={{
+            flexShrink: 0, padding: '7px 13px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer',
+            background: typeFilter === f ? COLORS.primary : COLORS.card,
+            color: typeFilter === f ? 'white' : COLORS.text,
+            border: `1px solid ${typeFilter === f ? COLORS.primary : COLORS.border}`,
+          }}>
+          {f.charAt(0).toUpperCase() + f.slice(1)}
+        </span>
+      ))}
+    </div>
+  )
+
+  const cellBase = { padding: '13px 14px', fontSize: '12.5px', color: COLORS.text, borderBottom: `1px solid ${COLORS.border}`, verticalAlign: 'middle' as const }
+  const ellipsis = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const
+
+  const headers: Array<{ label: string; align: 'left' | 'right' }> = [
+    { label: 'USER', align: 'left' },
+    { label: 'EMAIL', align: 'left' },
+    { label: 'TYPE', align: 'left' },
+    { label: 'DATE', align: 'left' },
+    { label: 'AMOUNT', align: 'right' },
+    { label: 'STATUS', align: 'left' },
+  ]
+
+  return (
+    <div style={{ padding: isDesktop ? '24px 28px' : '16px', maxWidth: isDesktop ? '1400px' : undefined, margin: '0 auto' }}>
+      {isDesktop && (
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text }}>Wallet Transactions</h2>
+          <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>Recent wallet activity across all users.</p>
+        </div>
+      )}
+
+      {isDesktop ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
+          {searchBox}
+          {filterChips}
+        </div>
+      ) : (
+        <>
+          {searchBox}
+          {filterChips}
+        </>
+      )}
+
+      {isDesktop && !loading && txns.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+          <SummaryCard label="Transactions shown" value={txns.length.toLocaleString()} />
+          <SummaryCard label="Deposits, refunds, cashback (shown)" value={formatNaira(moneyIn)} />
+          <SummaryCard label="Payments and other (shown)" value={formatNaira(otherTotal)} />
+        </div>
+      )}
 
       {loading ? (
         <p style={{ fontSize: '12.5px', color: COLORS.textMuted, textAlign: 'center' as const, padding: '30px 0' }}>Loading transactions...</p>
       ) : txns.length === 0 ? (
         <p style={{ fontSize: '12.5px', color: COLORS.textMuted, textAlign: 'center' as const, padding: '30px 0' }}>No transactions found.</p>
+      ) : isDesktop ? (
+        <div style={{ background: COLORS.card, borderRadius: '14px', border: `1px solid ${COLORS.border}`, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' as const }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' as const, minWidth: '760px' }}>
+              <thead>
+                <tr style={{ background: COLORS.bg }}>
+                  {headers.map((h) => (
+                    <th
+                      key={h.label}
+                      style={{ textAlign: h.align, padding: '11px 14px', fontSize: '10.5px', fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.4px', borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap' as const }}>
+                      {h.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {txns.map((t) => {
+                  const status = t.status || 'pending'
+                  const isCredit = isCreditType(t.transaction_type)
+                  return (
+                    <tr key={t.id}>
+                      <td style={{ ...cellBase, maxWidth: '220px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Icon name={TYPE_ICON[t.transaction_type || ''] || 'wallet'} size={14} color={COLORS.text} />
+                          </div>
+                          <span style={{ ...ellipsis, fontWeight: 600 }}>{t.profiles?.full_name || t.profiles?.email || 'Unknown user'}</span>
+                        </div>
+                      </td>
+                      <td style={{ ...cellBase, maxWidth: '220px', color: COLORS.textMuted }}>
+                        <div style={ellipsis}>{t.profiles?.email || '—'}</div>
+                      </td>
+                      <td style={{ ...cellBase, textTransform: 'capitalize' as const, whiteSpace: 'nowrap' as const }}>{t.transaction_type || 'transaction'}</td>
+                      <td style={{ ...cellBase, color: COLORS.textMuted, whiteSpace: 'nowrap' as const }}>{new Date(t.created_at).toLocaleString()}</td>
+                      <td style={{ ...cellBase, textAlign: 'right' as const, fontWeight: 800, whiteSpace: 'nowrap' as const, color: isCredit ? COLORS.green : COLORS.text }}>
+                        {isCredit ? '+' : ''}{formatNaira(t.amount)}
+                      </td>
+                      <td style={cellBase}><StatusPill status={status} /></td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
         <div style={{ background: COLORS.card, borderRadius: '14px', border: `1px solid ${COLORS.border}` }}>
           {txns.map((t, idx) => {
             const status = t.status || 'pending'
-            const style = STATUS_STYLE[status] || STATUS_STYLE.pending
-            const isCredit = t.transaction_type === 'deposit' || t.transaction_type === 'refund' || t.transaction_type === 'cashback'
+            const isCredit = isCreditType(t.transaction_type)
             return (
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 15px', borderBottom: idx === txns.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
                 <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -140,8 +264,8 @@ export default function AdminWallet() {
                   <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '1px', textTransform: 'capitalize' as const }}>{t.transaction_type || 'transaction'} · {new Date(t.created_at).toLocaleDateString()}</p>
                 </div>
                 <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
-                  <p style={{ fontSize: '12.5px', fontWeight: 800, color: isCredit ? COLORS.green : COLORS.text }}>{isCredit ? '+' : ''}₦{Number(t.amount || 0).toLocaleString()}</p>
-                  <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px', background: style.bg, color: style.color }}>{status.toUpperCase()}</span>
+                  <p style={{ fontSize: '12.5px', fontWeight: 800, color: isCredit ? COLORS.green : COLORS.text }}>{isCredit ? '+' : ''}{formatNaira(t.amount)}</p>
+                  <StatusPill status={status} />
                 </div>
               </div>
             )
