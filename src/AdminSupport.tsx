@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -152,6 +153,7 @@ function timeAgo(iso: string) {
 }
 
 export default function AdminSupport() {
+  const isDesktop = useIsDesktop()
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [filter, setFilter] = useState<FilterKey>('open')
   const [loading, setLoading] = useState(true)
@@ -383,12 +385,14 @@ export default function AdminSupport() {
   if (selected) {
     const pm = priorityMeta(selected.priority)
     return (
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: isDesktop ? '24px 28px' : '16px', maxWidth: isDesktop ? '1400px' : undefined, margin: '0 auto' }}>
         <div onClick={() => setSelected(null)} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', cursor: 'pointer' }}>
           <Icon name="arrowLeft" size={18} color={COLORS.text} />
           <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>Back to Support Center</span>
         </div>
 
+        <div style={isDesktop ? { display: 'grid', gridTemplateColumns: 'minmax(320px, 400px) minmax(0, 1fr)', gap: '20px', alignItems: 'start' } : undefined}>
+        <div>
         <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '16px', marginBottom: '14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
             <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text, flex: 1 }}>{selected.subject}</p>
@@ -531,8 +535,10 @@ export default function AdminSupport() {
         )}
 
         <ActivityCard items={activity} />
+        </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '14px' }}>
+        <div>
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '14px', maxHeight: isDesktop ? '58vh' : undefined, overflowY: isDesktop ? 'auto' as const : undefined }}>
           <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '12px 14px', maxWidth: '90%' }}>
             <p style={{ fontSize: '12.5px', color: COLORS.text, lineHeight: 1.5 }}>{selected.message}</p>
             <p style={{ fontSize: '10px', color: COLORS.textMuted, marginTop: '6px' }}>{new Date(selected.created_at).toLocaleString()}</p>
@@ -563,7 +569,7 @@ export default function AdminSupport() {
 
         <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '12px' }}>
           <textarea value={reply} onChange={(e) => setReply(e.target.value)} placeholder={isInternal ? 'Internal note (staff only)...' : 'Reply to requester...'}
-            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '64px', color: COLORS.text, marginBottom: '10px' }} />
+            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, fontSize: '13px', minHeight: '64px', color: COLORS.text, marginBottom: '10px', boxSizing: 'border-box' as const }} />
           {replyFile && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', fontSize: '11.5px', color: COLORS.textMuted }}>
               <Icon name="image" size={13} color={COLORS.textMuted} /> {replyFile.name}
@@ -599,15 +605,28 @@ export default function AdminSupport() {
             Reopen Ticket
           </div>
         )}
+        </div>
+        </div>
       </div>
     )
   }
 
+  const cellBase = { padding: '13px 14px', fontSize: '12.5px', color: COLORS.text, borderBottom: `1px solid ${COLORS.border}`, verticalAlign: 'middle' as const }
+  const ellipsis = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const
+  const headers = ['PRIORITY', 'TICKET', 'FROM', 'CATEGORY', 'ASSIGNED', 'STATUS', 'AGE']
+
   return (
-    <div style={{ padding: '16px' }}>
-      <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '10px', letterSpacing: '0.4px' }}>
-        SUPPORT CENTER
-      </p>
+    <div style={{ padding: isDesktop ? '24px 28px' : '16px', maxWidth: isDesktop ? '1400px' : undefined, margin: '0 auto' }}>
+      {isDesktop ? (
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text }}>Support Center</h2>
+          <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>Customer and company support tickets.</p>
+        </div>
+      ) : (
+        <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '10px', letterSpacing: '0.4px' }}>
+          SUPPORT CENTER
+        </p>
+      )}
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' as const }}>
         {tabs.map((t) => (
@@ -635,6 +654,57 @@ export default function AdminSupport() {
             <Icon name="chat" size={22} color={COLORS.textMuted} />
           </div>
           <p style={{ fontSize: '13px', color: COLORS.textMuted }}>No tickets here.</p>
+        </div>
+      ) : isDesktop ? (
+        <div style={{ background: COLORS.card, borderRadius: '14px', border: `1px solid ${COLORS.border}`, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' as const }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' as const, minWidth: '860px' }}>
+              <thead>
+                <tr style={{ background: COLORS.bg }}>
+                  {headers.map((h) => (
+                    <th
+                      key={h}
+                      style={{ textAlign: 'left' as const, padding: '11px 14px', fontSize: '10.5px', fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.4px', borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap' as const }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {tickets.map((t) => {
+                  const pm = priorityMeta(t.priority)
+                  return (
+                    <tr
+                      key={t.id}
+                      onClick={() => openTicket(t)}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = COLORS.bg }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                      style={{ cursor: 'pointer' }}>
+                      <td style={cellBase}>
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: pm.color, background: pm.bg, padding: '3px 8px', borderRadius: '6px', whiteSpace: 'nowrap' as const }}>{pm.label}</span>
+                      </td>
+                      <td style={{ ...cellBase, maxWidth: '300px' }}>
+                        <div style={{ ...ellipsis, fontWeight: 700 }} title={t.subject}>{t.subject}</div>
+                        {t.ticket_code && <div style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '1px' }}>{t.ticket_code}</div>}
+                      </td>
+                      <td style={{ ...cellBase, maxWidth: '200px' }}>
+                        <div style={ellipsis}>{requesterLabel(t)}</div>
+                        <div style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '1px' }}>{t.requester_type === 'company' ? 'Company' : 'Customer'}</div>
+                      </td>
+                      <td style={{ ...cellBase, color: COLORS.textMuted, maxWidth: '160px' }}>
+                        <div style={ellipsis}>{t.category || '—'}</div>
+                      </td>
+                      <td style={{ ...cellBase, whiteSpace: 'nowrap' as const, fontWeight: t.assigned_staff_id ? 400 : 700, color: t.assigned_staff_id ? COLORS.text : COLORS.amber }}>
+                        {t.assigned_staff_id ? adminName(t.assigned_staff_id) : 'Unassigned'}
+                      </td>
+                      <td style={cellBase}><StatusBadge status={t.status} /></td>
+                      <td style={{ ...cellBase, color: COLORS.textMuted, whiteSpace: 'nowrap' as const }}>{timeAgo(t.created_at)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
