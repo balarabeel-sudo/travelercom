@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -39,7 +40,17 @@ function Stars({ value, editable, onChange }: { value: number; editable?: boolea
   )
 }
 
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '14px 16px' }}>
+      <p style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 700, letterSpacing: '0.4px' }}>{label.toUpperCase()}</p>
+      <p style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, marginTop: '4px' }}>{value}</p>
+    </div>
+  )
+}
+
 function AdminReviews() {
+  const isDesktop = useIsDesktop()
   const [reviews, setReviews] = useState<ReviewRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -122,9 +133,25 @@ function AdminReviews() {
     )
   })
 
+  const averageRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / reviews.length : null
+
   return (
-    <div style={{ padding: '20px', maxWidth: '900px' }}>
-      <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '10px 14px' }}>
+    <div style={{ padding: isDesktop ? '24px 28px' : '20px', maxWidth: isDesktop ? '1400px' : '900px', margin: isDesktop ? '0 auto' : undefined }}>
+      {isDesktop && (
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text }}>Reviews</h2>
+          <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>Customer reviews of companies across the platform.</p>
+        </div>
+      )}
+
+      {isDesktop && !loading && reviews.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px', maxWidth: '640px' }}>
+          <SummaryCard label="Total reviews" value={reviews.length.toLocaleString()} />
+          <SummaryCard label="Average rating" value={averageRating !== null ? averageRating.toFixed(1) : '—'} />
+        </div>
+      )}
+
+      <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '10px 14px', maxWidth: isDesktop ? '440px' : undefined }}>
         <Icon name="search" size={16} color={COLORS.textMuted} />
         <input
           value={search}
@@ -156,7 +183,10 @@ function AdminReviews() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div
+        style={isDesktop
+          ? { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', alignItems: 'start' }
+          : { display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {filtered.map((r) => {
           const isEditing = editingId === r.id
           return (
@@ -180,7 +210,7 @@ function AdminReviews() {
                   value={draftComment}
                   onChange={(e) => setDraftComment(e.target.value)}
                   rows={3}
-                  style={{ width: '100%', border: `1px solid ${COLORS.border}`, borderRadius: '8px', padding: '8px 10px', fontSize: '12.5px', color: COLORS.text, resize: 'vertical' as const, marginBottom: '10px', fontFamily: 'inherit' }}
+                  style={{ width: '100%', border: `1px solid ${COLORS.border}`, borderRadius: '8px', padding: '8px 10px', fontSize: '12.5px', color: COLORS.text, resize: 'vertical' as const, marginBottom: '10px', fontFamily: 'inherit', boxSizing: 'border-box' as const }}
                 />
               ) : (
                 r.comment && <p style={{ fontSize: '12.5px', color: COLORS.text, lineHeight: 1.5, marginBottom: '10px' }}>{r.comment}</p>
