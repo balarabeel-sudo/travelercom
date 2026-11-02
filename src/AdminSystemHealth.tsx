@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   card: '#FFFFFF',
@@ -34,6 +35,7 @@ function StatusDot({ status }: { status: CheckResult['status'] }) {
 }
 
 export default function AdminSystemHealth() {
+  const isDesktop = useIsDesktop()
   const [checks, setChecks] = useState<CheckResult[]>(INITIAL)
   const [running, setRunning] = useState(false)
 
@@ -101,7 +103,10 @@ export default function AdminSystemHealth() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+      <div
+        style={isDesktop
+          ? { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }
+          : { display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {checks.map((c) => (
           <div key={c.name} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '14px', padding: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
