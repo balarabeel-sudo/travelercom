@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import useIsDesktop from './useIsDesktop'
 
 const COLORS = {
   primary: '#0EA5E9',
+  bg: '#F8FAFC',
   card: '#FFFFFF',
   text: '#1A1A1A',
   textMuted: '#64748B',
@@ -25,6 +27,7 @@ type LogEntry = {
 const MODULES = ['all', 'staff', 'refunds', 'withdrawals', 'platform', 'marketing', 'support', 'companies', 'bookings']
 
 export default function AdminAuditLogs() {
+  const isDesktop = useIsDesktop()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [moduleFilter, setModuleFilter] = useState('all')
   const [search, setSearch] = useState('')
@@ -54,17 +57,27 @@ export default function AdminAuditLogs() {
     return action.replace(/\./g, ' → ').replace(/_/g, ' ')
   }
 
+  const cellBase = { padding: '13px 14px', fontSize: '12.5px', color: COLORS.text, borderBottom: `1px solid ${COLORS.border}`, verticalAlign: 'middle' as const }
+  const headers = ['TIME', 'ACTION', 'MODULE', 'TARGET']
+
   return (
-    <div style={{ padding: '16px' }}>
-      <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '10px', letterSpacing: '0.4px' }}>
-        AUDIT LOG (last 100)
-      </p>
+    <div style={{ padding: isDesktop ? '24px 28px' : '16px', maxWidth: isDesktop ? '1400px' : undefined, margin: '0 auto' }}>
+      {isDesktop ? (
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text }}>Audit Log</h2>
+          <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>The last 100 recorded actions. Click a row to see the details.</p>
+        </div>
+      ) : (
+        <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '10px', letterSpacing: '0.4px' }}>
+          AUDIT LOG (last 100)
+        </p>
+      )}
 
       <input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search action or target ID..."
-        style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', color: COLORS.text }}
+        style={{ width: '100%', maxWidth: isDesktop ? '440px' : undefined, padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', color: COLORS.text, boxSizing: 'border-box' as const }}
       />
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', overflowX: 'auto' as const, paddingBottom: '4px' }}>
@@ -95,6 +108,64 @@ export default function AdminAuditLogs() {
             <Icon name="hourglass" size={22} color={COLORS.textMuted} />
           </div>
           <p style={{ fontSize: '13px', color: COLORS.textMuted }}>No log entries yet.</p>
+        </div>
+      ) : isDesktop ? (
+        <div style={{ background: COLORS.card, borderRadius: '14px', border: `1px solid ${COLORS.border}`, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' as const }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' as const, minWidth: '700px' }}>
+              <thead>
+                <tr style={{ background: COLORS.bg }}>
+                  {headers.map((h) => (
+                    <th
+                      key={h}
+                      style={{ textAlign: 'left' as const, padding: '11px 14px', fontSize: '10.5px', fontWeight: 700, color: COLORS.textMuted, letterSpacing: '0.4px', borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap' as const }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((l) => (
+                  <Fragment key={l.id}>
+                    <tr
+                      onClick={() => setExpanded(expanded === l.id ? null : l.id)}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = COLORS.bg }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                      style={{ cursor: 'pointer' }}>
+                      <td style={{ ...cellBase, color: COLORS.textMuted, whiteSpace: 'nowrap' as const }}>{new Date(l.created_at).toLocaleString()}</td>
+                      <td style={{ ...cellBase, fontWeight: 700, textTransform: 'capitalize' as const }}>{actionLabel(l.action)}</td>
+                      <td style={cellBase}>
+                        <span style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.textMuted, background: '#F1F5F9', padding: '3px 8px', borderRadius: '6px' }}>{l.module}</span>
+                      </td>
+                      <td style={{ ...cellBase, color: COLORS.textMuted, whiteSpace: 'nowrap' as const }}>
+                        {l.target_id ? `${l.target_type || 'target'}: ${l.target_id.slice(0, 8)}...` : '—'}
+                      </td>
+                    </tr>
+                    {expanded === l.id && (
+                      <tr>
+                        <td colSpan={4} style={{ padding: '12px 14px', background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+                          <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '4px', wordBreak: 'break-all' as const }}>Actor: {l.actor_id || '—'}</p>
+                          {l.target_id && (
+                            <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '4px', wordBreak: 'break-all' as const }}>Target ID: {l.target_id}</p>
+                          )}
+                          {l.previous_value && (
+                            <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '4px', wordBreak: 'break-word' as const }}>
+                              Before: {JSON.stringify(l.previous_value)}
+                            </p>
+                          )}
+                          {l.new_value && (
+                            <p style={{ fontSize: '11.5px', color: COLORS.textMuted, wordBreak: 'break-word' as const }}>
+                              After: {JSON.stringify(l.new_value)}
+                            </p>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
