@@ -9,6 +9,7 @@ import Login from './Login'
 import ForgotPassword from './ForgotPassword'
 import Register from './Ragister'
 import Home from './Home'
+import UserHomeDesktop from './UserHomeDesktop'
 import VerifyOTP from './VerifyOTP'
 import UploadDocs from './UploadDocs'
 import PendingApproval from './PendingApproval'
@@ -94,6 +95,30 @@ function InviteRedirectListener() {
   }, [navigate])
 
   return null
+}
+
+// /home is shared by every account type. On a computer, personal accounts get the
+// desktop home page; company accounts and phones keep using Home (which already
+// handles the company desktop dashboard and the phone layouts).
+function HomeRoute() {
+  const isDesktop = useIsDesktop()
+  const [accountType, setAccountType] = useState<'personal' | 'company' | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setAccountType(data.session?.user?.user_metadata?.account_type === 'company' ? 'company' : 'personal')
+    })
+  }, [])
+
+  if (!isDesktop) return <Home />
+  if (accountType === null) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', fontSize: '14px' }}>
+        Loading...
+      </div>
+    )
+  }
+  return accountType === 'personal' ? <UserHomeDesktop /> : <Home />
 }
 
 // Entry screens that use the full desktop width (splash, sign-up and login flow).
@@ -185,7 +210,7 @@ function AppShell() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/home" element={<Home />} />
+        <Route path="/home" element={<HomeRoute />} />
         <Route path="/verify-otp" element={<VerifyOTP />} />
         <Route path="/upload-docs" element={<UploadDocs />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
