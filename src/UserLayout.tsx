@@ -271,7 +271,7 @@ const CSS = `
 .tcu-content {
   flex: 1;
   min-width: 0;
-  padding: 28px 32px 56px;
+  padding: 24px 32px 40px;
   box-sizing: border-box;
 }
 .tcu-content-inner {
@@ -279,8 +279,8 @@ const CSS = `
   max-width: 1280px;
   margin: 0 auto;
 }
-.tcu-content-inner > div[style*="max-width: 480px"] { max-width: 880px !important; }
-.tcu-content-inner [style*="position: fixed"][style*="max-width: 480px"] { max-width: 880px !important; }
+.tcu-content-inner > div[style*="max-width: 480px"] { max-width: 720px !important; }
+.tcu-content-inner [style*="position: fixed"][style*="max-width: 480px"] { max-width: 720px !important; }
 .tcu-content-inner [style*="position: sticky"] { top: 72px !important; }
 [data-tcu-hide="1"] { display: none !important; }
 .tcu-footer {
