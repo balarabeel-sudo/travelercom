@@ -94,23 +94,23 @@ const FALLBACK_DESTINATIONS: Destination[] = [
 const CSS = `
 .tch-card { transition: box-shadow 0.15s ease, transform 0.15s ease; }
 .tch-card:hover { box-shadow: 0 10px 28px rgba(15,23,42,0.12); transform: translateY(-2px); }
-.tch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
-.tch-services { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
-.tch-dest { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 20px; }
+.tch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.tch-services { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+.tch-dest { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
 .tch-search-input:focus { outline: none; }
 `
 
 function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '44px 0 18px' }}>
-      <h2 style={{ fontSize: '24px', fontWeight: 800, color: COLORS.title, margin: 0 }}>{title}</h2>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '30px 0 14px' }}>
+      <h2 style={{ fontSize: '20px', fontWeight: 800, color: COLORS.title, margin: 0 }}>{title}</h2>
       {onSeeAll && (
         <button
           type="button"
           onClick={onSeeAll}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: '4px', border: 'none', background: 'transparent',
-            color: COLORS.primary, fontSize: '14.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            color: COLORS.primary, fontSize: '13.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
           }}>
           See all <Icon name="chevronRight" size={15} color={COLORS.primary} />
         </button>
@@ -153,11 +153,11 @@ function SearchBar() {
   }
   return (
     <div style={{
-      background: COLORS.card, borderRadius: '16px', padding: '14px', display: 'flex', alignItems: 'center', gap: '12px',
+      background: COLORS.card, borderRadius: '14px', padding: '10px', display: 'flex', alignItems: 'center', gap: '10px',
       boxShadow: '0 12px 32px rgba(15,23,42,0.14)', border: `1px solid ${COLORS.border}`,
     }}>
       <div style={{
-        flex: 1, display: 'flex', alignItems: 'center', gap: '12px', padding: '0 16px', height: '52px',
+        flex: 1, display: 'flex', alignItems: 'center', gap: '12px', padding: '0 14px', height: '44px',
         background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: '12px',
       }}>
         <Icon name="mapPin" size={20} color={COLORS.textMuted} />
@@ -168,7 +168,7 @@ function SearchBar() {
           onKeyDown={(e) => { if (e.key === 'Enter') go() }}
           placeholder="Where are you going? Search by city..."
           style={{
-            flex: 1, border: 'none', background: 'transparent', fontSize: '16px', color: COLORS.text, fontFamily: 'inherit',
+            flex: 1, border: 'none', background: 'transparent', fontSize: '14.5px', color: COLORS.text, fontFamily: 'inherit',
           }}
         />
       </div>
@@ -176,8 +176,8 @@ function SearchBar() {
         type="button"
         onClick={go}
         style={{
-          height: '52px', padding: '0 34px', border: 'none', borderRadius: '12px', background: COLORS.primary,
-          color: 'white', fontSize: '16px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          height: '44px', padding: '0 26px', border: 'none', borderRadius: '10px', background: COLORS.primary,
+          color: 'white', fontSize: '14.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
           display: 'inline-flex', alignItems: 'center', gap: '8px',
         }}>
         <Icon name="search" size={18} color="white" />
@@ -199,7 +199,7 @@ function TripCardDesktop({ icon, route, company, date, price, photoUrl, isFavori
         background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '16px', overflow: 'hidden',
         cursor: 'pointer',
       }}>
-      <div style={{ position: 'relative', height: '160px' }}>
+      <div style={{ position: 'relative', height: '120px' }}>
         <div style={{
           width: '100%', height: '100%',
           background: photoUrl ? '#E2E8F0' : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
@@ -213,12 +213,12 @@ function TripCardDesktop({ icon, route, company, date, price, photoUrl, isFavori
         </div>
         <FavoriteButton active={isFavorite} onClick={onToggleFavorite} />
       </div>
-      <div style={{ padding: '14px 16px 16px' }}>
-        <p style={{ fontSize: '16px', fontWeight: 700, color: COLORS.text, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{route}</p>
+      <div style={{ padding: '12px 14px 14px' }}>
+        <p style={{ fontSize: '15px', fontWeight: 700, color: COLORS.text, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{route}</p>
         <p style={{ fontSize: '13px', color: COLORS.textMuted, margin: '4px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{company} &bull; {date}</p>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '14px' }}>
-          <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.primary, margin: 0 }}>&#8358;{price.toLocaleString()}</p>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: 'white', background: COLORS.secondary, padding: '7px 16px', borderRadius: '9px' }}>Book</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px' }}>
+          <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary, margin: 0 }}>&#8358;{price.toLocaleString()}</p>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: 'white', background: COLORS.secondary, padding: '6px 14px', borderRadius: '9px' }}>Book</span>
         </div>
       </div>
     </div>
@@ -481,8 +481,8 @@ function UserHomeDesktop() {
           <div
             onClick={openHero}
             style={{
-              height: '380px', borderRadius: '24px', position: 'relative', overflow: 'hidden', boxSizing: 'border-box',
-              padding: heroIsImage ? 0 : '56px 60px',
+              height: '300px', borderRadius: '20px', position: 'relative', overflow: 'hidden', boxSizing: 'border-box',
+              padding: heroIsImage ? 0 : '40px 48px',
               background: currentSlide.type === 'default' ? bannerGradient() : bannerGradient(currentSlide.banner.banner_type),
               color: 'white', cursor: heroHref ? 'pointer' : 'default',
             }}>
@@ -496,7 +496,7 @@ function UserHomeDesktop() {
             )}
             {!heroIsImage && heroDiscountPct != null && (
               <div style={{
-                position: 'absolute', top: '36px', right: '48px', width: '104px', height: '104px', borderRadius: '50%',
+                position: 'absolute', top: '26px', right: '40px', width: '92px', height: '92px', borderRadius: '50%',
                 background: 'rgba(255,255,255,0.96)', display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', textAlign: 'center', boxShadow: '0 6px 16px rgba(0,0,0,0.2)',
               }}>
@@ -509,22 +509,22 @@ function UserHomeDesktop() {
               <div style={{ position: 'relative', maxWidth: '680px' }}>
                 {currentSlide.type === 'default' ? (
                   <>
-                    <h1 style={{ fontSize: '46px', fontWeight: 800, lineHeight: 1.15, margin: '0 0 14px' }}>Explore Nigeria With Confidence</h1>
-                    <p style={{ fontSize: '19px', opacity: 0.92, margin: 0 }}>Hotels, Transport, Flights &amp; Tours in One Platform</p>
+                    <h1 style={{ fontSize: '34px', fontWeight: 800, lineHeight: 1.15, margin: '0 0 10px' }}>Explore Nigeria With Confidence</h1>
+                    <p style={{ fontSize: '16px', opacity: 0.92, margin: 0 }}>Hotels, Transport, Flights &amp; Tours in One Platform</p>
                   </>
                 ) : (
                   <>
-                    <h1 style={{ fontSize: '38px', fontWeight: 800, lineHeight: 1.2, margin: '0 0 14px', maxWidth: heroDiscountPct != null ? '75%' : '100%' }}>
+                    <h1 style={{ fontSize: '28px', fontWeight: 800, lineHeight: 1.2, margin: '0 0 10px', maxWidth: heroDiscountPct != null ? '75%' : '100%' }}>
                       {currentSlide.banner.title}
                     </h1>
-                    <p style={{ fontSize: '18px', opacity: 0.95, margin: 0, maxWidth: heroDiscountPct != null ? '75%' : '100%' }}>
+                    <p style={{ fontSize: '15px', opacity: 0.95, margin: 0, maxWidth: heroDiscountPct != null ? '75%' : '100%' }}>
                       {currentSlide.banner.message}
                     </p>
                     {currentSlide.banner.cta_text && (
                       <div style={{
-                        marginTop: '22px', display: 'inline-flex', alignItems: 'center', gap: '8px',
-                        background: 'rgba(255,255,255,0.95)', color: '#1A1A1A', padding: '12px 22px',
-                        borderRadius: '12px', fontSize: '15px', fontWeight: 800,
+                        marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '8px',
+                        background: 'rgba(255,255,255,0.95)', color: '#1A1A1A', padding: '9px 18px',
+                        borderRadius: '10px', fontSize: '13.5px', fontWeight: 800,
                       }}>
                         {currentSlide.banner.cta_text} <span>&rarr;</span>
                       </div>
@@ -536,7 +536,7 @@ function UserHomeDesktop() {
           </div>
 
           {heroSlides.length > 1 && (
-            <div style={{ position: 'absolute', left: 0, right: 0, bottom: '64px', display: 'flex', justifyContent: 'center', gap: '8px' }}>
+            <div style={{ position: 'absolute', left: 0, right: 0, bottom: '46px', display: 'flex', justifyContent: 'center', gap: '8px' }}>
               {heroSlides.map((_, i) => (
                 <div
                   key={i}
@@ -551,7 +551,7 @@ function UserHomeDesktop() {
             </div>
           )}
 
-          <div style={{ position: 'relative', zIndex: 2, margin: '-44px 40px 0' }}>
+          <div style={{ position: 'relative', zIndex: 2, margin: '-30px 36px 0' }}>
             <SearchBar />
           </div>
         </div>
@@ -566,16 +566,16 @@ function UserHomeDesktop() {
               onClick={() => navigate(s.path)}
               style={{
                 background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '16px',
-                padding: '22px 18px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                padding: '14px 16px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
               }}>
               <div style={{
-                width: '48px', height: '48px', borderRadius: '13px', background: '#E0F2FE',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px',
+                width: '38px', height: '38px', borderRadius: '11px', background: '#E0F2FE',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px',
               }}>
-                <Icon name={s.icon} size={24} color={COLORS.primary} />
+                <Icon name={s.icon} size={19} color={COLORS.primary} />
               </div>
-              <p style={{ fontSize: '15.5px', fontWeight: 700, color: COLORS.text, margin: 0 }}>{s.label}</p>
-              <p style={{ fontSize: '13px', color: COLORS.textMuted, margin: '4px 0 0' }}>{s.desc}</p>
+              <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text, margin: 0 }}>{s.label}</p>
+              <p style={{ fontSize: '12px', color: COLORS.textMuted, margin: '3px 0 0' }}>{s.desc}</p>
             </div>
           ))}
         </div>
@@ -589,7 +589,7 @@ function UserHomeDesktop() {
               className="tch-card"
               onClick={() => navigate(`/search?city=${encodeURIComponent(d.city)}`)}
               style={{
-                position: 'relative', height: '220px', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer',
+                position: 'relative', height: '165px', borderRadius: '14px', overflow: 'hidden', cursor: 'pointer',
                 background: d.photo ? '#E2E8F0' : `linear-gradient(135deg, ${d.color || COLORS.primary}, ${COLORS.primary})`,
               }}>
               {d.photo ? (
@@ -603,7 +603,7 @@ function UserHomeDesktop() {
                 position: 'absolute', left: 0, right: 0, bottom: 0, padding: '40px 16px 14px',
                 background: 'linear-gradient(to top, rgba(15,23,42,0.75), rgba(15,23,42,0))', color: 'white',
               }}>
-                <p style={{ fontSize: '17px', fontWeight: 800, margin: 0 }}>{d.city}</p>
+                <p style={{ fontSize: '15px', fontWeight: 800, margin: 0 }}>{d.city}</p>
                 {d.count > 0 ? (
                   <p style={{ fontSize: '12.5px', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: '4px', opacity: 0.95 }}>
                     <Icon name="star" size={12} color="#FBBF24" filled /> {d.rating.toFixed(1)} &middot; {d.count} reviews
@@ -631,7 +631,7 @@ function UserHomeDesktop() {
                   background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '16px',
                   overflow: 'hidden', cursor: 'pointer',
                 }}>
-                <div style={{ position: 'relative', height: '180px' }}>
+                <div style={{ position: 'relative', height: '140px' }}>
                   <div style={{
                     width: '100%', height: '100%',
                     background: h.photo_url ? '#E2E8F0' : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`,
@@ -645,8 +645,8 @@ function UserHomeDesktop() {
                   </div>
                   <FavoriteButton active={favoriteIds.has(h.id)} onClick={(e) => toggleFavorite(e, h.id)} />
                 </div>
-                <div style={{ padding: '14px 16px 16px' }}>
-                  <p style={{ fontSize: '16px', fontWeight: 700, color: COLORS.text, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.title}</p>
+                <div style={{ padding: '12px 14px 14px' }}>
+                  <p style={{ fontSize: '15px', fontWeight: 700, color: COLORS.text, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.title}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '13px', color: COLORS.textMuted }}>
                     <span>{h.destination || ''}</span>
                     {h.avgRating !== null && (
@@ -657,7 +657,7 @@ function UserHomeDesktop() {
                       </>
                     )}
                   </div>
-                  <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.primary, margin: '14px 0 0' }}>
+                  <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary, margin: '10px 0 0' }}>
                     &#8358;{h.price.toLocaleString()}
                     <span style={{ fontSize: '12.5px', color: COLORS.textMuted, fontWeight: 400 }}> /night</span>
                   </p>
@@ -718,19 +718,19 @@ function UserHomeDesktop() {
           className="tch-card"
           onClick={() => navigate('/bookings')}
           style={{
-            marginTop: '44px', background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '16px',
-            padding: '22px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer',
+            marginTop: '30px', background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: '16px',
+            padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer',
           }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{
-              width: '48px', height: '48px', borderRadius: '13px', background: '#E0F2FE',
+              width: '38px', height: '38px', borderRadius: '11px', background: '#E0F2FE',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Icon name="ticket" size={24} color={COLORS.primary} />
+              <Icon name="ticket" size={19} color={COLORS.primary} />
             </div>
             <div>
-              <p style={{ fontSize: '18px', fontWeight: 800, color: COLORS.title, margin: 0 }}>My Bookings</p>
-              <p style={{ fontSize: '14px', color: COLORS.textMuted, margin: '4px 0 0' }}>View your tickets and manage your trips</p>
+              <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.title, margin: 0 }}>My Bookings</p>
+              <p style={{ fontSize: '12.5px', color: COLORS.textMuted, margin: '3px 0 0' }}>View your tickets and manage your trips</p>
             </div>
           </div>
           <Icon name="chevronRight" size={22} color={COLORS.textMuted} />
