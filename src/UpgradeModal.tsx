@@ -2,9 +2,9 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 // Shown when a Free-plan company taps a Business Suite feature.
-// The upgrade destination is the same one the rest of the app already uses
-// for "Upgrade" buttons, so the existing plan flow is not duplicated here.
-const UPGRADE_ROUTE = '/support'
+// "Upgrade" opens the Business Suite page, which lists the benefits and lets the company
+// send an upgrade request (it used to open the Support page).
+const UPGRADE_ROUTE = '/upgrade-business-suite'
 
 const BENEFITS = [
   { title: 'Manage all activities', text: 'Control bookings, inventory and pricing in one place.' },
