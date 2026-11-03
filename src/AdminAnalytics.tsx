@@ -4,6 +4,7 @@ import {
   COLORS, RangeKey, RANGE_OPTIONS, windowForRange, Bucket,
   sum, pctChange, formatNaira, formatCompactNaira, KpiCard, SectionCard, EmptyNote, TrendChart,
 } from './AnalyticsUI'
+import useIsDesktop from './useIsDesktop'
 
 // ---------- Types (match the admin_analytics_summary / admin_analytics_timeseries RPCs) ----------
 type Summary = {
@@ -63,6 +64,7 @@ function bucketsFromTimeseries(points: TimePoint[], range: RangeKey): Bucket[] {
 }
 
 export default function AdminAnalytics() {
+  const isDesktop = useIsDesktop()
   const [summary, setSummary] = useState<Summary | null>(null)
   const [timeseries, setTimeseries] = useState<TimePoint[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -120,9 +122,12 @@ export default function AdminAnalytics() {
     URL.revokeObjectURL(url)
   }
 
+  const pagePadding = isDesktop ? '24px 28px 40px' : '16px 16px 40px'
+  const pageMax = isDesktop ? '1400px' : undefined
+
   if (loading) {
     return (
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: isDesktop ? '24px 28px' : '16px', maxWidth: pageMax, margin: '0 auto' }}>
         {[1, 2, 3].map((i) => (
           <div key={i} style={{ height: i === 1 ? '160px' : '90px', background: COLORS.card, borderRadius: '14px', marginBottom: '14px', border: `1px solid ${COLORS.border}` }} />
         ))}
@@ -132,7 +137,7 @@ export default function AdminAnalytics() {
 
   if (errorMsg || !summary) {
     return (
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: isDesktop ? '24px 28px' : '16px', maxWidth: pageMax, margin: '0 auto' }}>
         <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '16px', marginBottom: '14px' }}>
           <p style={{ fontSize: '13px', color: '#dc2626' }}>{errorMsg || 'Unable to load analytics.'}</p>
         </div>
@@ -159,12 +164,14 @@ export default function AdminAnalytics() {
   const mostBookedCategory = bookings_by_category.length > 1 ? bookings_by_category.reduce((a, b) => (b.bookings > a.bookings ? b : a), bookings_by_category[0]) : null
   const highestValueCategory = bookings_by_category.length > 1 ? bookings_by_category.reduce((a, b) => (b.revenue > a.revenue ? b : a), bookings_by_category[0]) : null
 
+  const block = isDesktop ? { breakInside: 'avoid' as const } : undefined
+
   return (
-    <div style={{ padding: '16px 16px 40px' }}>
+    <div style={{ padding: pagePadding, maxWidth: pageMax, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap' as const, gap: '10px' }}>
         <div>
-          <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>Traveler.com Analytics</p>
-          <p style={{ fontSize: '11px', color: COLORS.textMuted }}>Platform performance & ecosystem insights</p>
+          <p style={{ fontSize: isDesktop ? '20px' : '15px', fontWeight: 800, color: COLORS.text }}>Traveler.com Analytics</p>
+          <p style={{ fontSize: isDesktop ? '12px' : '11px', color: COLORS.textMuted }}>Platform performance & ecosystem insights</p>
         </div>
         <span onClick={exportCsv} style={{ padding: '8px 13px', border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '12px', fontWeight: 700, color: COLORS.text, cursor: 'pointer', background: COLORS.card }}>
           Export
@@ -221,139 +228,157 @@ export default function AdminAnalytics() {
         <KpiCard label="Cancellation Rate" value={cancellationRate + '%'} />
       </div>
 
-      {/* Platform Performance trend chart */}
-      <SectionCard title="Platform Performance">
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto' as const }}>
-          {METRIC_OPTIONS.map((m) => (
-            <span key={m.key} onClick={() => setMetric(m.key)}
-              style={{ flexShrink: 0, padding: '6px 11px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer',
-                background: metric === m.key ? COLORS.primary : COLORS.bg, color: metric === m.key ? 'white' : COLORS.textMuted }}>
-              {m.label}
-            </span>
-          ))}
+      <div style={isDesktop ? { columnCount: 2, columnGap: '16px' } : undefined}>
+        {/* Platform Performance trend chart */}
+        <div style={block}>
+          <SectionCard title="Platform Performance">
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', overflowX: 'auto' as const }}>
+              {METRIC_OPTIONS.map((m) => (
+                <span key={m.key} onClick={() => setMetric(m.key)}
+                  style={{ flexShrink: 0, padding: '6px 11px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer',
+                    background: metric === m.key ? COLORS.primary : COLORS.bg, color: metric === m.key ? 'white' : COLORS.textMuted }}>
+                  {m.label}
+                </span>
+              ))}
+            </div>
+            {range === 'today' || !chartSeries ? (
+              <EmptyNote text="Not enough data to display this trend for a single day. Pick a wider range." />
+            ) : (
+              <TrendChart
+                buckets={chartBuckets}
+                series={chartSeries[metric]}
+                allSeries={chartSeries}
+                activeMetric={metric}
+                valueFormatter={formatMetricValue}
+                renderTooltipRows={(idx) => [
+                  { label: 'Revenue', value: formatNaira(chartSeries.revenue[idx]) },
+                  { label: 'Bookings', value: String(chartSeries.bookings[idx]) },
+                  { label: 'Customers', value: String(chartSeries.customers[idx]) },
+                  { label: 'Companies', value: String(chartSeries.companies[idx]) },
+                  { label: 'Transactions', value: String(chartSeries.transactions[idx]) },
+                ]}
+              />
+            )}
+          </SectionCard>
         </div>
-        {range === 'today' || !chartSeries ? (
-          <EmptyNote text="Not enough data to display this trend for a single day. Pick a wider range." />
-        ) : (
-          <TrendChart
-            buckets={chartBuckets}
-            series={chartSeries[metric]}
-            allSeries={chartSeries}
-            activeMetric={metric}
-            valueFormatter={formatMetricValue}
-            renderTooltipRows={(idx) => [
-              { label: 'Revenue', value: formatNaira(chartSeries.revenue[idx]) },
-              { label: 'Bookings', value: String(chartSeries.bookings[idx]) },
-              { label: 'Customers', value: String(chartSeries.customers[idx]) },
-              { label: 'Companies', value: String(chartSeries.companies[idx]) },
-              { label: 'Transactions', value: String(chartSeries.transactions[idx]) },
-            ]}
-          />
-        )}
-      </SectionCard>
 
-      {/* Financial Overview */}
-      <SectionCard title="Financial Overview">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-          <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{formatNaira(period.gross_revenue)}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Gross Booking Value</p></div>
-          <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{formatNaira(period.traveler_fee)}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Traveler.com Revenue (fees)</p></div>
-          <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{formatNaira(providerRevenue)}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Company/Provider Revenue</p></div>
-          <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{formatNaira(period.cancelled_amount)}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Cancelled Booking Value</p></div>
+        {/* Financial Overview */}
+        <div style={block}>
+          <SectionCard title="Financial Overview">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+              <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{formatNaira(period.gross_revenue)}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Gross Booking Value</p></div>
+              <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{formatNaira(period.traveler_fee)}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Traveler.com Revenue (fees)</p></div>
+              <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{formatNaira(providerRevenue)}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Company/Provider Revenue</p></div>
+              <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{formatNaira(period.cancelled_amount)}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Cancelled Booking Value</p></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '10px', borderTop: `1px solid ${COLORS.border}` }}>
+              <div><p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>{period.payments_successful_count.toLocaleString()}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Successful Payments ({formatNaira(period.payments_successful_amount)})</p></div>
+              <div><p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>{period.payments_pending_count.toLocaleString()}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Pending Payments</p></div>
+              <div><p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>{period.refund_count.toLocaleString()}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Refunds ({formatNaira(period.refund_amount)})</p></div>
+            </div>
+            <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '10px' }}>Traveler.com doesn't currently record a "Failed" payment status separately from Pending.</p>
+          </SectionCard>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '10px', borderTop: `1px solid ${COLORS.border}` }}>
-          <div><p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>{period.payments_successful_count.toLocaleString()}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Successful Payments ({formatNaira(period.payments_successful_amount)})</p></div>
-          <div><p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>{period.payments_pending_count.toLocaleString()}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Pending Payments</p></div>
-          <div><p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text }}>{period.refund_count.toLocaleString()}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Refunds ({formatNaira(period.refund_amount)})</p></div>
-        </div>
-        <p style={{ fontSize: '10.5px', color: COLORS.textMuted, marginTop: '10px' }}>Traveler.com doesn't currently record a "Failed" payment status separately from Pending.</p>
-      </SectionCard>
 
-      {/* Booking Category Analytics */}
-      <SectionCard title="Booking Category Analytics">
-        {bookings_by_category.length === 0 ? (
-          <EmptyNote text="No booking data available for this period." />
-        ) : (
-          bookings_by_category.map((c, i) => (
-            <div key={c.category} style={{ padding: '10px 0', borderBottom: i === bookings_by_category.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' as const, gap: '4px' }}>
-                <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>{CATEGORY_LABELS[c.category] || humanize(c.category)}</p>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  {mostBookedCategory?.category === c.category && <span style={{ fontSize: '9px', fontWeight: 700, color: COLORS.primary, background: '#E0F2FE', padding: '2px 7px', borderRadius: '6px' }}>Most Booked Category</span>}
-                  {highestValueCategory?.category === c.category && <span style={{ fontSize: '9px', fontWeight: 700, color: COLORS.green, padding: '2px 7px', borderRadius: '6px', background: '#F0FDF4' }}>Highest Booking Value</span>}
+        {/* Booking Category Analytics */}
+        <div style={block}>
+          <SectionCard title="Booking Category Analytics">
+            {bookings_by_category.length === 0 ? (
+              <EmptyNote text="No booking data available for this period." />
+            ) : (
+              bookings_by_category.map((c, i) => (
+                <div key={c.category} style={{ padding: '10px 0', borderBottom: i === bookings_by_category.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' as const, gap: '4px' }}>
+                    <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>{CATEGORY_LABELS[c.category] || humanize(c.category)}</p>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      {mostBookedCategory?.category === c.category && <span style={{ fontSize: '9px', fontWeight: 700, color: COLORS.primary, background: '#E0F2FE', padding: '2px 7px', borderRadius: '6px' }}>Most Booked Category</span>}
+                      {highestValueCategory?.category === c.category && <span style={{ fontSize: '9px', fontWeight: 700, color: COLORS.green, padding: '2px 7px', borderRadius: '6px', background: '#F0FDF4' }}>Highest Booking Value</span>}
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{c.bookings} bookings · {formatNaira(c.revenue)} · {c.cancelled} cancelled</p>
                 </div>
-              </div>
-              <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{c.bookings} bookings · {formatNaira(c.revenue)} · {c.cancelled} cancelled</p>
-            </div>
-          ))
-        )}
-      </SectionCard>
-
-      {/* Company / Partner Analytics */}
-      <SectionCard title="Company / Partner Analytics">
-        <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px', marginBottom: '12px' }}>
-          {companies_by_status.map((s) => (
-            <div key={s.status} style={{ flex: '1 1 40%', background: COLORS.bg, borderRadius: '10px', padding: '10px' }}>
-              <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>{s.cnt}</p>
-              <p style={{ fontSize: '10px', color: COLORS.textMuted }}>{humanize(s.status)}</p>
-            </div>
-          ))}
+              ))
+            )}
+          </SectionCard>
         </div>
-        <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '8px' }}>By category (with bookings / total)</p>
-        {companies_by_category.map((c, i) => (
-          <div key={c.category} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: i === companies_by_category.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
-            <span style={{ fontSize: '12px', color: COLORS.text }}>{CATEGORY_LABELS[c.category] || humanize(c.category)}</span>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{c.with_bookings} / {c.cnt}</span>
-          </div>
-        ))}
-      </SectionCard>
 
-      {/* Top Performers */}
-      <SectionCard title="Top Companies by Revenue">
-        {top_companies.length === 0 ? (
-          <EmptyNote text="No company revenue data for this period." />
-        ) : (
-          top_companies.map((c, i) => (
-            <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: i === top_companies.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
-              <div>
-                <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{c.business_name}</p>
-                <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{CATEGORY_LABELS[c.business_type] || humanize(c.business_type || '')}</p>
-              </div>
-              <div style={{ textAlign: 'right' as const }}>
-                <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{formatNaira(c.revenue)}</p>
-                <p style={{ fontSize: '10px', color: COLORS.textMuted }}>{c.bookings} bookings</p>
-              </div>
+        {/* Company / Partner Analytics */}
+        <div style={block}>
+          <SectionCard title="Company / Partner Analytics">
+            <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px', marginBottom: '12px' }}>
+              {companies_by_status.map((s) => (
+                <div key={s.status} style={{ flex: '1 1 40%', background: COLORS.bg, borderRadius: '10px', padding: '10px' }}>
+                  <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>{s.cnt}</p>
+                  <p style={{ fontSize: '10px', color: COLORS.textMuted }}>{humanize(s.status)}</p>
+                </div>
+              ))}
             </div>
-          ))
-        )}
-      </SectionCard>
-
-      <SectionCard title="Top Routes (Bus/Train/Flight)">
-        {top_routes.length === 0 ? (
-          <EmptyNote text="No route data available yet." />
-        ) : (
-          top_routes.map((r, i) => (
-            <div key={`${r.category}-${r.origin}-${r.destination}`} style={{ padding: '9px 0', borderBottom: i === top_routes.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
-              <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{r.origin} → {r.destination} <span style={{ fontWeight: 500, color: COLORS.textMuted }}>({CATEGORY_LABELS[r.category] || humanize(r.category)})</span></p>
-              <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{r.bookings} bookings · {formatNaira(r.revenue)}</p>
-            </div>
-          ))
-        )}
-      </SectionCard>
-
-      {/* Platform Operations */}
-      <SectionCard title="Platform Operations">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{operations.today_bookings}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Today's Bookings</p></div>
-          <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{formatNaira(operations.today_revenue)}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Today's Revenue</p></div>
-          <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{operations.pending_company_approvals}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Pending Company Approvals</p></div>
-          <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{operations.upcoming_activity_48h}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Departures/Check-ins/Tours/Events (next 48h)</p></div>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '8px' }}>By category (with bookings / total)</p>
+            {companies_by_category.map((c, i) => (
+              <div key={c.category} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: i === companies_by_category.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
+                <span style={{ fontSize: '12px', color: COLORS.text }}>{CATEGORY_LABELS[c.category] || humanize(c.category)}</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{c.with_bookings} / {c.cnt}</span>
+              </div>
+            ))}
+          </SectionCard>
         </div>
-      </SectionCard>
 
-      {/* Honest data-gap notes rather than fake sections */}
-      <SectionCard title="Not Yet Available">
-        <EmptyNote text="Cabin/geographical customer analytics (by country/state), user activity/search tracking, and cross-page drill-down (Platform → Category → Company → Booking) aren't built yet — none of the underlying data (customer location, page-view/search logs) or navigation exists yet. Flagging these rather than estimating them." />
-      </SectionCard>
+        {/* Top Performers */}
+        <div style={block}>
+          <SectionCard title="Top Companies by Revenue">
+            {top_companies.length === 0 ? (
+              <EmptyNote text="No company revenue data for this period." />
+            ) : (
+              top_companies.map((c, i) => (
+                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: i === top_companies.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
+                  <div>
+                    <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{c.business_name}</p>
+                    <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{CATEGORY_LABELS[c.business_type] || humanize(c.business_type || '')}</p>
+                  </div>
+                  <div style={{ textAlign: 'right' as const }}>
+                    <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{formatNaira(c.revenue)}</p>
+                    <p style={{ fontSize: '10px', color: COLORS.textMuted }}>{c.bookings} bookings</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </SectionCard>
+        </div>
+
+        <div style={block}>
+          <SectionCard title="Top Routes (Bus/Train/Flight)">
+            {top_routes.length === 0 ? (
+              <EmptyNote text="No route data available yet." />
+            ) : (
+              top_routes.map((r, i) => (
+                <div key={`${r.category}-${r.origin}-${r.destination}`} style={{ padding: '9px 0', borderBottom: i === top_routes.length - 1 ? 'none' : `1px solid ${COLORS.border}` }}>
+                  <p style={{ fontSize: '12px', fontWeight: 700, color: COLORS.text }}>{r.origin} → {r.destination} <span style={{ fontWeight: 500, color: COLORS.textMuted }}>({CATEGORY_LABELS[r.category] || humanize(r.category)})</span></p>
+                  <p style={{ fontSize: '10.5px', color: COLORS.textMuted }}>{r.bookings} bookings · {formatNaira(r.revenue)}</p>
+                </div>
+              ))
+            )}
+          </SectionCard>
+        </div>
+
+        {/* Platform Operations */}
+        <div style={block}>
+          <SectionCard title="Platform Operations">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{operations.today_bookings}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Today's Bookings</p></div>
+              <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{formatNaira(operations.today_revenue)}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Today's Revenue</p></div>
+              <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{operations.pending_company_approvals}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Pending Company Approvals</p></div>
+              <div><p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.text }}>{operations.upcoming_activity_48h}</p><p style={{ fontSize: '10px', color: COLORS.textMuted }}>Departures/Check-ins/Tours/Events (next 48h)</p></div>
+            </div>
+          </SectionCard>
+        </div>
+
+        {/* Honest data-gap notes rather than fake sections */}
+        <div style={block}>
+          <SectionCard title="Not Yet Available">
+            <EmptyNote text="Cabin/geographical customer analytics (by country/state), user activity/search tracking, and cross-page drill-down (Platform → Category → Company → Booking) aren't built yet — none of the underlying data (customer location, page-view/search logs) or navigation exists yet. Flagging these rather than estimating them." />
+          </SectionCard>
+        </div>
+      </div>
     </div>
   )
 }
