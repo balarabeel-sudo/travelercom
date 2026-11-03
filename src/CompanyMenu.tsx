@@ -17,6 +17,9 @@ const COLORS = {
   green: '#16A34A',
 }
 
+// The Business Suite page lists the benefits and lets the company send an upgrade request.
+const UPGRADE_ROUTE = '/upgrade-business-suite'
+
 export default function CompanyMenu() {
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
@@ -86,7 +89,7 @@ export default function CompanyMenu() {
           {companyPlan === 'free' && (
             <button
               type="button"
-              onClick={() => navigate('/support')}
+              onClick={() => navigate(UPGRADE_ROUTE)}
               style={{
                 padding: '12px 24px', background: 'white', color: '#4C1D95', border: 'none',
                 borderRadius: '10px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
@@ -161,7 +164,7 @@ export default function CompanyMenu() {
               <p style={{ fontSize: '15px', color: '#DDD6FE', margin: '0 0 22px' }}>Unlock more power. Manage better. Grow faster.</p>
               <button
                 type="button"
-                onClick={() => navigate('/support')}
+                onClick={() => navigate(UPGRADE_ROUTE)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#F59E0B', color: '#2E1065',
                   padding: '13px 28px', borderRadius: '12px', fontWeight: 800, fontSize: '15px', border: 'none',
@@ -268,7 +271,7 @@ export default function CompanyMenu() {
             </div>
 
             <div
-              onClick={() => navigate('/support')}
+              onClick={() => navigate(UPGRADE_ROUTE)}
               style={{
                 background: '#F59E0B', color: '#2E1065', textAlign: 'center', padding: '13px',
                 borderRadius: '12px', fontWeight: 800, fontSize: '14px', cursor: 'pointer',
