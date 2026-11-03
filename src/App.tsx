@@ -77,6 +77,7 @@ import AddFlightListing from './AddFlightListing'
 import VehicleRentals from './VehicleRentals'
 import VehicleRentalDetails from './VehicleRentalDetails'
 import CompanyLayout, { isCompanyDesktopPath } from './CompanyLayout'
+import { UserShell } from './UserLayout'
 import useIsDesktop from './useIsDesktop'
 import PlatformGate from './PlatformGate'
 
@@ -215,8 +216,8 @@ function AppShell() {
         <Route path="/upload-docs" element={<UploadDocs />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
         <Route path="/verify-booking" element={<CompanyLayout><VerifyBooking /></CompanyLayout>} />
-        <Route path="/account" element={<Account />} />
-        <Route path="/profile" element={<Profile />} />
+        <Route path="/account" element={<UserShell><Account /></UserShell>} />
+        <Route path="/profile" element={<UserShell><Profile /></UserShell>} />
         <Route path="/add-listing-router" element={<AddListingRouter />} />
         <Route path="/add-bus-listing" element={<CompanyLayout><AddBusListing /></CompanyLayout>} />
         <Route path="/add-listing" element={<CompanyLayout><AddListing /></CompanyLayout>} />
@@ -226,16 +227,16 @@ function AppShell() {
         <Route path="/add-vehicle-rental-listing" element={<CompanyLayout><AddVehicleRentalListing /></CompanyLayout>} />
         <Route path="/add-flight-listing" element={<CompanyLayout><AddFlightListing /></CompanyLayout>} />
         <Route path="/my-listings" element={<CompanyLayout><MyListings /></CompanyLayout>} />
-        <Route path="/hotels" element={<Hotels />} />
-        <Route path="/wallet" element={<Wallet />} />
-        <Route path="/hotels/:id" element={<HotelDetails />} />
+        <Route path="/hotels" element={<UserShell><Hotels /></UserShell>} />
+        <Route path="/wallet" element={<UserShell><Wallet /></UserShell>} />
+        <Route path="/hotels/:id" element={<UserShell><HotelDetails /></UserShell>} />
         <Route path="/bookings-management" element={<CompanyLayout><BookingsManagement /></CompanyLayout>} />
         <Route path="/listings-management" element={<CompanyLayout><ListingsManagement /></CompanyLayout>} />
-        <Route path="/services/:category" element={<Services />} />
-        <Route path="/services/:category/:id" element={<ServiceDetails />} />
+        <Route path="/services/:category" element={<UserShell><Services /></UserShell>} />
+        <Route path="/services/:category/:id" element={<UserShell><ServiceDetails /></UserShell>} />
         <Route path="/upgrade-business-suite" element={<UpgradeBusinessSuite />} />
         <Route path="/payment-terms" element={<TermsAndConditions />} />
-        <Route path="/search" element={<Search />} />
+        <Route path="/search" element={<UserShell><Search /></UserShell>} />
         <Route path="/guests" element={<CompanyLayout><GuestList /></CompanyLayout>} />
         <Route path="/company-menu" element={<CompanyLayout><CompanyMenu /></CompanyLayout>} />
         <Route path="/inventory" element={<CompanyLayout><InventoryManagement /></CompanyLayout>} />
@@ -244,33 +245,33 @@ function AppShell() {
         <Route path="/promotions" element={<CompanyLayout><Promotions /></CompanyLayout>} />
         <Route path="/reviews" element={<CompanyLayout><Ratings /></CompanyLayout>} />
         <Route path="/company-profile" element={<CompanyLayout><CompanyProfile /></CompanyLayout>} />
-        <Route path="/company/:id" element={<CompanyStorefront />} />
+        <Route path="/company/:id" element={<UserShell><CompanyStorefront /></UserShell>} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/customer-privacy" element={<CustomerPrivacyPolicy />} />
         <Route path="/customer-terms" element={<CustomerTerms />} />
         <Route path="/company-terms" element={<CompanyTerms />} />
         <Route path="/about" element={<About />} />
-       <Route path="/notifications" element={<Notifications />} />
-       <Route path="/support" element={<Support />} />
+       <Route path="/notifications" element={<UserShell><Notifications /></UserShell>} />
+       <Route path="/support" element={<UserShell><Support /></UserShell>} />
        <Route path="/settings" element={<CompanyLayout><Settings /></CompanyLayout>} />
-        <Route path="/customer-settings" element={<CustomerSettings />} />
+        <Route path="/customer-settings" element={<UserShell><CustomerSettings /></UserShell>} />
         <Route path="/add-guest" element={<CompanyLayout><AddGuest /></CompanyLayout>} />
-        <Route path="/flights" element={<Flights />} />
-        <Route path="/flight/:id" element={<FlightDetails />} />
-        <Route path="/bus" element={<Bus />} />
-        <Route path="/vehicle-rentals" element={<VehicleRentals />} />
-        <Route path="/vehicle-rentals/:id" element={<VehicleRentalDetails />} />
-        <Route path="/bus/:id" element={<BusDetails />} />
-        <Route path="/train" element={<Train />} />
-        <Route path="/train/:id" element={<TrainDetails />} />
-        <Route path="/tours" element={<Tours />} />
-        <Route path="/tour/:id" element={<TourDetails />} />
-        <Route path="/event-centers" element={<EventCenters />} />
-        <Route path="/event-center/:id" element={<EventCenterDetails />} />
+        <Route path="/flights" element={<UserShell><Flights /></UserShell>} />
+        <Route path="/flight/:id" element={<UserShell><FlightDetails /></UserShell>} />
+        <Route path="/bus" element={<UserShell><Bus /></UserShell>} />
+        <Route path="/vehicle-rentals" element={<UserShell><VehicleRentals /></UserShell>} />
+        <Route path="/vehicle-rentals/:id" element={<UserShell><VehicleRentalDetails /></UserShell>} />
+        <Route path="/bus/:id" element={<UserShell><BusDetails /></UserShell>} />
+        <Route path="/train" element={<UserShell><Train /></UserShell>} />
+        <Route path="/train/:id" element={<UserShell><TrainDetails /></UserShell>} />
+        <Route path="/tours" element={<UserShell><Tours /></UserShell>} />
+        <Route path="/tour/:id" element={<UserShell><TourDetails /></UserShell>} />
+        <Route path="/event-centers" element={<UserShell><EventCenters /></UserShell>} />
+        <Route path="/event-center/:id" element={<UserShell><EventCenterDetails /></UserShell>} />
         <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/my-bookings" element={<MyBookings />} />
-        <Route path="/bookings" element={<MyBookings />} />
+        <Route path="/my-bookings" element={<UserShell><MyBookings /></UserShell>} />
+        <Route path="/bookings" element={<UserShell><MyBookings /></UserShell>} />
         <Route path="/staff/create-role" element={<CompanyLayout><CreateRole onBack={() => window.history.back()} /></CompanyLayout>} />
         <Route path="/staff/manage-roles" element={<CompanyLayout><ManageRoles onBack={() => window.history.back()} onCreateRole={() => window.location.hash = '#/staff/create-role'} /></CompanyLayout>} />
         <Route path="/staff/permission-matrix" element={<CompanyLayout><PermissionMatrix onBack={() => window.history.back()} /></CompanyLayout>} />
