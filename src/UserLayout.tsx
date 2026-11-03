@@ -279,6 +279,10 @@ const CSS = `
   max-width: 1280px;
   margin: 0 auto;
 }
+.tcu-content-inner > div[style*="max-width: 480px"] { max-width: 880px !important; }
+.tcu-content-inner [style*="position: fixed"][style*="max-width: 480px"] { max-width: 880px !important; }
+.tcu-content-inner [style*="position: sticky"] { top: 72px !important; }
+[data-tcu-hide="1"] { display: none !important; }
 .tcu-footer {
   flex-shrink: 0;
   border-top: 1px solid var(--tcu-border);
@@ -317,6 +321,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
   const [userName, setUserName] = useState(cachedUserName)
   const [menuOpen, setMenuOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLElement>(null)
 
   // Start each page at the top when navigating between sections.
   useEffect(() => {
@@ -337,6 +342,27 @@ export default function UserLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     setMenuOpen(false)
   }, [pathname])
+
+  // Phone pages draw their own fixed bottom navigation bar. The desktop navbar replaces it,
+  // so any small fixed bar that holds the Home and Account tabs is hidden on desktop.
+  useEffect(() => {
+    if (!isDesktop) return
+    const root = contentRef.current
+    if (!root) return
+    const hideMobileNav = () => {
+      root.querySelectorAll<HTMLElement>('[style*="position: fixed"]').forEach((el) => {
+        if (el.hasAttribute('data-tcu-hide')) return
+        const text = el.textContent || ''
+        if (text.includes('Home') && text.includes('Account') && el.getBoundingClientRect().height < 120) {
+          el.setAttribute('data-tcu-hide', '1')
+        }
+      })
+    }
+    hideMobileNav()
+    const observer = new MutationObserver(hideMobileNav)
+    observer.observe(root, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [isDesktop, pathname])
 
   // The user's name is only needed for the avatar letter on desktop.
   useEffect(() => {
@@ -438,7 +464,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="tcu-content">
+        <main className="tcu-content" ref={contentRef}>
           <div className="tcu-content-inner">{children}</div>
         </main>
 
@@ -457,4 +483,40 @@ export default function UserLayout({ children }: { children: ReactNode }) {
     </div>,
     document.body
   )
+}
+
+// Remembered between page changes so the shell does not flash while the account type loads.
+let cachedIsCompany: boolean | null = null
+
+// Wraps any customer-facing page. On desktop, personal accounts get the UserLayout shell;
+// company accounts and phones get the page exactly as before.
+export function UserShell({ children }: { children: ReactNode }) {
+  const isDesktop = useIsDesktop()
+  const [isCompany, setIsCompany] = useState<boolean | null>(cachedIsCompany)
+
+  useEffect(() => {
+    if (!isDesktop) return
+    let cancelled = false
+    const apply = (session: any) => {
+      const company = session?.user?.user_metadata?.account_type === 'company'
+      cachedIsCompany = company
+      if (!cancelled) setIsCompany(company)
+    }
+    supabase.auth.getSession().then(({ data }) => apply(data.session))
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => apply(session))
+    return () => {
+      cancelled = true
+      listener.subscription.unsubscribe()
+    }
+  }, [isDesktop])
+
+  if (!isDesktop || isCompany === true) return <>{children}</>
+  if (isCompany === null) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', fontSize: '14px' }}>
+        Loading...
+      </div>
+    )
+  }
+  return <UserLayout>{children}</UserLayout>
 }
