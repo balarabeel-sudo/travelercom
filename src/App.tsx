@@ -234,7 +234,7 @@ function AppShell() {
         <Route path="/listings-management" element={<CompanyLayout><ListingsManagement /></CompanyLayout>} />
         <Route path="/services/:category" element={<UserShell><Services /></UserShell>} />
         <Route path="/services/:category/:id" element={<UserShell><ServiceDetails /></UserShell>} />
-        <Route path="/upgrade-business-suite" element={<UpgradeBusinessSuite />} />
+        <Route path="/upgrade-business-suite" element={<CompanyLayout><UpgradeBusinessSuite /></CompanyLayout>} />
         <Route path="/payment-terms" element={<TermsAndConditions />} />
         <Route path="/search" element={<UserShell><Search /></UserShell>} />
         <Route path="/guests" element={<CompanyLayout><GuestList /></CompanyLayout>} />
