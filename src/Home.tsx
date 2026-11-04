@@ -547,7 +547,7 @@ if (accountType === 'company') {
               </div>
               <button
                 type="button"
-                onClick={() => navigate(isSuite ? '/company-menu' : '/support')}
+                onClick={() => navigate(isSuite ? '/company-menu' : '/upgrade-business-suite')}
                 style={{
                   padding: '12px 24px', background: 'white', color: '#4C1D95', border: 'none',
                   borderRadius: '10px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
@@ -1748,4 +1748,3 @@ function CompanyBottomNav({ active, navigate }: { active: string; navigate: (p: 
 }
 
 export default Home
-                
