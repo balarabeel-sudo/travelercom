@@ -13,6 +13,7 @@ function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [toast, setToast] = useState('')
 
@@ -43,6 +44,28 @@ function Login() {
       // an invite card (InviteGate) and must tap Accept themselves.
       setLoading(false)
       navigate('/home')
+    }
+  }
+
+  // Google sign-in. The browser leaves the app, Google asks the user to pick an account,
+  // then Google/Supabase sends the user back to the site root. SplashScreen finds the
+  // saved session there and sends the user straight to /home.
+  const handleGoogleLogin = async () => {
+    if (googleLoading) return
+    setErrorMsg('')
+    setGoogleLoading(true)
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/`,
+        queryParams: { prompt: 'select_account' },
+      },
+    })
+
+    if (error) {
+      setGoogleLoading(false)
+      setErrorMsg('Google login could not start. Please try again.')
     }
   }
 
@@ -105,7 +128,7 @@ function Login() {
           <div style={{ flex: 1, height: '1px', background: COLORS.border }} />
         </div>
 
-        <SocialLoginButtons onProviderClick={(p) => setToast(`${p.charAt(0).toUpperCase() + p.slice(1)} login is coming soon`)} />
+        <SocialLoginButtons onProviderClick={(p) => { if (p === 'google') handleGoogleLogin() }} />
 
         <p style={{ textAlign: 'center', color: COLORS.textMuted, fontSize: '13px', marginTop: '22px' }}>
           Don't have an account?{' '}
