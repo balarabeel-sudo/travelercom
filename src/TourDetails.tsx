@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
@@ -28,22 +29,22 @@ const STEP_LABELS: { key: Step; label: string }[] = [
   { key: 'summary', label: 'Review' },
 ]
 
+// A tour has no fixed date, time or number of slots. The customer simply picks the day they
+// want to go and buys a ticket, so there is no "fully booked" or "slots left" state here.
 type TourDetail = {
   id: string
   photo_url: string | null
+  photo_urls: string[] | null
   title: string
   description: string | null
   destination: string
   price: number
-  seats_available: number | null
   gate_fee: number | null
   vehicle_fee: number | null
   company_id: string
   tour_type: string | null
   duration_minutes: number | null
   meeting_point: string | null
-  departure_time: string | null
-  arrival_time: string | null
   companies: { business_name: string } | null
 }
 
@@ -64,6 +65,10 @@ function TourDetails() {
   const [addVehicleFee, setAddVehicleFee] = useState(false)
   const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
   const [reviews, setReviews] = useState<{ id: string; rating: number; comment: string | null; created_at: string; full_name: string | null }[]>([])
+
+  // Photo slider (same behaviour as the hotel page)
+  const [photoIndex, setPhotoIndex] = useState(0)
+  const sliderRef = useRef<HTMLDivElement | null>(null)
 
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -103,7 +108,7 @@ function TourDetails() {
 
       const { data: svc } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, tour_type, gate_fee, vehicle_fee, duration_minutes, meeting_point, departure_time, arrival_time, companies(business_name)')
+        .select('id, title, description, destination, price, company_id, photo_url, photo_urls, tour_type, gate_fee, vehicle_fee, duration_minutes, meeting_point, companies(business_name)')
         .eq('id', id)
         .maybeSingle()
       setService(svc as any)
@@ -164,7 +169,6 @@ function TourDetails() {
   const addOnsTotal = (addGateFee ? (service?.gate_fee ?? 0) : 0) + (addVehicleFee ? (service?.vehicle_fee ?? 0) : 0)
 
   const activePrice = discountedTotal + addOnsTotal
-  const seatsLeft = service?.seats_available ?? null
 
   const validateGuest = () => {
     const errors: { name?: string; email?: string; phone?: string } = {}
@@ -209,17 +213,12 @@ function TourDetails() {
     setMessage(null)
 
     if (!tourDate) {
-      setMessage({ type: 'error', text: 'Please select a tour date.' })
+      setMessage({ type: 'error', text: 'Please choose the date you want to go.' })
       return
     }
 
     if (travelers < 1) {
       setMessage({ type: 'error', text: 'Please select at least 1 traveler.' })
-      return
-    }
-
-    if (seatsLeft !== null && travelers > seatsLeft) {
-      setMessage({ type: 'error', text: `Only ${seatsLeft} slot${seatsLeft !== 1 ? 's' : ''} left for this tour.` })
       return
     }
 
@@ -250,13 +249,6 @@ function TourDetails() {
       return
     }
 
-    if (seatsLeft !== null) {
-      const { data: newCount, error: decErr } = await supabase.rpc('decrement_seats', { p_service_id: service.id, p_quantity: travelers })
-      if (!decErr && newCount !== null) {
-        setService({ ...service, seats_available: newCount })
-      }
-    }
-
     const newBalance = walletBalance - activePrice
     const { error: walletErr } = await supabase
       .from('wallets')
@@ -283,7 +275,6 @@ function TourDetails() {
       status: 'successful',
     }).select('id').single()
 
-    void newBooking
     setBooking(false)
     setWalletBalance(newBalance)
     // The ticket code is created by the database; always show that exact code.
@@ -366,7 +357,7 @@ function TourDetails() {
         <p style={{ fontSize: '17px', fontWeight: 800, marginTop: '10px' }}>
           {step === 'details' && 'Tour Details'}
           {step === 'guest' && 'Your Information'}
-          {step === 'dates' && 'Select Tour Date'}
+          {step === 'dates' && 'When Do You Want To Go?'}
           {step === 'participants' && 'Participants'}
           {step === 'payment' && 'Payment'}
           {step === 'summary' && 'Review & Confirm'}
@@ -394,7 +385,68 @@ function TourDetails() {
           overflow: 'hidden',
           position: 'relative'
         }}>
-          {service.photo_url ? <img src={service.photo_url} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="map" size={56} color="white" />}
+          {(() => {
+            const photos = service.photo_urls && service.photo_urls.length > 0 ? service.photo_urls : (service.photo_url ? [service.photo_url] : [])
+            if (photos.length === 0) return <Icon name="map" size={56} color="white" />
+            const idx = Math.min(photoIndex, photos.length - 1)
+            const goToPhoto = (i: number) => {
+              const el = sliderRef.current
+              if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+            }
+            const sliderStyle = {
+              display: 'flex', width: '100%', height: '100%', overflowX: 'auto', overflowY: 'hidden',
+              scrollSnapType: 'x mandatory', scrollbarWidth: 'none', msOverflowStyle: 'none',
+              WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y',
+            } as CSSProperties
+            const arrowStyle = {
+              position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: '30px', height: '30px',
+              borderRadius: '50%', background: 'rgba(15,23,42,0.45)', color: 'white', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', fontSize: '20px', lineHeight: 1, cursor: 'pointer',
+            } as CSSProperties
+            return (
+              <>
+                {/* Swipe left or right to move between photos; each photo snaps into place. */}
+                <div
+                  ref={sliderRef}
+                  style={sliderStyle}
+                  onScroll={(e) => {
+                    const el = e.currentTarget
+                    if (el.clientWidth === 0) return
+                    const i = Math.round(el.scrollLeft / el.clientWidth)
+                    if (i !== photoIndex) setPhotoIndex(i)
+                  }}>
+                  {photos.map((src, i) => (
+                    <img
+                      key={i}
+                      src={src}
+                      alt={`${service.title} photo ${i + 1}`}
+                      loading={i === 0 ? 'eager' : 'lazy'}
+                      draggable={false}
+                      style={{ flex: '0 0 100%', width: '100%', height: '100%', objectFit: 'cover', scrollSnapAlign: 'start', scrollSnapStop: 'always' } as CSSProperties}
+                    />
+                  ))}
+                </div>
+                {photos.length > 1 && (
+                  <>
+                    <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(15,23,42,0.55)', color: 'white', fontSize: '11.5px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px' }}>
+                      {idx + 1} / {photos.length}
+                    </div>
+                    {idx > 0 && (
+                      <div onClick={() => goToPhoto(idx - 1)} style={{ ...arrowStyle, left: '8px' }}>&#8249;</div>
+                    )}
+                    {idx < photos.length - 1 && (
+                      <div onClick={() => goToPhoto(idx + 1)} style={{ ...arrowStyle, right: '8px' }}>&#8250;</div>
+                    )}
+                    <div style={{ position: 'absolute', bottom: '10px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '5px', pointerEvents: 'none' }}>
+                      {photos.map((_, i) => (
+                        <div key={i} style={{ width: i === idx ? '16px' : '5px', height: '5px', borderRadius: '3px', background: i === idx ? 'white' : 'rgba(255,255,255,0.5)', transition: 'width 0.2s' }} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )
+          })()}
           {activePromo && (
             <div style={{
               position: 'absolute', top: '12px', left: '12px', background: '#6B21A8', color: 'white',
@@ -430,26 +482,12 @@ function TourDetails() {
           </div>
         )}
 
-        {(service.departure_time || service.meeting_point) && (
+        {service.meeting_point && (
           <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-            {service.departure_time && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: service.meeting_point ? '10px' : 0 }}>
-                <Icon name="calendar" size={14} color={COLORS.primary} />
-                <span style={{ fontSize: '12.5px', color: COLORS.text, fontWeight: 700 }}>
-                  {new Date(service.departure_time).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                </span>
-                <span style={{ fontSize: '12.5px', color: COLORS.textMuted }}>
-                  {new Date(service.departure_time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                  {service.arrival_time && ` – ${new Date(service.arrival_time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`}
-                </span>
-              </div>
-            )}
-            {service.meeting_point && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Icon name="mapPin" size={14} color={COLORS.primary} />
-                <span style={{ fontSize: '12.5px', color: COLORS.text }}>Meeting point: <strong>{service.meeting_point}</strong></span>
-              </div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icon name="mapPin" size={14} color={COLORS.primary} />
+              <span style={{ fontSize: '12.5px', color: COLORS.text }}>Meeting point: <strong>{service.meeting_point}</strong></span>
+            </div>
           </div>
         )}
 
@@ -496,28 +534,20 @@ function TourDetails() {
         </div>
 
         <div style={{ background: COLORS.card, borderRadius: '14px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Price per person</span>
             <span style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary }}>₦{service.price.toLocaleString()}</span>
           </div>
-          {seatsLeft !== null && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Slots available</span>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: seatsLeft === 0 ? COLORS.red : COLORS.text }}>{seatsLeft === 0 ? 'Fully booked' : seatsLeft}</span>
-            </div>
-          )}
         </div>
 
         <button
           onClick={() => setStep('guest')}
-          disabled={seatsLeft !== null && seatsLeft === 0}
           style={{
-            width: '100%', padding: '15px',
-            background: seatsLeft !== null && seatsLeft === 0 ? '#94a3b8' : COLORS.secondary,
+            width: '100%', padding: '15px', background: COLORS.secondary,
             color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px',
-            cursor: seatsLeft !== null && seatsLeft === 0 ? 'not-allowed' : 'pointer',
+            cursor: 'pointer',
           }}>
-          {seatsLeft !== null && seatsLeft === 0 ? 'Fully Booked' : 'Book Now'}
+          Book Now
         </button>
       </>)}
 
@@ -541,7 +571,7 @@ function TourDetails() {
 
       {step === 'dates' && (<>
         <div style={{ background: COLORS.card, borderRadius: '14px', padding: '14px', marginBottom: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-          <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>Tour Date</p>
+          <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>The date you want to go</p>
           <input
             type="date"
             value={tourDate}
@@ -549,15 +579,12 @@ function TourDetails() {
             onChange={(e) => setTourDate(e.target.value)}
             style={{ width: '100%', padding: '10px', borderRadius: '9px', border: `1px solid ${COLORS.border}`, fontSize: '13px', boxSizing: 'border-box' }}
           />
-          {seatsLeft === 0 && (
-            <p style={{ fontSize: '11.5px', color: COLORS.red, marginTop: '8px' }}>This tour is fully booked — no dates are available right now.</p>
-          )}
         </div>
 
         <button
           onClick={() => setStep('participants')}
-          disabled={!tourDate || seatsLeft === 0}
-          style={{ width: '100%', padding: '15px', background: !tourDate || seatsLeft === 0 ? '#94a3b8' : COLORS.secondary, color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: !tourDate || seatsLeft === 0 ? 'not-allowed' : 'pointer' }}>
+          disabled={!tourDate}
+          style={{ width: '100%', padding: '15px', background: !tourDate ? '#94a3b8' : COLORS.secondary, color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '15px', cursor: !tourDate ? 'not-allowed' : 'pointer' }}>
           Continue
         </button>
       </>)}
@@ -573,14 +600,11 @@ function TourDetails() {
             </span>
             <span style={{ fontSize: '15px', fontWeight: 700, color: COLORS.text, minWidth: '20px', textAlign: 'center' as const }}>{travelers}</span>
             <span
-              onClick={() => setTravelers(seatsLeft !== null ? Math.min(seatsLeft, travelers + 1) : travelers + 1)}
+              onClick={() => setTravelers(travelers + 1)}
               style={{ width: '32px', height: '32px', borderRadius: '8px', border: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
               <Icon name="plus" size={14} color={COLORS.text} />
             </span>
           </div>
-          {seatsLeft !== null && (
-            <p style={{ fontSize: '11px', color: COLORS.textMuted }}>{seatsLeft} slot{seatsLeft !== 1 ? 's' : ''} available</p>
-          )}
 
           {(service.gate_fee || service.vehicle_fee) && (
             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', marginTop: '14px' }}>
