@@ -17,7 +17,7 @@ type LogRow = {
   target_type: string
   target_id: string | null
   created_at: string
-  actor_id: string
+  actor_id: string | null
   actor_name?: string | null
   actor_email?: string | null
 }
@@ -40,6 +40,7 @@ const ACTION_ICONS: Record<string, string> = {
   invite: 'userPlus', resend_invite: 'refresh', cancel_invite: 'x', accept_invite: 'check',
   change_role: 'shield', grant_permission: 'plus', revoke_permission: 'minus',
   clear_override: 'refresh', suspend: 'lock', activate: 'check', revoke_access: 'lock',
+  create_role: 'plus', update_role_permissions: 'shield',
   // Bookings
   assigned_task: 'clipboard', completed_task: 'checkCircle', cancelled_booking: 'x',
   verified_ticket: 'ticket',
@@ -75,6 +76,8 @@ function actionLabel(a: string) {
     suspend: 'suspended a staff member',
     activate: 'reactivated a staff member',
     revoke_access: "revoked a staff member's access",
+    create_role: 'created a role',
+    update_role_permissions: 'updated the permissions of a role',
     assigned_task: 'assigned a task',
     completed_task: 'completed a task',
     cancelled_booking: 'cancelled a booking',
@@ -90,8 +93,24 @@ function actionLabel(a: string) {
     replied_ticket: 'replied to a support ticket',
     resolved_ticket: 'resolved a support ticket',
     updated_settings: 'updated company settings',
+    premium_granted: 'granted Business Suite access to this company',
+    premium_revoked: 'ended Business Suite access for this company',
+    premium_expired: 'ended Business Suite access because it expired',
   }
   return map[a] || humanize(a)
+}
+
+// Actions the platform performs by itself (scheduled jobs). They have no person behind them.
+const SYSTEM_ACTIONS = new Set(['premium_expired', 'withdrawal.legacy_refunded'])
+
+// Who did it. Real people are shown by name. A missing person is either the platform itself
+// (scheduled jobs) or an older entry from before the person was being recorded.
+function actorText(l: LogRow) {
+  if (l.actor_name) return l.actor_name
+  if (l.actor_email) return l.actor_email
+  if (!l.actor_id) return SYSTEM_ACTIONS.has(l.action) ? 'TravelerCom System' : 'Unknown user'
+  // Signed in, but not a teammate whose profile this account can read (for example TravelerCom admin).
+  return 'TravelerCom team'
 }
 
 export default function ActivityLog({ companyId, onBack, embedded = false }: { companyId?: string; onBack?: () => void; embedded?: boolean }) {
@@ -126,7 +145,7 @@ export default function ActivityLog({ companyId, onBack, embedded = false }: { c
       .limit(300)
 
     const rows = logRows || []
-    const actorIds = [...new Set(rows.map((r) => r.actor_id))]
+    const actorIds = [...new Set(rows.map((r) => r.actor_id).filter((id): id is string => !!id))]
     let profileMap: Record<string, { full_name: string | null; email: string | null }> = {}
     if (actorIds.length > 0) {
       const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', actorIds)
@@ -136,8 +155,8 @@ export default function ActivityLog({ companyId, onBack, embedded = false }: { c
     setLogs(
       rows.map((r) => ({
         ...r,
-        actor_name: profileMap[r.actor_id]?.full_name,
-        actor_email: profileMap[r.actor_id]?.email,
+        actor_name: r.actor_id ? profileMap[r.actor_id]?.full_name : null,
+        actor_email: r.actor_id ? profileMap[r.actor_id]?.email : null,
       })),
     )
     setLoading(false)
@@ -149,9 +168,9 @@ export default function ActivityLog({ companyId, onBack, embedded = false }: { c
     if (moduleFilter !== 'all' && l.module !== moduleFilter) return false
     if (search.trim()) {
       const q = search.toLowerCase()
-      const actorText = (l.actor_name || l.actor_email || '').toLowerCase()
+      const actorSearch = actorText(l).toLowerCase()
       if (
-        !actorText.includes(q) &&
+        !actorSearch.includes(q) &&
         !l.action.toLowerCase().includes(q) &&
         !l.target_type.toLowerCase().includes(q) &&
         !l.module.toLowerCase().includes(q)
@@ -243,7 +262,7 @@ export default function ActivityLog({ companyId, onBack, embedded = false }: { c
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, color: COLORS.text }}>
-                    <b>{l.actor_name || l.actor_email || 'Someone'}</b> {actionLabel(l.action)}
+                    <b>{actorText(l)}</b> {actionLabel(l.action)}
                   </div>
                   <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
                     <span>{new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>

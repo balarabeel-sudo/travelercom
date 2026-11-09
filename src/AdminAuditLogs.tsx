@@ -22,9 +22,13 @@ type LogEntry = {
   previous_value: any
   new_value: any
   created_at: string
+  actor_name?: string | null
 }
 
 const MODULES = ['all', 'staff', 'refunds', 'withdrawals', 'platform', 'marketing', 'support', 'companies', 'bookings']
+
+// Actions the platform performs by itself (scheduled jobs). They have no person behind them.
+const SYSTEM_ACTIONS = new Set(['premium_expired', 'withdrawal.legacy_refunded'])
 
 export default function AdminAuditLogs() {
   const isDesktop = useIsDesktop()
@@ -44,13 +48,37 @@ export default function AdminAuditLogs() {
     if (moduleFilter !== 'all') query = query.eq('module', moduleFilter)
 
     const { data, error } = await query
-    if (error) setError(error.message)
-    else setLogs(data || [])
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+      return
+    }
+
+    // Look up the name of the person behind each action (name, or email if no name).
+    const rows: LogEntry[] = data || []
+    const actorIds = [...new Set(rows.map((r) => r.actor_id).filter((id): id is string => !!id))]
+    const names: Record<string, string> = {}
+    if (actorIds.length > 0) {
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', actorIds)
+      for (const p of profiles || []) names[p.id] = p.full_name || p.email || ''
+    }
+    setLogs(rows.map((r) => ({ ...r, actor_name: r.actor_id ? names[r.actor_id] || null : null })))
     setLoading(false)
   }
 
+  // Who did it. A missing person is either the platform itself (scheduled jobs) or an older
+  // entry from before the person was being recorded.
+  function whoText(l: LogEntry) {
+    if (l.actor_name) return l.actor_name
+    if (!l.actor_id) return SYSTEM_ACTIONS.has(l.action) ? 'System' : 'Unknown (older entry)'
+    return 'Unknown user'
+  }
+
   const filtered = search.trim()
-    ? logs.filter((l) => l.action.toLowerCase().includes(search.toLowerCase()) || (l.target_id || '').toLowerCase().includes(search.toLowerCase()))
+    ? logs.filter((l) => {
+        const q = search.toLowerCase()
+        return l.action.toLowerCase().includes(q) || (l.target_id || '').toLowerCase().includes(q) || whoText(l).toLowerCase().includes(q)
+      })
     : logs
 
   function actionLabel(action: string) {
@@ -58,7 +86,7 @@ export default function AdminAuditLogs() {
   }
 
   const cellBase = { padding: '13px 14px', fontSize: '12.5px', color: COLORS.text, borderBottom: `1px solid ${COLORS.border}`, verticalAlign: 'middle' as const }
-  const headers = ['TIME', 'ACTION', 'MODULE', 'TARGET']
+  const headers = ['TIME', 'DONE BY', 'ACTION', 'MODULE', 'TARGET']
 
   return (
     <div style={{ padding: isDesktop ? '24px 28px' : '16px', maxWidth: isDesktop ? '1400px' : undefined, margin: '0 auto' }}>
@@ -76,7 +104,7 @@ export default function AdminAuditLogs() {
       <input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search action or target ID..."
+        placeholder="Search name, action or target ID..."
         style={{ width: '100%', maxWidth: isDesktop ? '440px' : undefined, padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.border}`, fontSize: '13px', marginBottom: '10px', color: COLORS.text, boxSizing: 'border-box' as const }}
       />
 
@@ -133,6 +161,7 @@ export default function AdminAuditLogs() {
                       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                       style={{ cursor: 'pointer' }}>
                       <td style={{ ...cellBase, color: COLORS.textMuted, whiteSpace: 'nowrap' as const }}>{new Date(l.created_at).toLocaleString()}</td>
+                      <td style={{ ...cellBase, fontWeight: 700 }}>{whoText(l)}</td>
                       <td style={{ ...cellBase, fontWeight: 700, textTransform: 'capitalize' as const }}>{actionLabel(l.action)}</td>
                       <td style={cellBase}>
                         <span style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.textMuted, background: '#F1F5F9', padding: '3px 8px', borderRadius: '6px' }}>{l.module}</span>
@@ -143,8 +172,8 @@ export default function AdminAuditLogs() {
                     </tr>
                     {expanded === l.id && (
                       <tr>
-                        <td colSpan={4} style={{ padding: '12px 14px', background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
-                          <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '4px', wordBreak: 'break-all' as const }}>Actor: {l.actor_id || '—'}</p>
+                        <td colSpan={5} style={{ padding: '12px 14px', background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+                          <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '4px', wordBreak: 'break-all' as const }}>Done by: {whoText(l)}{l.actor_id ? ` (${l.actor_id})` : ''}</p>
                           {l.target_id && (
                             <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginBottom: '4px', wordBreak: 'break-all' as const }}>Target ID: {l.target_id}</p>
                           )}
@@ -181,13 +210,14 @@ export default function AdminAuditLogs() {
                   {l.module}
                 </span>
               </div>
-              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '4px' }}>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text, marginTop: '4px' }}>By {whoText(l)}</p>
+              <p style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px' }}>
                 {new Date(l.created_at).toLocaleString()}
                 {l.target_id ? ` · ${l.target_type || 'target'}: ${l.target_id.slice(0, 8)}...` : ''}
               </p>
               {expanded === l.id && (
                 <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${COLORS.border}` }}>
-                  <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px' }}>Actor: {l.actor_id || '—'}</p>
+                  <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px', wordBreak: 'break-all' as const }}>Done by: {whoText(l)}{l.actor_id ? ` (${l.actor_id})` : ''}</p>
                   {l.previous_value && (
                     <p style={{ fontSize: '11px', color: COLORS.textMuted, marginBottom: '4px', wordBreak: 'break-word' as const }}>
                       Before: {JSON.stringify(l.previous_value)}
