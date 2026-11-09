@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
@@ -23,11 +24,11 @@ const COLORS = {
 type ServiceDetail = {
   id: string
   photo_url: string | null
+  photo_urls: string[] | null
   title: string
   description: string | null
   destination: string
   price: number
-  seats_available: number | null
   company_id: string
   amenities: string[] | null
   capacity: number | null
@@ -73,6 +74,7 @@ function EventCenterDetails() {
 
   const [hallTypes, setHallTypes] = useState<HallType[]>([])
   const [hallAvailCounts, setHallAvailCounts] = useState<Record<string, number>>({})
+  const [hallCountsLoading, setHallCountsLoading] = useState(false)
   const [selectedHallTypeId, setSelectedHallTypeId] = useState<string | null>(null)
   const [unitOptions, setUnitOptions] = useState<{ id: string; unit_number: string }[]>([])
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null)
@@ -81,6 +83,15 @@ function EventCenterDetails() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
+
+  // Availability of the whole venue for the chosen dates (listings without hall types).
+  // null = not known yet (no dates chosen, or still checking).
+  const [venueFree, setVenueFree] = useState<boolean | null>(null)
+  const [checkingVenue, setCheckingVenue] = useState(false)
+
+  // Photo slider (same behaviour as the hotel page)
+  const [photoIndex, setPhotoIndex] = useState(0)
+  const sliderRef = useRef<HTMLDivElement | null>(null)
 
   const [booking, setBooking] = useState(false)
   const [confirmingPin, setConfirmingPin] = useState(false)
@@ -123,7 +134,7 @@ function EventCenterDetails() {
 
       const { data: svc, error: svcErr } = await supabase
         .from('services')
-        .select('id, title, description, destination, price, seats_available, company_id, photo_url, amenities, capacity, companies(business_name, allow_unit_selection)')
+        .select('id, title, description, destination, price, company_id, photo_url, photo_urls, amenities, capacity, companies(business_name, allow_unit_selection)')
         .eq('id', id)
         .maybeSingle()
 
@@ -164,26 +175,14 @@ function EventCenterDetails() {
         .eq('service_id', id)
 
       if (items && items.length > 0) {
-        const itemIds = items.map((i) => i.id)
-        const { data: unitRows } = await supabase
-          .from('inventory_units')
-          .select('inventory_item_id, status')
-          .in('inventory_item_id', itemIds)
-
-        const availCounts: Record<string, number> = {}
-        ;(unitRows || []).forEach((u: any) => {
-          if (u.status === 'available') {
-            availCounts[u.inventory_item_id] = (availCounts[u.inventory_item_id] || 0) + 1
-          }
-        })
-
         const mapped: HallType[] = items.map((i: any) => ({
           id: i.id,
           name: i.name,
           price: Number(i.price) || 0,
           weekendPrice: i.weekend_price !== null ? Number(i.weekend_price) : null,
           holidayPrice: i.holiday_price !== null ? Number(i.holiday_price) : null,
-          available: availCounts[i.id] || 0,
+          // Real availability is only known once the customer picks event dates.
+          available: 0,
         }))
         setHallTypes(mapped)
 
@@ -218,35 +217,62 @@ function EventCenterDetails() {
     // Date-aware: checks real confirmed bookings for overlap on these exact
     // event dates, instead of a static inventory_units.status flag — this is
     // what actually stops two customers double-booking the same hall.
+    let cancelled = false
     const fetchUnits = async () => {
       if (!selectedHallTypeId || days0 <= 0) { setUnitOptions([]); setSelectedUnitId(null); return }
       setLoadingUnits(true)
-      const { data } = await supabase.rpc('list_available_units_for_dates', {
-        p_item_id: selectedHallTypeId, p_check_in: startDate, p_check_out: endDate,
+      const { data } = await supabase.rpc('list_available_event_halls', {
+        p_item_id: selectedHallTypeId, p_start: startDate, p_end: endDate,
       })
+      if (cancelled) return
       setUnitOptions(data || [])
       setSelectedUnitId(data && data.length > 0 ? data[0].id : null)
       setLoadingUnits(false)
     }
     fetchUnits()
+    return () => { cancelled = true }
   }, [selectedHallTypeId, startDate, endDate, days0])
 
   useEffect(() => {
-    // Real per-date-range "how many halls of this type are actually free"
-    // counts for the hall-type cards, so a hall doesn't show "Available"
-    // just because its static status flag was never reset.
+    // Real per-date "how many halls of this type are actually free" counts for the
+    // hall cards. Until the answer arrives the cards say "Checking..." instead of
+    // "Not available".
+    let cancelled = false
     const fetchCounts = async () => {
-      if (hallTypes.length === 0 || days0 <= 0) { setHallAvailCounts({}); return }
+      if (hallTypes.length === 0 || days0 <= 0) { setHallAvailCounts({}); setHallCountsLoading(false); return }
+      setHallCountsLoading(true)
+      setHallAvailCounts({})
       const entries = await Promise.all(hallTypes.map(async (h) => {
-        const { data } = await supabase.rpc('list_available_units_for_dates', {
-          p_item_id: h.id, p_check_in: startDate, p_check_out: endDate,
+        const { data } = await supabase.rpc('list_available_event_halls', {
+          p_item_id: h.id, p_start: startDate, p_end: endDate,
         })
         return [h.id, data ? data.length : 0] as const
       }))
+      if (cancelled) return
       setHallAvailCounts(Object.fromEntries(entries))
+      setHallCountsLoading(false)
     }
     fetchCounts()
+    return () => { cancelled = true }
   }, [hallTypes, startDate, endDate, days0])
+
+  useEffect(() => {
+    // Venues without hall types: the whole venue is free or taken for the chosen dates.
+    let cancelled = false
+    const checkVenue = async () => {
+      setVenueFree(null)
+      if (!service || usingHallTypes || days0 <= 0) { setCheckingVenue(false); return }
+      setCheckingVenue(true)
+      const { data, error } = await supabase.rpc('is_event_center_free', {
+        p_service_id: service.id, p_start: startDate, p_end: endDate,
+      })
+      if (cancelled) return
+      setVenueFree(error ? null : data === true)
+      setCheckingVenue(false)
+    }
+    checkVenue()
+    return () => { cancelled = true }
+  }, [service, usingHallTypes, startDate, endDate, days0])
 
   const days = (() => {
     if (!startDate || !endDate) return 0
@@ -303,7 +329,12 @@ function EventCenterDetails() {
 
   const canContinueFromDetails = true
 
-  const canContinueFromDates = days > 0 && (!usingHallTypes || (!!selectedHallTypeId && !!selectedUnitId))
+  const noHallsForDates = usingHallTypes && days > 0 && !hallCountsLoading
+    && hallTypes.length > 0 && hallTypes.every((h) => hallAvailCounts[h.id] === 0)
+
+  const canContinueFromDates = days > 0 && (usingHallTypes
+    ? (!!selectedHallTypeId && !!selectedUnitId)
+    : venueFree === true)
 
   // Branded receipt image — built only from real confirmed booking data.
   const downloadReceipt = () => {
@@ -351,19 +382,32 @@ function EventCenterDetails() {
 
     setBooking(true)
 
+    // Venues without hall types: check once more, right before booking, that the dates are still free.
+    if (!usingHallTypes) {
+      const { data: stillFree } = await supabase.rpc('is_event_center_free', {
+        p_service_id: service.id, p_start: startDate, p_end: endDate,
+      })
+      if (stillFree !== true) {
+        setBooking(false)
+        setVenueFree(false)
+        setMessage({ type: 'error', text: 'This event center is not available for these dates — please go back and choose another date.' })
+        return
+      }
+    }
+
     let assignedUnitId: string | null = null
     let assignedNumber = ''
 
     if (selectedHall && selectedUnitId) {
-      const { data: claimedRows } = await supabase.rpc('claim_specific_unit_for_dates', {
-        p_unit_id: selectedUnitId, p_check_in: startDate, p_check_out: endDate,
+      const { data: claimedRows } = await supabase.rpc('claim_event_hall', {
+        p_unit_id: selectedUnitId, p_start: startDate, p_end: endDate,
       })
       const claimed = claimedRows && claimedRows.length > 0 ? claimedRows[0] : null
 
       if (!claimed) {
         setBooking(false)
-        const { data: refreshed } = await supabase.rpc('list_available_units_for_dates', {
-          p_item_id: selectedHall.id, p_check_in: startDate, p_check_out: endDate,
+        const { data: refreshed } = await supabase.rpc('list_available_event_halls', {
+          p_item_id: selectedHall.id, p_start: startDate, p_end: endDate,
         })
         setUnitOptions(refreshed || [])
         setSelectedUnitId(refreshed && refreshed.length > 0 ? refreshed[0].id : null)
@@ -401,11 +445,6 @@ function EventCenterDetails() {
         .from('inventory_units')
         .update({ booking_id: newBooking?.id || null })
         .eq('id', assignedUnitId)
-    } else if (!usingHallTypes && service.seats_available !== null && service.seats_available > 0) {
-      const { data: newCount, error: decErr } = await supabase.rpc('decrement_seats', { p_service_id: service.id })
-      if (!decErr && newCount !== null) {
-        setService({ ...service, seats_available: newCount })
-      }
     }
 
     const newBalance = walletBalance - activePrice
@@ -552,7 +591,68 @@ function EventCenterDetails() {
           overflow: 'hidden',
           position: 'relative'
         }}>
-          {service.photo_url ? <img src={service.photo_url} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tent" size={56} color="white" />}
+          {(() => {
+            const photos = service.photo_urls && service.photo_urls.length > 0 ? service.photo_urls : (service.photo_url ? [service.photo_url] : [])
+            if (photos.length === 0) return <Icon name="tent" size={56} color="white" />
+            const idx = Math.min(photoIndex, photos.length - 1)
+            const goToPhoto = (i: number) => {
+              const el = sliderRef.current
+              if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+            }
+            const sliderStyle = {
+              display: 'flex', width: '100%', height: '100%', overflowX: 'auto', overflowY: 'hidden',
+              scrollSnapType: 'x mandatory', scrollbarWidth: 'none', msOverflowStyle: 'none',
+              WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y',
+            } as CSSProperties
+            const arrowStyle = {
+              position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: '30px', height: '30px',
+              borderRadius: '50%', background: 'rgba(15,23,42,0.45)', color: 'white', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', fontSize: '20px', lineHeight: 1, cursor: 'pointer',
+            } as CSSProperties
+            return (
+              <>
+                {/* Swipe left or right to move between photos; each photo snaps into place. */}
+                <div
+                  ref={sliderRef}
+                  style={sliderStyle}
+                  onScroll={(e) => {
+                    const el = e.currentTarget
+                    if (el.clientWidth === 0) return
+                    const i = Math.round(el.scrollLeft / el.clientWidth)
+                    if (i !== photoIndex) setPhotoIndex(i)
+                  }}>
+                  {photos.map((src, i) => (
+                    <img
+                      key={i}
+                      src={src}
+                      alt={`${service.title} photo ${i + 1}`}
+                      loading={i === 0 ? 'eager' : 'lazy'}
+                      draggable={false}
+                      style={{ flex: '0 0 100%', width: '100%', height: '100%', objectFit: 'cover', scrollSnapAlign: 'start', scrollSnapStop: 'always' } as CSSProperties}
+                    />
+                  ))}
+                </div>
+                {photos.length > 1 && (
+                  <>
+                    <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(15,23,42,0.55)', color: 'white', fontSize: '11.5px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px' }}>
+                      {idx + 1} / {photos.length}
+                    </div>
+                    {idx > 0 && (
+                      <div onClick={() => goToPhoto(idx - 1)} style={{ ...arrowStyle, left: '8px' }}>&#8249;</div>
+                    )}
+                    {idx < photos.length - 1 && (
+                      <div onClick={() => goToPhoto(idx + 1)} style={{ ...arrowStyle, right: '8px' }}>&#8250;</div>
+                    )}
+                    <div style={{ position: 'absolute', bottom: '10px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '5px', pointerEvents: 'none' }}>
+                      {photos.map((_, i) => (
+                        <div key={i} style={{ width: i === idx ? '16px' : '5px', height: '5px', borderRadius: '3px', background: i === idx ? 'white' : 'rgba(255,255,255,0.5)', transition: 'width 0.2s' }} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )
+          })()}
           {activePromo && (
             <div style={{
               position: 'absolute', top: '12px', left: '12px', background: '#6B21A8', color: 'white',
@@ -614,12 +714,13 @@ function EventCenterDetails() {
               <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Price per day</span>
               <span style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary }}>₦{service.price.toLocaleString()}</span>
             </div>
-            {service.seats_available !== null && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Slots available</span>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text }}>{service.seats_available}</span>
-              </div>
-            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', color: COLORS.textMuted }}>Availability</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.green }}>Available</span>
+            </div>
+            <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '8px' }}>
+              Choose your event date in the next steps and we will confirm it is free.
+            </p>
           </div>
         )}
 
@@ -680,6 +781,29 @@ function EventCenterDetails() {
           {endDate && startDate && days <= 0 && (
             <p style={{ fontSize: '11.5px', color: COLORS.red, marginBottom: '8px' }}>End date must be on or after the start date.</p>
           )}
+          {!usingHallTypes && days > 0 && checkingVenue && (
+            <p style={{ fontSize: '12px', color: COLORS.textMuted, marginBottom: '8px' }}>Checking availability for these dates...</p>
+          )}
+          {!usingHallTypes && days > 0 && !checkingVenue && venueFree === true && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px', background: '#f0fdf4',
+              border: '1px solid #86efac', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px',
+            }}>
+              <Icon name="check" size={14} color={COLORS.green} />
+              <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.green }}>Available for these dates.</p>
+            </div>
+          )}
+          {!usingHallTypes && days > 0 && !checkingVenue && venueFree === false && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2',
+              border: '1px solid #fca5a5', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px',
+            }}>
+              <Icon name="x" size={14} color={COLORS.red} />
+              <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.red }}>
+                Not available for these dates. Please try a different date.
+              </p>
+            </div>
+          )}
           {activePromo && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: '6px', background: '#F5F3FF',
@@ -707,14 +831,29 @@ function EventCenterDetails() {
         {usingHallTypes && days > 0 && (
           <div style={{ marginBottom: '16px' }}>
             <p style={{ fontSize: '13px', fontWeight: 700, color: COLORS.text, marginBottom: '10px' }}>Select a Hall / Package</p>
+
+            {noHallsForDates && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2',
+                border: '1px solid #fca5a5', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px',
+              }}>
+                <Icon name="x" size={14} color={COLORS.red} />
+                <p style={{ fontSize: '12px', fontWeight: 600, color: COLORS.red }}>
+                  No halls available for these dates. Please try a different date.
+                </p>
+              </div>
+            )}
+
             {hallTypes.map((hall) => {
+              const countKnown = !hallCountsLoading && hallAvailCounts[hall.id] !== undefined
               const realAvailable = hallAvailCounts[hall.id] ?? 0
-              const isAvailable = realAvailable > 0
+              // Until the real answer arrives a hall is treated as available, never as "Not available".
+              const isAvailable = !countKnown || realAvailable > 0
               const isSelected = selectedHallTypeId === hall.id
               return (
                 <div
                   key={hall.id}
-                  onClick={() => isAvailable && setSelectedHallTypeId(hall.id)}
+                  onClick={() => countKnown && isAvailable && setSelectedHallTypeId(hall.id)}
                   style={{
                     background: COLORS.card,
                     borderRadius: '14px',
@@ -722,7 +861,7 @@ function EventCenterDetails() {
                     marginBottom: '10px',
                     border: isSelected ? `2px solid ${COLORS.primary}` : '2px solid transparent',
                     boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-                    cursor: isAvailable ? 'pointer' : 'not-allowed',
+                    cursor: countKnown && isAvailable ? 'pointer' : 'default',
                     opacity: isAvailable ? 1 : 0.5,
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -732,13 +871,19 @@ function EventCenterDetails() {
                     <p style={{ fontSize: '14px', fontWeight: 700, color: COLORS.text }}>{hall.name}</p>
                     <p style={{ fontSize: '13px', color: COLORS.primary, fontWeight: 700, marginTop: '2px' }}>₦{hall.price.toLocaleString()}</p>
                   </div>
-                  <span style={{
-                    fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px',
-                    background: isAvailable ? '#f0fdf4' : '#fef2f2',
-                    color: isAvailable ? COLORS.green : COLORS.red
-                  }}>
-                    {isAvailable ? `${realAvailable} available` : 'Not available for these dates'}
-                  </span>
+                  {!countKnown ? (
+                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px', background: COLORS.bg, color: COLORS.textMuted }}>
+                      Checking...
+                    </span>
+                  ) : (
+                    <span style={{
+                      fontSize: '11px', fontWeight: 700, padding: '5px 10px', borderRadius: '8px',
+                      background: isAvailable ? '#f0fdf4' : '#fef2f2',
+                      color: isAvailable ? COLORS.green : COLORS.red
+                    }}>
+                      {isAvailable ? `${realAvailable} available` : 'Not Available'}
+                    </span>
+                  )}
                 </div>
               )
             })}
