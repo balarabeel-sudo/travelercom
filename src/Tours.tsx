@@ -89,7 +89,6 @@ type Tour = {
   description: string | null
   destination: string
   price: number
-  seats_available: number | null
   photo_url: string | null
   photo_urls: string[] | null
   tour_type: string | null
@@ -223,7 +222,7 @@ function Tours() {
     setNetError(false)
     let query = supabase
       .from('services')
-      .select('id, title, description, destination, price, seats_available, photo_url, photo_urls, tour_type, amenities, duration_minutes, companies(business_name)')
+      .select('id, title, description, destination, price, photo_url, photo_urls, tour_type, amenities, duration_minutes, companies(business_name)')
       .eq('category', 'tour')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -495,7 +494,6 @@ function Tours() {
               const amenityList = t.amenities || []
               const shownAmenities = amenityList.slice(0, 3)
               const extraAmenities = amenityList.length - shownAmenities.length
-              const available = !!t.seats_available && t.seats_available > 0
               return (
                 <div key={t.id} className="tc-tour-card" onClick={() => navigate(`/tour/${t.id}`)}
                   style={{ background: COLORS.card, borderRadius: '16px', padding: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer', display: 'flex', gap: '14px', alignItems: 'stretch', animationDelay: `${Math.min(idx, 8) * 60}ms` }}>
@@ -503,7 +501,7 @@ function Tours() {
                   {/* photo */}
                   <div style={{ position: 'relative', width: '124px', minHeight: '152px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0 }}>
                     <div style={{ position: 'absolute', inset: 0, background: t.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {t.photo_url ? <img src={t.photo_url} alt={t.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="map" size={26} color="white" />}
+                      {t.photo_url ? <img src={t.photo_url} alt={t.title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="map" size={26} color="white" />}
                     </div>
                     <div onClick={(e) => toggleFavorite(e, t.id)} style={{ position: 'absolute', top: '8px', right: '8px', width: '27px', height: '27px', borderRadius: '50%', background: 'rgba(255,255,255,0.94)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Icon name="heart" size={14} color={isFav ? COLORS.secondary : '#64748B'} filled={isFav} />
@@ -560,9 +558,8 @@ function Tours() {
                     <div style={{ marginTop: 'auto', paddingTop: '10px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '8px' }}>
                       <div style={{ minWidth: 0 }}>
                         <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.blue, whiteSpace: 'nowrap' }}>₦{Number(t.price).toLocaleString()} <span style={{ fontSize: '11px', color: COLORS.textMuted, fontWeight: 500 }}>/person</span></p>
-                        <p style={{ fontSize: '11.5px', fontWeight: 700, color: available ? COLORS.green : '#DC2626', marginTop: '2px' }}>
-                          {available ? 'Available' : 'Not available'}
-                        </p>
+                        {/* A tour has no fixed slots or dates: the customer picks the day they want to go, so it is always bookable. */}
+                        <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.green, marginTop: '2px' }}>Available</p>
                       </div>
                       <span style={{ flexShrink: 0, padding: '9px 16px', background: COLORS.secondary, color: 'white', borderRadius: '10px', fontWeight: 800, fontSize: '12px' }}>View Details</span>
                     </div>
