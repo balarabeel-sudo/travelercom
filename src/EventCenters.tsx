@@ -329,7 +329,7 @@ function EventCenters() {
               <div key={e.id} onClick={() => navigate(`/event-center/${e.id}`)} style={{ background: COLORS.card, borderRadius: '16px', padding: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer', display: 'flex', gap: '12px' }}>
                 <div style={{ position: 'relative', width: '108px', height: '135px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0 }}>
                   <div style={{ width: '100%', height: '100%', background: e.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {e.photo_url ? <img src={e.photo_url} alt={e.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tent" size={26} color="white" />}
+                    {e.photo_url ? <img src={e.photo_url} alt={e.title} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tent" size={26} color="white" />}
                   </div>
                   <div onClick={(ev) => toggleFavorite(ev, e.id)} style={{ position: 'absolute', top: '8px', right: '8px', width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(e.id) ? COLORS.secondary : '#94a3b8' }}>
                     <Icon name="heart" size={14} color={favoriteIds.has(e.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(e.id)} />
@@ -379,9 +379,8 @@ function EventCenters() {
                   <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '8px' }}>
                     <div>
                       <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(e.price).toLocaleString()} <span style={{ fontSize: '10.5px', color: COLORS.textMuted, fontWeight: 400 }}>/day</span></p>
-                      <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!e.seats_available || e.seats_available === 0) ? '#DC2626' : COLORS.green }}>
-                        {(!e.seats_available || e.seats_available === 0) ? 'Not available' : `${e.seats_available} slots available`}
-                      </p>
+                      {/* Real availability depends on the date the customer picks, so the list shows Available and the details page checks the chosen dates. */}
+                      <p style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.green }}>Available</p>
                     </div>
                     <span style={{ flexShrink: 0, padding: '8px 14px', background: COLORS.secondary, color: 'white', borderRadius: '8px', fontWeight: 700, fontSize: '11.5px' }}>View Details</span>
                   </div>
