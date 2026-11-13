@@ -228,6 +228,7 @@ function MyBookings() {
               rows,
               amountPaid: Number(b.amount_paid),
               filenamePrefix: category,
+              cancelled: status === 'cancelled',
             })
           }
 

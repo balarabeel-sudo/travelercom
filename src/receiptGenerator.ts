@@ -8,6 +8,7 @@ const COLORS = {
   textMuted: '#64748B',
   border: '#E2E8F0',
   green: '#16A34A',
+  red: '#DC2626',
   bg: '#F8FAFC',
 }
 
@@ -28,6 +29,8 @@ export type ReceiptData = {
   amountPaid: number
   transactionId?: string
   filenamePrefix?: string
+  // When true, the receipt shows a red X mark and a "PAYMENT CANCELED" stamp instead of the success state.
+  cancelled?: boolean
 }
 
 function loadImage(src: string): Promise<HTMLImageElement | null> {
@@ -241,9 +244,38 @@ function drawIcon(ctx: CanvasRenderingContext2D, name: string, x: number, y: num
   fn(ctx, x, y, s, color)
 }
 
+// Big diagonal red "PAYMENT CANCELED" stamp, drawn over the booking details area of a cancelled receipt.
+function drawCancelledStamp(ctx: CanvasRenderingContext2D, centerX: number, centerY: number) {
+  const text = 'PAYMENT CANCELED'
+  ctx.save()
+  ctx.translate(centerX, centerY)
+  ctx.rotate(-Math.PI / 14)
+  ctx.globalAlpha = 0.6
+  ctx.font = 'bold 58px Arial, sans-serif'
+  const tw = ctx.measureText(text).width
+  const boxW = tw + 70
+  const boxH = 104
+
+  // outer + inner border like a rubber stamp
+  ctx.strokeStyle = COLORS.red
+  ctx.lineWidth = 7
+  roundRect(ctx, -boxW / 2, -boxH / 2, boxW, boxH, 14)
+  ctx.stroke()
+  ctx.lineWidth = 2.5
+  roundRect(ctx, -boxW / 2 + 11, -boxH / 2 + 11, boxW - 22, boxH - 22, 8)
+  ctx.stroke()
+
+  ctx.fillStyle = COLORS.red
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, 0, 3)
+  ctx.restore()
+}
+
 // Renders a branded, template-matched booking receipt to a PNG and triggers a download.
 // Every value comes from the real, already-confirmed booking — nothing here is invented.
 export async function downloadReceiptImage(data: ReceiptData) {
+  const isCancelled = !!data.cancelled
   const scale = 2
   const width = 1000
   const rowH = 46
@@ -326,11 +358,11 @@ export async function downloadReceiptImage(data: ReceiptData) {
 
   let y = headerH
 
-  // ---------- payment success + booking reference ----------
+  // ---------- payment status (success or cancelled) + booking reference ----------
   const checkR = 32
   ctx.beginPath()
   ctx.arc(pad + checkR, y + checkR, checkR, 0, Math.PI * 2)
-  ctx.fillStyle = COLORS.green
+  ctx.fillStyle = isCancelled ? COLORS.red : COLORS.green
   ctx.fill()
   ctx.save()
   ctx.strokeStyle = 'white'
@@ -338,19 +370,34 @@ export async function downloadReceiptImage(data: ReceiptData) {
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.beginPath()
-  ctx.moveTo(pad + checkR - 13, y + checkR)
-  ctx.lineTo(pad + checkR - 3, y + checkR + 10)
-  ctx.lineTo(pad + checkR + 14, y + checkR - 12)
+  if (isCancelled) {
+    // X mark
+    const cx = pad + checkR
+    const cy = y + checkR
+    ctx.moveTo(cx - 12, cy - 12)
+    ctx.lineTo(cx + 12, cy + 12)
+    ctx.moveTo(cx + 12, cy - 12)
+    ctx.lineTo(cx - 12, cy + 12)
+  } else {
+    // check mark
+    ctx.moveTo(pad + checkR - 13, y + checkR)
+    ctx.lineTo(pad + checkR - 3, y + checkR + 10)
+    ctx.lineTo(pad + checkR + 14, y + checkR - 12)
+  }
   ctx.stroke()
   ctx.restore()
 
   ctx.textAlign = 'left'
   ctx.font = 'bold 19px Arial, sans-serif'
-  ctx.fillStyle = COLORS.green
-  ctx.fillText('PAYMENT SUCCESSFUL', pad + checkR * 2 + 16, y + 24)
+  ctx.fillStyle = isCancelled ? COLORS.red : COLORS.green
+  ctx.fillText(isCancelled ? 'PAYMENT CANCELED' : 'PAYMENT SUCCESSFUL', pad + checkR * 2 + 16, y + 24)
   ctx.font = '13px Arial, sans-serif'
   ctx.fillStyle = COLORS.textMuted
-  ctx.fillText('Your payment has been processed successfully.', pad + checkR * 2 + 16, y + 44)
+  ctx.fillText(
+    isCancelled ? 'This booking has been cancelled.' : 'Your payment has been processed successfully.',
+    pad + checkR * 2 + 16,
+    y + 44,
+  )
 
   const refBoxW = 300, refBoxX = width - pad - refBoxW, refBoxY = y
   roundRect(ctx, refBoxX, refBoxY, refBoxW, 108, 10)
@@ -382,7 +429,7 @@ export async function downloadReceiptImage(data: ReceiptData) {
   ctx.fill()
   ctx.font = '12px Arial, sans-serif'
   ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.fillText('AMOUNT PAID', pad + 24, y + 28)
+  ctx.fillText(isCancelled ? 'BOOKING AMOUNT' : 'AMOUNT PAID', pad + 24, y + 28)
   ctx.font = 'bold 40px Arial, sans-serif'
   ctx.fillStyle = '#FFFFFF'
   ctx.fillText(`\u20A6${data.amountPaid.toLocaleString()}`, pad + 24, y + 72)
@@ -431,6 +478,7 @@ export async function downloadReceiptImage(data: ReceiptData) {
   y += detailsHeaderH
 
   // ---------- detail rows ----------
+  const rowsTop = y
   for (const row of data.rows) {
     drawIcon(ctx, row.icon || iconForLabel(row.label), pad, y - 15, 18, COLORS.navy)
     ctx.font = '14px Arial, sans-serif'
@@ -484,18 +532,18 @@ export async function downloadReceiptImage(data: ReceiptData) {
   ctx.clip()
   ctx.fillStyle = COLORS.navy
   ctx.fillRect(totalX, y, width - pad - totalX, sumH)
-  ctx.fillStyle = COLORS.secondary
+  ctx.fillStyle = isCancelled ? COLORS.red : COLORS.secondary
   ctx.fillRect(totalX, y, 5, sumH)
   ctx.restore()
   ctx.font = '11px Arial, sans-serif'
   ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.fillText('TOTAL PAID', totalX + 24, y + 30)
+  ctx.fillText(isCancelled ? 'BOOKING AMOUNT' : 'TOTAL PAID', totalX + 24, y + 30)
   ctx.font = 'bold 26px Arial, sans-serif'
   ctx.fillStyle = '#FFFFFF'
   ctx.fillText(`\u20A6${data.amountPaid.toLocaleString()}`, totalX + 24, y + 66)
   ctx.font = 'bold 12px Arial, sans-serif'
-  ctx.fillStyle = '#4ADE80'
-  ctx.fillText('PAID IN FULL', totalX + 24, y + 90)
+  ctx.fillStyle = isCancelled ? '#F87171' : '#4ADE80'
+  ctx.fillText(isCancelled ? 'PAYMENT CANCELED' : 'PAID IN FULL', totalX + 24, y + 90)
 
   y += summaryH
 
@@ -541,6 +589,11 @@ export async function downloadReceiptImage(data: ReceiptData) {
   ctx.font = 'bold 11.5px Arial, sans-serif'
   ctx.fillStyle = '#FFFFFF'
   ctx.fillText(SUPPORT_EMAIL, supportX + 28, footerCenterY + 13)
+
+  // ---------- cancelled stamp (drawn last so it sits on top of the booking details) ----------
+  if (isCancelled) {
+    drawCancelledStamp(ctx, width / 2, rowsTop + rowsH / 2 - 8)
+  }
 
   canvas.toBlob((blob) => {
     if (!blob) return
