@@ -236,6 +236,7 @@ function BottomNav({ active, navigate }: { active: string; navigate: (p: string)
   const items = [
     { key: 'home', icon: 'home', label: 'Home', path: '/home' },
     { key: 'search', icon: 'search', label: 'Search', path: '/search' },
+    { key: 'vehicles', icon: 'car', label: 'Vehicles', path: '/vehicle-rentals' },
     { key: 'bookings', icon: 'ticket', label: 'Bookings', path: '/bookings' },
     { key: 'account', icon: 'user', label: 'Account', path: '/account' },
   ]
