@@ -1502,7 +1502,7 @@ const services = [
           <h3 style={{ fontSize: '16px', fontWeight: 800, color: COLORS.text }}>
             Domestic Flights
           </h3>
-          <span onClick={() => navigate('/services/flight')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
+          <span onClick={() => navigate('/flights')} style={{ fontSize: '12px', color: COLORS.primary, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
             See all <Icon name="chevronRight" size={13} color={COLORS.primary} />
           </span>
         </div>
