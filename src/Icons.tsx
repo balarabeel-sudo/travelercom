@@ -114,6 +114,10 @@ const paths: Record<string, string> = {
   arrowUpRight: 'M7 17 17 7M7 7h10v10',
   minus: 'M5 12h14',
 
+  // --- Added: used by the listing Pause / Activate buttons (ListingsManagement.tsx)
+  pause: 'M6 4h4v16H6V4ZM14 4h4v16h-4V4Z',
+  play: 'M5 3l14 9-14 9V3Z',
+
   // --- Added: these names were used across the app (listing/amenity chips, tour and
   // event-type tiles, admin and staff panels, settings, support, offline screen) but
   // were missing here, so they rendered as the empty fallback circle.

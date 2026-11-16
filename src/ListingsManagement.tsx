@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import useIsDesktop from './useIsDesktop'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import Icon from './Icons'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -102,9 +103,10 @@ function ListingsManagement() {
       inactive: listings.filter((x) => x.status === 'inactive').length,
     }
     const outlineBtn = {
+      display: 'inline-flex', alignItems: 'center', gap: '6px',
       padding: '8px 14px', border: `1px solid ${COLORS.border}`, borderRadius: '8px', background: COLORS.card,
       color: '#334155', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-    }
+    } as const
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
@@ -176,12 +178,17 @@ function ListingsManagement() {
                       </td>
                       <td style={{ ...td, textAlign: 'right' as const }}>
                         <div style={{ display: 'inline-flex', gap: '8px' }}>
-                          <button type="button" disabled={busyId === x.id} onClick={() => navigate(`/add-listing?edit=${x.id}`)} style={outlineBtn}>Edit</button>
+                          <button type="button" disabled={busyId === x.id} onClick={() => navigate(`/add-listing?edit=${x.id}`)} style={outlineBtn}>
+                            <Icon name="edit" size={14} color={COLORS.textMuted} />
+                            Edit
+                          </button>
                           <button type="button" disabled={busyId === x.id} onClick={() => handleToggleStatus(x)} style={outlineBtn}>
+                            <Icon name={x.status === 'active' ? 'pause' : 'play'} size={14} color={COLORS.textMuted} />
                             {x.status === 'active' ? 'Pause' : 'Activate'}
                           </button>
                           <button type="button" disabled={busyId === x.id} onClick={() => handleDelete(x)}
                             style={{ ...outlineBtn, border: '1px solid #FECACA', color: COLORS.red }}>
+                            <Icon name="trash" size={14} color={COLORS.red} />
                             Delete
                           </button>
                         </div>
@@ -196,6 +203,15 @@ function ListingsManagement() {
       </div>
     )
   }
+
+  // ------------------------------------------------------------------
+  // Mobile layout
+  // ------------------------------------------------------------------
+  const mobileBtn = {
+    flex: 1, padding: '9px', background: COLORS.bg, color: COLORS.text,
+    border: `1px solid ${COLORS.border}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+  } as const
 
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, maxWidth: '480px', margin: '0 auto', paddingBottom: '40px' }}>
@@ -212,7 +228,9 @@ function ListingsManagement() {
         boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span onClick={() => navigate('/home')} style={{ fontSize: '20px', cursor: 'pointer' }}>←</span>
+          <span onClick={() => navigate('/home')} style={{ cursor: 'pointer', display: 'flex' }}>
+            <Icon name="arrowLeft" size={20} color={COLORS.text} />
+          </span>
           <h1 style={{ fontSize: '17px', fontWeight: 800, color: COLORS.text }}>My Listings</h1>
         </div>
         <span
@@ -295,29 +313,23 @@ function ListingsManagement() {
                   <button
                     onClick={() => navigate(`/add-listing?edit=${l.id}`)}
                     disabled={busyId === l.id}
-                    style={{
-                      flex: 1, padding: '9px', background: COLORS.bg, color: COLORS.text,
-                      border: `1px solid ${COLORS.border}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer'
-                    }}>
-                    ✏️ Edit
+                    style={mobileBtn}>
+                    <Icon name="edit" size={14} color={COLORS.textMuted} />
+                    Edit
                   </button>
                   <button
                     onClick={() => handleToggleStatus(l)}
                     disabled={busyId === l.id}
-                    style={{
-                      flex: 1, padding: '9px', background: COLORS.bg, color: COLORS.text,
-                      border: `1px solid ${COLORS.border}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer'
-                    }}>
-                    {l.status === 'active' ? '⏸ Pause' : '▶️ Activate'}
+                    style={mobileBtn}>
+                    <Icon name={l.status === 'active' ? 'pause' : 'play'} size={14} color={COLORS.textMuted} />
+                    {l.status === 'active' ? 'Pause' : 'Activate'}
                   </button>
                   <button
                     onClick={() => handleDelete(l)}
                     disabled={busyId === l.id}
-                    style={{
-                      flex: 1, padding: '9px', background: '#fef2f2', color: COLORS.red,
-                      border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer'
-                    }}>
-                    🗑 Delete
+                    style={{ ...mobileBtn, background: '#fef2f2', color: COLORS.red, border: '1px solid #fca5a5' }}>
+                    <Icon name="trash" size={14} color={COLORS.red} />
+                    Delete
                   </button>
                 </div>
               </div>
