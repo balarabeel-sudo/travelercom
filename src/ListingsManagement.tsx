@@ -23,7 +23,19 @@ type Listing = {
   price: number
   seats_available: number | null
   status: string
+  category: string | null
+  departure_time: string | null
 }
+
+// Booking closes 30 minutes before departure (enforced in the database too).
+const BOOKING_CLOSE_MS = 30 * 60 * 1000
+
+// Bus and train listings cannot be reopened while their departure time is
+// in the past or less than 30 minutes away: the company must set a new date first.
+const isDepartureExpired = (l: Listing) =>
+  (l.category === 'bus' || l.category === 'train') &&
+  !!l.departure_time &&
+  new Date(l.departure_time).getTime() <= Date.now() + BOOKING_CLOSE_MS
 
 function ListingsManagement() {
   const navigate = useNavigate()
@@ -52,7 +64,7 @@ function ListingsManagement() {
 
     const { data } = await supabase
       .from('services')
-      .select('id, title, destination, price, seats_available, status')
+      .select('id, title, destination, price, seats_available, status, category, departure_time')
       .eq('company_id', company.id)
       .order('created_at', { ascending: false })
 
@@ -66,6 +78,11 @@ function ListingsManagement() {
   }, [])
 
   const handleToggleStatus = async (listing: Listing) => {
+    if (listing.status !== 'active' && isDepartureExpired(listing)) {
+      window.alert('The departure time of this listing has passed (or is less than 30 minutes away). Please set a new departure date, then activate it again.')
+      navigate(`/add-listing?edit=${listing.id}`)
+      return
+    }
     setBusyId(listing.id)
     const newStatus = listing.status === 'active' ? 'inactive' : 'active'
     await supabase.from('services').update({ status: newStatus }).eq('id', listing.id)
