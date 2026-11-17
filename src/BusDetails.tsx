@@ -25,6 +25,9 @@ const COLORS = {
 const ADDON_PRICES = { luggage: 3000, insurance: 1500 }
 const SERVICE_FEE = 300
 
+// Booking closes 30 minutes before departure (also enforced in the database).
+const BOOKING_CLOSE_MS = 30 * 60 * 1000
+
 const ID_TYPES = ['NIN', "Voter's Card (PVC)", "Driver's License", 'School ID'] as const
 
 function isIdFormatValid(idType: string, idNumber: string): boolean {
@@ -227,6 +230,10 @@ function BusDetails() {
     if (!service || !agreedTerms) return
     setMessage(null)
 
+    if (service.departure_time && new Date(service.departure_time).getTime() <= Date.now() + BOOKING_CLOSE_MS) {
+      setMessage({ type: 'error', text: 'Booking is closed: this trip departs in less than 30 minutes or has already left.' })
+      return
+    }
     if (usingSeatTypes && !selectedUnitId) {
       setMessage({ type: 'error', text: 'That seat just sold out. Please go back and pick another.' })
       return
@@ -349,6 +356,7 @@ function BusDetails() {
   const inputStyle = { width: '100%', padding: '12px', border: `1px solid ${COLORS.border}`, borderRadius: '10px', fontSize: '13.5px', marginBottom: '12px', boxSizing: 'border-box' as const }
   const labelStyle = { fontSize: '11.5px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '5px', display: 'block' as const }
   const cardStyle = { background: COLORS.card, borderRadius: '16px', padding: '18px', marginBottom: '16px', boxShadow: '0 2px 14px rgba(15,23,42,0.06)' }
+  const bookingClosed = !!service.departure_time && new Date(service.departure_time).getTime() <= Date.now() + BOOKING_CLOSE_MS
 
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, paddingBottom: '110px' }}>
@@ -380,6 +388,15 @@ function BusDetails() {
         {/* STEP 1 — TRIP SUMMARY */}
         {step === 1 && (
           <>
+            {bookingClosed && (
+              <div style={{ ...cardStyle, background: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <Icon name="clock" size={18} color={COLORS.red} />
+                <div>
+                  <p style={{ fontSize: '13.5px', fontWeight: 800, color: COLORS.red }}>Booking closed</p>
+                  <p style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>This trip departs in less than 30 minutes or has already left, so it can no longer be booked.</p>
+                </div>
+              </div>
+            )}
             <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
               <div style={{ height: '150px', background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.primary})`, position: 'relative' }}>
                 {service.photo_url && <img src={service.photo_url} alt={service.title} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.55 }} />}
@@ -709,17 +726,17 @@ function BusDetails() {
             )}
             {step < 5 && (
               <button
-                disabled={step === 2 && !passengerValid}
+                disabled={bookingClosed || (step === 2 && !passengerValid)}
                 onClick={() => setStep(step + 1)}
-                style={{ flex: 2, padding: '14px', borderRadius: '12px', border: 'none', background: step === 2 && !passengerValid ? '#94a3b8' : COLORS.secondary, color: 'white', fontWeight: 700, fontSize: '14px' }}>
-                Continue
+                style={{ flex: 2, padding: '14px', borderRadius: '12px', border: 'none', background: bookingClosed || (step === 2 && !passengerValid) ? '#94a3b8' : COLORS.secondary, color: 'white', fontWeight: 700, fontSize: '14px' }}>
+                {bookingClosed ? 'Booking closed' : 'Continue'}
               </button>
             )}
             {step === 5 && (
               <button
-                disabled={booking || !agreedTerms}
+                disabled={booking || !agreedTerms || bookingClosed}
                 onClick={() => setConfirmingPin(true)}
-                style={{ flex: 2, padding: '14px', borderRadius: '12px', border: 'none', background: booking || !agreedTerms ? '#94a3b8' : COLORS.secondary, color: 'white', fontWeight: 700, fontSize: '14px' }}>
+                style={{ flex: 2, padding: '14px', borderRadius: '12px', border: 'none', background: booking || !agreedTerms || bookingClosed ? '#94a3b8' : COLORS.secondary, color: 'white', fontWeight: 700, fontSize: '14px' }}>
                 {booking ? 'Processing...' : 'Confirm Booking'}
               </button>
             )}
