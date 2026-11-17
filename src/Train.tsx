@@ -17,6 +17,12 @@ const COLORS = {
   green: '#16A34A',
 }
 
+// Booking closes 30 minutes before departure (also enforced in the database).
+// A trip stays visible as "Booking closed" until 30 minutes after departure,
+// then it is paused automatically and disappears from this list.
+const BOOKING_CLOSE_MS = 30 * 60 * 1000
+const isBookingClosed = (iso: string | null) => !!iso && new Date(iso).getTime() <= Date.now() + BOOKING_CLOSE_MS
+
 const TRAVEL_AMENITY_ICON: Record<string, string> = {
   WiFi: 'wifi', AC: 'snowflake', 'Charging Port': 'plug', Meals: 'food', 'Reclining Seats': 'seat', Toilet: 'toilet', Refundable: 'refresh', 'Baggage Allowance': 'luggage',
 }
@@ -112,6 +118,7 @@ function Train() {
       .select('id, title, description, origin, destination, departure_time, duration_minutes, price, seats_available, photo_url, amenities, train_type, companies(business_name)')
       .eq('category', 'train')
       .eq('status', 'active')
+      .gt('departure_time', new Date(Date.now() - BOOKING_CLOSE_MS).toISOString())
       .order('created_at', { ascending: false })
 
     if (origin.trim()) query = query.ilike('origin', `%${origin.trim()}%`)
@@ -340,8 +347,10 @@ function Train() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {visible.map((h) => (
-              <div key={h.id} onClick={() => navigate(`/train/${h.id}`)} style={{ background: COLORS.card, borderRadius: '16px', padding: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer', display: 'flex', gap: '12px' }}>
+            {visible.map((h) => {
+              const closed = isBookingClosed(h.departure_time)
+              return (
+              <div key={h.id} onClick={() => { if (!closed) navigate(`/train/${h.id}`) }} style={{ background: COLORS.card, borderRadius: '16px', padding: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: closed ? 'default' : 'pointer', display: 'flex', gap: '12px', opacity: closed ? 0.75 : 1 }}>
                 <div style={{ position: 'relative', width: '125px', height: '150px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0 }}>
                   <div style={{ width: '100%', height: '100%', background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="train" size={26} color="white" />}
@@ -349,10 +358,10 @@ function Train() {
                   <div onClick={(e) => toggleFavorite(e, h.id)} style={{ position: 'absolute', top: '8px', right: '8px', width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8' }}>
                     <Icon name="heart" size={14} color={favoriteIds.has(h.id) ? COLORS.secondary : '#94a3b8'} filled={favoriteIds.has(h.id)} />
                   </div>
-                  {h.id === lowestPriceId && (
+                  {h.id === lowestPriceId && !closed && (
                     <span style={{ position: 'absolute', top: '8px', left: '8px', background: COLORS.secondary, color: 'white', fontSize: '9.5px', fontWeight: 700, padding: '4px 8px', borderRadius: '20px' }}>Best Value</span>
                   )}
-                  {h.id === topRatedId && h.id !== lowestPriceId && (
+                  {h.id === topRatedId && h.id !== lowestPriceId && !closed && (
                     <span style={{ position: 'absolute', top: '8px', left: '8px', background: COLORS.primary, color: 'white', fontSize: '9.5px', fontWeight: 700, padding: '4px 8px', borderRadius: '20px' }}>Top Rated</span>
                   )}
                 </div>
@@ -391,16 +400,23 @@ function Train() {
 
                   <div style={{ marginTop: '8px' }}>
                     <p style={{ fontSize: '15px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()}</p>
-                    {h.seats_available !== null && (
+                    {closed ? (
+                      <p style={{ fontSize: '10.5px', fontWeight: 700, color: '#DC2626' }}>Departing soon</p>
+                    ) : h.seats_available !== null && (
                       <p style={{ fontSize: '10.5px', fontWeight: 700, color: h.seats_available === 0 ? '#DC2626' : COLORS.green }}>
                         {h.seats_available === 0 ? 'Fully booked' : `${h.seats_available} seats left`}
                       </p>
                     )}
                   </div>
-                  <span style={{ display: 'inline-block', marginTop: '8px', padding: '8px 16px', background: COLORS.secondary, color: 'white', borderRadius: '9px', fontWeight: 700, fontSize: '12px' }}>View Trains</span>
+                  {closed ? (
+                    <span style={{ display: 'inline-block', marginTop: '8px', padding: '8px 16px', background: '#E2E8F0', color: COLORS.textMuted, borderRadius: '9px', fontWeight: 700, fontSize: '12px' }}>Booking closed</span>
+                  ) : (
+                    <span style={{ display: 'inline-block', marginTop: '8px', padding: '8px 16px', background: COLORS.secondary, color: 'white', borderRadius: '9px', fontWeight: 700, fontSize: '12px' }}>View Trains</span>
+                  )}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

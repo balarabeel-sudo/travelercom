@@ -17,6 +17,12 @@ const COLORS = {
   green: '#16A34A',
 }
 
+// Booking closes 30 minutes before departure (also enforced in the database).
+// A trip stays visible as "Booking closed" until 30 minutes after departure,
+// then it is paused automatically and disappears from this list.
+const BOOKING_CLOSE_MS = 30 * 60 * 1000
+const isBookingClosed = (iso: string | null) => !!iso && new Date(iso).getTime() <= Date.now() + BOOKING_CLOSE_MS
+
 const TRAVEL_AMENITY_ICON: Record<string, string> = {
   WiFi: 'wifi', AC: 'snowflake', 'Charging Port': 'plug', Meals: 'food', 'Reclining Seats': 'seat', Toilet: 'toilet', Refundable: 'refresh', 'Baggage Allowance': 'luggage',
 }
@@ -139,6 +145,7 @@ function Bus() {
       .select('id, title, description, origin, destination, departure_time, duration_minutes, price, seats_available, photo_url, amenities, companies(business_name)')
       .eq('category', 'bus')
       .eq('status', 'active')
+      .gt('departure_time', new Date(Date.now() - BOOKING_CLOSE_MS).toISOString())
       .order('created_at', { ascending: false })
 
     if (origin.trim()) query = query.ilike('origin', `%${origin.trim()}%`)
@@ -429,17 +436,18 @@ function Bus() {
               const originSplit = splitLocation(h.origin)
               const destSplit = splitLocation(h.destination)
               const arrivalIso = computeArrivalIso(h.departure_time, h.duration_minutes)
+              const closed = isBookingClosed(h.departure_time)
               return (
-                <div key={h.id} onClick={() => navigate(`/bus/${h.id}?passengers=${passengers}`)} style={{ background: COLORS.card, borderRadius: '16px', padding: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer', display: 'flex', gap: '12px' }}>
+                <div key={h.id} onClick={() => { if (!closed) navigate(`/bus/${h.id}?passengers=${passengers}`) }} style={{ background: COLORS.card, borderRadius: '16px', padding: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: closed ? 'default' : 'pointer', display: 'flex', gap: '12px', opacity: closed ? 0.75 : 1 }}>
 
                   <div style={{ position: 'relative', width: '96px', height: '96px', borderRadius: '12px', overflow: 'hidden', flexShrink: 0 }}>
                     <div style={{ width: '100%', height: '100%', background: h.photo_url ? undefined : `linear-gradient(135deg, ${COLORS.secondary}, ${COLORS.primary})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="bus" size={28} color="white" />}
                     </div>
-                    {h.id === bestDealId && (
+                    {h.id === bestDealId && !closed && (
                       <span style={{ position: 'absolute', top: '6px', left: '6px', background: '#DCFCE7', color: COLORS.green, fontSize: '9.5px', fontWeight: 800, padding: '3px 7px', borderRadius: '6px' }}>Best Deal</span>
                     )}
-                    {h.id === popularId && h.id !== bestDealId && (
+                    {h.id === popularId && h.id !== bestDealId && !closed && (
                       <span style={{ position: 'absolute', top: '6px', left: '6px', background: COLORS.secondary, color: 'white', fontSize: '9.5px', fontWeight: 800, padding: '3px 7px', borderRadius: '6px' }}>Popular</span>
                     )}
                   </div>
@@ -499,11 +507,15 @@ function Bus() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '10px' }}>
                       <div>
                         <p style={{ fontSize: '16px', fontWeight: 800, color: COLORS.primary }}>₦{Number(h.price).toLocaleString()}</p>
-                        <p style={{ fontSize: '10.5px', fontWeight: 700, color: (!h.seats_available || h.seats_available === 0) ? '#DC2626' : COLORS.primary }}>
-                          {(!h.seats_available || h.seats_available === 0) ? 'Not available' : `${h.seats_available} seats left`}
+                        <p style={{ fontSize: '10.5px', fontWeight: 700, color: (closed || !h.seats_available || h.seats_available === 0) ? '#DC2626' : COLORS.primary }}>
+                          {closed ? 'Departing soon' : (!h.seats_available || h.seats_available === 0) ? 'Not available' : `${h.seats_available} seats left`}
                         </p>
                       </div>
-                      <span style={{ padding: '9px 16px', background: COLORS.secondary, color: 'white', borderRadius: '9px', fontWeight: 700, fontSize: '12px' }}>View Seats</span>
+                      {closed ? (
+                        <span style={{ padding: '9px 16px', background: '#E2E8F0', color: COLORS.textMuted, borderRadius: '9px', fontWeight: 700, fontSize: '12px' }}>Booking closed</span>
+                      ) : (
+                        <span style={{ padding: '9px 16px', background: COLORS.secondary, color: 'white', borderRadius: '9px', fontWeight: 700, fontSize: '12px' }}>View Seats</span>
+                      )}
                     </div>
                   </div>
                 </div>
