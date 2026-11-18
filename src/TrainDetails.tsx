@@ -5,6 +5,7 @@ import Icon from './Icons'
 import { DetailsSkeleton } from './LoadingSkeleton'
 import NetworkError from './NetworkError'
 import { downloadReceiptImage } from './receiptGenerator'
+import ConfirmPinModal from './ConfirmPinModal'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -20,7 +21,8 @@ const COLORS = {
   gold: '#D4A017',
 }
 
-// Flat platform fees — no per-listing pricing exists for these yet, adjust here if needed.
+// Flat platform fees. These are only used to SHOW the price on screen; the database
+// recalculates the real price in book_transport_with_wallet (keep both in sync).
 const ADDON_PRICES = { luggage: 3000, insurance: 1500 }
 const SERVICE_FEE = 300
 
@@ -71,11 +73,11 @@ function TrainDetails() {
   const [netError, setNetError] = useState(false)
   const [step, setStep] = useState(1)
   const [service, setService] = useState<TrainService | null>(null)
-  const [userId, setUserId] = useState('')
   const [walletBalance, setWalletBalance] = useState(0)
   const [activePromo, setActivePromo] = useState<{ id: string; title: string; discount_type: string; discount_value: number } | null>(null)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
   const [booking, setBooking] = useState(false)
+  const [confirmingPin, setConfirmingPin] = useState(false)
 
   const [seatTypes, setSeatTypes] = useState<SeatType[]>([])
   const [selectedSeatTypeId, setSelectedSeatTypeId] = useState<string | null>(null)
@@ -106,7 +108,6 @@ function TrainDetails() {
       setNetError(false)
       const { data: userData, error } = await supabase.auth.getUser()
       if (error || !userData.user) { navigate('/login'); return }
-      setUserId(userData.user.id)
       setFullName(userData.user.user_metadata?.full_name || '')
       setEmail(userData.user.email || '')
 
@@ -221,74 +222,44 @@ function TrainDetails() {
     }
 
     setBooking(true)
-    let assignedUnitId: string | null = null
-    let assignedNumber = ''
 
-    if (selectedSeat && selectedUnitId) {
-      const chosen = unitOptions.find((u) => u.id === selectedUnitId)
-      const { data: claimedRows } = await supabase.rpc('claim_inventory_unit', { p_unit_id: selectedUnitId })
-      const claimed = claimedRows && claimedRows.length > 0 ? claimedRows[0] : null
+    // Everything that matters (price, promotion, seat, payment, booking record) is
+    // handled by the database in one safe step. The browser only sends the choices.
+    const { data, error: bookErr } = await supabase.rpc('book_transport_with_wallet', {
+      p_service_id: service.id,
+      p_inventory_item_id: selectedSeat?.id || null,
+      p_unit_id: selectedUnitId,
+      p_quantity: 1,
+      p_promotion_id: activePromo?.id || null,
+      p_extra_luggage: extraLuggage,
+      p_travel_insurance: travelInsurance,
+      p_customer_name: fullName || null,
+      p_id_type: idType,
+      p_id_number: idNumber.trim(),
+      p_expected_amount: total,
+    })
 
-      if (!claimed) {
-        setBooking(false)
-        setMessage({ type: 'error', text: `Seat ${chosen?.unit_number || ''} was just taken. Please go back and pick another.` })
-        return
-      }
-      assignedUnitId = claimed.id
-      assignedNumber = claimed.unit_number
-    }
-
-    const { data: newBooking, error: bookingErr } = await supabase.from('bookings').insert({
-      user_id: userId,
-      service_id: service.id,
-      company_id: service.company_id,
-      inventory_item_id: selectedSeat?.id || null,
-      quantity: 1,
-      amount_paid: total,
-      commission_amount: 0,
-      booking_status: 'confirmed',
-      customer_name: fullName || null,
-      assigned_unit_number: assignedNumber || null,
-      promotion_id: activePromo?.id || null,
-      id_type: idType,
-      id_number: idNumber.trim(),
-    }).select('id, ticket_code').single()
-
-    if (bookingErr) {
-      if (assignedUnitId) await supabase.from('inventory_units').update({ status: 'available' }).eq('id', assignedUnitId)
+    if (bookErr || !data) {
       setBooking(false)
-      setMessage({ type: 'error', text: 'Booking failed: ' + bookingErr.message })
+      setMessage({ type: 'error', text: bookErr?.message || 'Booking failed. Please try again.' })
       return
     }
 
-    if (assignedUnitId) {
-      await supabase.from('inventory_units').update({ booking_id: newBooking?.id || null }).eq('id', assignedUnitId)
-    } else if (!usingSeatTypes && service.seats_available !== null && service.seats_available > 0) {
-      const { data: newCount, error: decErr } = await supabase.rpc('decrement_seats', { p_service_id: service.id })
-      if (!decErr && newCount !== null) {
-        setService({ ...service, seats_available: newCount })
-      }
+    const result = data as any
+    if (selectedSeat && result.assigned_unit_number) {
+      setSeatTypes((prev) => prev.map((s) => s.id === selectedSeat.id ? { ...s, available: Math.max(0, s.available - 1) } : s))
+      setUnitOptions((prev) => prev.filter((u) => u.id !== selectedUnitId))
     }
-
-    const newBalance = walletBalance - total
-    const { error: walletErr } = await supabase.from('wallets').update({ balance: newBalance }).eq('user_id', userId)
-    if (walletErr) {
-      setBooking(false)
-      setMessage({ type: 'error', text: 'Payment failed: ' + walletErr.message })
-      return
+    if (!usingSeatTypes && result.seats_available !== null && result.seats_available !== undefined) {
+      setService({ ...service, seats_available: Number(result.seats_available) })
     }
-
-    const { data: walletRow } = await supabase.from('wallets').select('id').eq('user_id', userId).maybeSingle()
-    const { data: txnRow } = await supabase.from('transactions').insert({
-      user_id: userId, wallet_id: walletRow?.id, transaction_type: 'payment', amount: total, status: 'successful',
-    }).select('id').single()
 
     setBooking(false)
-    setWalletBalance(newBalance)
-    setReservationId(newBooking?.id || '')
+    setWalletBalance(Number(result.new_balance))
+    setReservationId(result.booking_id || '')
     // The ticket code is created by the database; always show that exact code.
-    setPnr(newBooking?.ticket_code || 'Open My Bookings')
-    setTransactionId(txnRow?.id || '')
+    setPnr(result.ticket_code || 'Open My Bookings')
+    setTransactionId(result.transaction_id || '')
     setStep(6)
   }
 
@@ -639,7 +610,7 @@ function TrainDetails() {
             {step === 5 && (
               <button
                 disabled={booking || !agreedTerms || bookingClosed}
-                onClick={handleConfirmBooking}
+                onClick={() => setConfirmingPin(true)}
                 style={{ flex: 2, padding: '14px', borderRadius: '12px', border: 'none', background: booking || !agreedTerms || bookingClosed ? '#94a3b8' : COLORS.secondary, color: 'white', fontWeight: 700, fontSize: '14px' }}>
                 {booking ? 'Processing...' : 'Confirm Booking'}
               </button>
@@ -647,6 +618,14 @@ function TrainDetails() {
           </div>
         </div>
       )}
+
+      <ConfirmPinModal
+        open={confirmingPin}
+        onCancel={() => setConfirmingPin(false)}
+        onSuccess={() => { setConfirmingPin(false); handleConfirmBooking() }}
+        title="Confirm Payment"
+        subtitle={`Enter your PIN to pay ₦${total.toLocaleString()}.`}
+      />
     </div>
   )
 }
