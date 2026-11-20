@@ -124,6 +124,8 @@ function Home() {
   const [companyListings, setCompanyListings] = useState<CompanyListingRow[]>([])
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // Personal accounts see the page right away; the lists below fill in as data arrives.
+  const [feedLoading, setFeedLoading] = useState(true)
   const [accountType, setAccountType] = useState<'personal' | 'company'>('personal')
   const [displayName, setDisplayName] = useState('')
   const [companyApproval, setCompanyApproval] = useState<'pending' | 'approved' | 'rejected'>('pending')
@@ -157,75 +159,94 @@ function Home() {
   const [topDestinations, setTopDestinations] = useState<{ city: string; photo: string | null; rating: number; count: number }[]>([])
   useEffect(() => {
     const loadUser = async () => {
-      const { data, error } = await supabase.auth.getUser()
-      if (error || !data.user) {
+      // getSession reads the saved login on the phone (no network call), so the page starts faster.
+      const { data: sessionData } = await supabase.auth.getSession()
+      const user = sessionData.session?.user
+      if (!user) {
         navigate('/login')
         return
       }
-      const meta = data.user.user_metadata || {}
+      const meta = user.user_metadata || {}
       const isCompany = meta.account_type === 'company'
 
       // Staff members now stay on Home like everyone else; they open their workspace
       // from the Account page.
       setAccountType(isCompany ? 'company' : 'personal')
-      const { data: bannerRows } = await supabase
-        .from('platform_banners')
-        .select('id, title, message, image_url, link_url, banner_type, link_type, target_listing_id, target_category, cta_text, promotion_id')
-        .eq('active', true)
-        .in('target_audience', isCompany ? ['all', 'company'] : ['all', 'personal'])
-        .order('created_at', { ascending: false })
-      setBanners(bannerRows || [])
-
-      // Category (for routing to the right details page) for any banner linked to a specific listing.
-      const linkedListingIds = Array.from(new Set(
-        (bannerRows || []).filter((b: any) => b.link_type === 'listing' && b.target_listing_id).map((b: any) => b.target_listing_id)
-      ))
-      if (linkedListingIds.length > 0) {
-        const { data: svcRows } = await supabase.from('services').select('id, category').in('id', linkedListingIds)
-        const map: Record<string, { category: string }> = {}
-        ;(svcRows || []).forEach((s: any) => { map[s.id] = { category: s.category } })
-        setListingMeta(map)
-      }
-
-      // Real discount % for the "X% OFF" badge, sourced from the app's actual promotions
-      // table (the same one every Details page reads from at checkout).
-      const today = new Date().toISOString().slice(0, 10)
-      const promoIds = Array.from(new Set(
-        (bannerRows || []).filter((b: any) => b.banner_type === 'discount' && b.promotion_id).map((b: any) => b.promotion_id)
-      ))
-      if (promoIds.length > 0) {
-        const { data: promoRows } = await supabase.from('promotions').select('id, discount_value, active, end_date').in('id', promoIds)
-        const pmap: Record<string, number> = {}
-        ;(promoRows || []).forEach((p: any) => {
-          if (p.active && (!p.end_date || p.end_date >= today)) pmap[p.id] = p.discount_value
-        })
-        setPromoPercents(pmap)
-      }
       setDisplayName(meta.full_name || '')
 
-      // Ensure a profiles row exists for this user (required for companies/wallets/bookings FK)
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', data.user.id)
-        .maybeSingle()
+      // Never let one failed request stop the others.
+      const safe = (p: PromiseLike<unknown>) => Promise.resolve(p).catch(() => undefined)
 
-      if (!existingProfile) {
-        await supabase.from('profiles').insert({
-          id: data.user.id,
-          full_name: meta.full_name || null,
-          phone_number: meta.phone || null,
-          account_type: isCompany ? 'company' : 'personal',
-          company_name: isCompany ? (meta.full_name || null) : null,
-          status: 'pending',
-        })
+      // Banners + the extra info they need (runs in the background, fills in when ready).
+      const loadBanners = async () => {
+        const { data: bannerRows } = await supabase
+          .from('platform_banners')
+          .select('id, title, message, image_url, link_url, banner_type, link_type, target_listing_id, target_category, cta_text, promotion_id')
+          .eq('active', true)
+          .in('target_audience', isCompany ? ['all', 'company'] : ['all', 'personal'])
+          .order('created_at', { ascending: false })
+        setBanners(bannerRows || [])
+
+        // Category (for routing to the right details page) for any banner linked to a specific listing.
+        const linkedListingIds = Array.from(new Set(
+          (bannerRows || []).filter((b: any) => b.link_type === 'listing' && b.target_listing_id).map((b: any) => b.target_listing_id)
+        ))
+        // Real discount % for the "X% OFF" badge, sourced from the app's actual promotions
+        // table (the same one every Details page reads from at checkout).
+        const today = new Date().toISOString().slice(0, 10)
+        const promoIds = Array.from(new Set(
+          (bannerRows || []).filter((b: any) => b.banner_type === 'discount' && b.promotion_id).map((b: any) => b.promotion_id)
+        ))
+
+        await Promise.all([
+          (async () => {
+            if (linkedListingIds.length === 0) return
+            const { data: svcRows } = await supabase.from('services').select('id, category').in('id', linkedListingIds)
+            const map: Record<string, { category: string }> = {}
+            ;(svcRows || []).forEach((s: any) => { map[s.id] = { category: s.category } })
+            setListingMeta(map)
+          })(),
+          (async () => {
+            if (promoIds.length === 0) return
+            const { data: promoRows } = await supabase.from('promotions').select('id, discount_value, active, end_date').in('id', promoIds)
+            const pmap: Record<string, number> = {}
+            ;(promoRows || []).forEach((p: any) => {
+              if (p.active && (!p.end_date || p.end_date >= today)) pmap[p.id] = p.discount_value
+            })
+            setPromoPercents(pmap)
+          })(),
+        ])
       }
-      
+
+      // Ensure a profiles row exists for this user (required for companies/wallets/bookings FK)
+      const ensureProfile = async () => {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        if (!existingProfile) {
+          await supabase.from('profiles').insert({
+            id: user.id,
+            full_name: meta.full_name || null,
+            phone_number: meta.phone || null,
+            account_type: isCompany ? 'company' : 'personal',
+            company_name: isCompany ? (meta.full_name || null) : null,
+            status: 'pending',
+          })
+        }
+      }
+
+      const bannersTask = safe(loadBanners())
+
       if (isCompany) {
-      const { data: existing } = await supabase
+        await safe(ensureProfile())
+
+        const { data: existing } = await supabase
           .from('companies')
           .select('id, approval_status, plan')
-          .eq('owner_id', data.user.id)
+          .eq('owner_id', user.id)
           .maybeSingle()
 
         let companyId = existing?.id
@@ -238,7 +259,7 @@ function Home() {
           const { data: created } = await supabase
             .from('companies')
             .insert({
-              owner_id: data.user.id,
+              owner_id: user.id,
               business_name: meta.full_name || 'My Company',
               business_type: meta.business_type || null,
               approval_status: 'pending'
@@ -248,15 +269,30 @@ function Home() {
           setCompanyApproval(created?.approval_status || 'pending')
           setCompanyPlan(created?.plan || 'free')
           companyId = created?.id
-        }  
+        }
 
         if (companyId) {
-          const { data: allBookings } = await supabase
-            .from('bookings')
-            .select('checked_in, booking_status, amount_paid, created_at, services(commission_rate)')
-            .eq('company_id', companyId)
+          // Bookings, active-listing count and latest listings are independent, so load them together.
+          const [bookingsRes, activeRes, listingsRes] = await Promise.all([
+            supabase
+              .from('bookings')
+              .select('checked_in, booking_status, amount_paid, created_at, services(commission_rate)')
+              .eq('company_id', companyId),
+            supabase
+              .from('services')
+              .select('id', { count: 'exact', head: true })
+              .eq('company_id', companyId)
+              .eq('status', 'active'),
+            // Latest listings for the desktop "My Listings" table
+            supabase
+              .from('services')
+              .select('id, title, category, status, destination, photo_url')
+              .eq('company_id', companyId)
+              .order('created_at', { ascending: false })
+              .limit(5),
+          ])
 
-          const bookings = allBookings || []
+          const bookings = bookingsRes.data || []
           setRawBookings(bookings)
           const totalBookings = bookings.length
           const pendingBookings = bookings.filter((b: any) => !b.checked_in && b.booking_status === 'confirmed').length
@@ -268,85 +304,87 @@ function Home() {
               return sum + Number(b.amount_paid) * (1 - rate / 100)
             }, 0)
 
-          const { count: activeListings } = await supabase
-            .from('services')
-            .select('id', { count: 'exact', head: true })
-            .eq('company_id', companyId)
-            .eq('status', 'active')
-
           setCompanyStats({
             totalBookings,
             revenue,
             pendingBookings,
             completed,
-            activeListings: activeListings || 0,
+            activeListings: activeRes.count || 0,
           })
 
-          // Latest listings for the desktop "My Listings" table
-          const { data: listingRows } = await supabase
-            .from('services')
-            .select('id, title, category, status, destination, photo_url')
-            .eq('company_id', companyId)
-            .order('created_at', { ascending: false })
-            .limit(5)
-          setCompanyListings((listingRows as CompanyListingRow[]) || [])
+          setCompanyListings((listingsRes.data as CompanyListingRow[]) || [])
         }
+
+        setLoading(false)
+        await bannersTask
       } else {
-        const { data: hotelRows } = await supabase
-          .from('services')
-          .select('id, title, destination, photo_url, price, seats_available')
-          .eq('category', 'hotel')
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(6)
+        // Personal account: show the page immediately, then fill each section as its data arrives.
+        setLoading(false)
 
-        if (hotelRows && hotelRows.length > 0) {
-          const ids = hotelRows.map((h) => h.id)
-          const { data: reviewRows } = await supabase
-            .from('reviews')
-            .select('service_id, rating')
-            .in('service_id', ids)
+        const hotelsTask = safe((async () => {
+          const { data: hotelRows } = await supabase
+            .from('services')
+            .select('id, title, destination, photo_url, price, seats_available')
+            .eq('category', 'hotel')
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(6)
 
-          const ratingMap: Record<string, number[]> = {}
-          ;(reviewRows || []).forEach((r: any) => {
-            if (r.rating == null) return
-            if (!ratingMap[r.service_id]) ratingMap[r.service_id] = []
-            ratingMap[r.service_id].push(Number(r.rating))
-          })
+          if (hotelRows && hotelRows.length > 0) {
+            const ids = hotelRows.map((h) => h.id)
+            const { data: reviewRows } = await supabase
+              .from('reviews')
+              .select('service_id, rating')
+              .in('service_id', ids)
 
-          setPopularHotels(hotelRows.map((h: any) => {
-            const ratings = ratingMap[h.id] || []
-            const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null
-            return { ...h, avgRating }
-          }))
-        }
+            const ratingMap: Record<string, number[]> = {}
+            ;(reviewRows || []).forEach((r: any) => {
+              if (r.rating == null) return
+              if (!ratingMap[r.service_id]) ratingMap[r.service_id] = []
+              ratingMap[r.service_id].push(Number(r.rating))
+            })
 
-        const { data: busRows } = await supabase
-          .from('services')
-          .select('id, origin, destination, departure_time, price, photo_url, companies(business_name)')
-          .eq('category', 'bus')
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(6)
-        setPopularBus((busRows || []).map((r: any) => ({ ...r, companyName: r.companies?.business_name || 'Traveler.com Partner' })))
+            setPopularHotels(hotelRows.map((h: any) => {
+              const ratings = ratingMap[h.id] || []
+              const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null
+              return { ...h, avgRating }
+            }))
+          }
+        })())
 
-        const { data: flightRows } = await supabase
-          .from('services')
-          .select('id, origin, destination, departure_time, price, photo_url, companies(business_name)')
-          .eq('category', 'flight')
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(6)
-        setPopularFlights((flightRows || []).map((r: any) => ({ ...r, companyName: r.companies?.business_name || 'Traveler.com Partner' })))
+        const busTask = safe((async () => {
+          const { data: busRows } = await supabase
+            .from('services')
+            .select('id, origin, destination, departure_time, price, photo_url, companies(business_name)')
+            .eq('category', 'bus')
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(6)
+          setPopularBus((busRows || []).map((r: any) => ({ ...r, companyName: r.companies?.business_name || 'Traveler.com Partner' })))
+        })())
 
-        const { data: favRows } = await supabase
-          .from('favorites')
-          .select('service_id')
-          .eq('user_id', data.user.id)
-        setFavoriteIds(new Set((favRows || []).map((f: any) => f.service_id)))
+        const flightsTask = safe((async () => {
+          const { data: flightRows } = await supabase
+            .from('services')
+            .select('id, origin, destination, departure_time, price, photo_url, companies(business_name)')
+            .eq('category', 'flight')
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(6)
+          setPopularFlights((flightRows || []).map((r: any) => ({ ...r, companyName: r.companies?.business_name || 'Traveler.com Partner' })))
+        })())
+
+        const favsTask = safe((async () => {
+          const { data: favRows } = await supabase
+            .from('favorites')
+            .select('service_id')
+            .eq('user_id', user.id)
+          setFavoriteIds(new Set((favRows || []).map((f: any) => f.service_id)))
+        })())
+
+        await Promise.all([bannersTask, safe(ensureProfile()), hotelsTask, busTask, flightsTask, favsTask])
+        setFeedLoading(false)
       }
-
-      setLoading(false)
     }
     loadUser()
   }, [navigate])
@@ -383,12 +421,15 @@ function Home() {
   useEffect(() => {
     if (accountType !== 'personal') return
     const loadDestinations = async () => {
+      // Only the newest listings are needed to pick the top cities (keeps the download small).
       const { data: svcs } = await supabase
         .from('services')
         .select('id, destination, photo_url, category')
         .in('category', ['tour', 'event_center'])
         .eq('status', 'active')
         .not('destination', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(40)
 
       if (!svcs || svcs.length === 0) return
 
@@ -1355,7 +1396,7 @@ const services = [
                 overflow: 'hidden',
               }}>
                 {d.photo ? (
-                  <img src={d.photo} alt={d.city} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={d.photo} alt={d.city} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <Icon name={d.icon || 'mapPin'} size={32} color="white" />
                 )}
@@ -1401,8 +1442,8 @@ const services = [
             color: COLORS.textMuted,
             boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
           }}>
-            <p style={{ fontSize: '13px' }}>No hotels available yet</p>
-            <p style={{ fontSize: '12px', marginTop: '4px' }}>Check back soon!</p>
+            <p style={{ fontSize: '13px' }}>{feedLoading ? 'Loading...' : 'No hotels available yet'}</p>
+            {!feedLoading && <p style={{ fontSize: '12px', marginTop: '4px' }}>Check back soon!</p>}
           </div>
         ) : (
           <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
@@ -1429,7 +1470,7 @@ const services = [
                     justifyContent: 'center',
                     fontSize: '30px',
                   }}>
-                    {h.photo_url ? <img src={h.photo_url} alt={h.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="hotel" size={30} color="white" />}
+                    {h.photo_url ? <img src={h.photo_url} alt={h.title} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="hotel" size={30} color="white" />}
                   </div>
                   <div
                     onClick={(e) => toggleFavorite(e, h.id)}
@@ -1475,7 +1516,7 @@ const services = [
           </span>
         </div>
         {popularBus.length === 0 ? (
-          <EmptyCard text="No bus routes available yet" />
+          <EmptyCard text={feedLoading ? 'Loading...' : 'No bus routes available yet'} />
         ) : (
           <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
             {popularBus.map((r) => (
@@ -1507,7 +1548,7 @@ const services = [
           </span>
         </div>
         {popularFlights.length === 0 ? (
-          <EmptyCard text="No flights available yet" />
+          <EmptyCard text={feedLoading ? 'Loading...' : 'No flights available yet'} />
         ) : (
           <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
             {popularFlights.map((f) => (
@@ -1585,7 +1626,7 @@ function TripCard({ icon, route, company, date, price, photoUrl, isFavorite, onT
           justifyContent: 'center',
           fontSize: '26px',
         }}>
-          {photoUrl ? <img src={photoUrl} alt={route} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name={icon} size={28} color="white" />}
+          {photoUrl ? <img src={photoUrl} alt={route} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name={icon} size={28} color="white" />}
         </div>
         <div
           onClick={onToggleFavorite}
