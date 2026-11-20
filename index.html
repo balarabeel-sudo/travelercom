@@ -8,7 +8,10 @@
     <meta name="theme-color" content="#0EA5E9" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <title>Traveler.com</title>
-    <script src="https://js.paystack.co/v1/inline.js"></script>
+    <!-- Open the connection to Supabase early so the first data request starts faster -->
+    <link rel="preconnect" href="https://cmgxoujhvfwsaaigmdpy.supabase.co" crossorigin />
+    <!-- defer: Paystack no longer blocks the first screen from showing (slow networks) -->
+    <script src="https://js.paystack.co/v1/inline.js" defer></script>
   </head>
   <body>
     <div id="root"></div>
