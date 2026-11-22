@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
 import NotificationBell from './NotificationBell'
@@ -149,11 +149,11 @@ function ComingSoonPanel({ label }: { label: string }) {
 
 function AdminDashboard() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [checking, setChecking] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [permissions, setPermissions] = useState<Set<string>>(new Set())
-  const [section, setSection] = useState<SectionKey>('overview')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : false)
   const [userEmail, setUserEmail] = useState('')
@@ -161,6 +161,14 @@ function AdminDashboard() {
   const [founderUnread, setFounderUnread] = useState(0)
 
   const [accessError, setAccessError] = useState('')
+
+  // The active section lives in the URL (/#/admin?section=hotels) so a refresh
+  // keeps the admin on the same page instead of jumping back to Overview.
+  const urlSection = searchParams.get('section')
+  const rawSection: SectionKey = ALL_ITEMS.some((i) => i.key === urlSection) ? (urlSection as SectionKey) : 'overview'
+  const setSection = (key: SectionKey) => {
+    setSearchParams(key === 'overview' ? {} : { section: key }, { replace: true })
+  }
 
   useEffect(() => {
     const onResize = () => setIsDesktop(window.innerWidth >= 1024)
@@ -258,6 +266,9 @@ function AdminDashboard() {
   if (!isAdmin) {
     return null
   }
+
+  // If the URL points to a section this admin is not allowed to see, fall back to Overview.
+  const section: SectionKey = canSeeSection(rawSection, isSuperAdmin, permissions) ? rawSection : 'overview'
 
   const currentLabel = ALL_ITEMS.find((i) => i.key === section)?.label || 'Overview'
 
