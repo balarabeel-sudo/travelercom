@@ -164,10 +164,14 @@ function AdminDashboard() {
 
   // The active section lives in the URL (/#/admin?section=hotels) so a refresh
   // keeps the admin on the same page instead of jumping back to Overview.
+  // Each section change is a normal history entry (push, not replace), so the
+  // phone's Back button goes to the previous section first and only leaves the
+  // admin dashboard after the first section is reached.
   const urlSection = searchParams.get('section')
   const rawSection: SectionKey = ALL_ITEMS.some((i) => i.key === urlSection) ? (urlSection as SectionKey) : 'overview'
   const setSection = (key: SectionKey) => {
-    setSearchParams(key === 'overview' ? {} : { section: key }, { replace: true })
+    if (key === rawSection) return
+    setSearchParams(key === 'overview' ? {} : { section: key })
   }
 
   useEffect(() => {
