@@ -22,6 +22,19 @@ const AMENITY_ICON: Record<string, string> = {
 }
 const AMENITIES_LIST = Object.keys(AMENITY_ICON)
 
+// Date/time shown in the form must be the device's local time (Nigeria = UTC+1),
+// the same clock the company typed it in. Using toISOString() here shifted the
+// time back by one hour every time a listing was edited.
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const toLocalDate = (iso: string) => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+const toLocalTime = (iso: string) => {
+  const d = new Date(iso)
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
 function AddTourListing() {
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
@@ -90,11 +103,10 @@ function AddTourListing() {
           setTitle(listing.title || '')
           setDestination(listing.destination || '')
           if (listing.departure_time) {
-            const d = new Date(listing.departure_time)
-            setTourDate(d.toISOString().slice(0, 10))
-            setStartTime(d.toISOString().slice(11, 16))
+            setTourDate(toLocalDate(listing.departure_time))
+            setStartTime(toLocalTime(listing.departure_time))
           }
-          if (listing.arrival_time) setEndTime(new Date(listing.arrival_time).toISOString().slice(11, 16))
+          if (listing.arrival_time) setEndTime(toLocalTime(listing.arrival_time))
           setMeetingPoint(listing.meeting_point || '')
           setPrice(listing.price ? String(listing.price) : '')
           setQuantity(listing.seats_available ? String(listing.seats_available) : '')
