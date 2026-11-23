@@ -19,6 +19,19 @@ const AMENITY_ICON: Record<string, string> = {
 }
 const AMENITIES_LIST = Object.keys(AMENITY_ICON)
 
+// Date/time shown in the form must be the device's local time (Nigeria = UTC+1),
+// the same clock the company typed it in. Using toISOString() here shifted the
+// time back by one hour every time a listing was edited.
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const toLocalDate = (iso: string) => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+const toLocalTime = (iso: string) => {
+  const d = new Date(iso)
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
 function computeDurationMinutes(travelDate: string, depTime: string, arrTime: string): number | null {
   if (!travelDate || !depTime || !arrTime) return null
   const dep = new Date(`${travelDate}T${depTime}:00`)
@@ -94,12 +107,11 @@ function AddBusListing() {
           setOrigin(listing.origin || '')
           setDestination(listing.destination || '')
           if (listing.departure_time) {
-            const dep = new Date(listing.departure_time)
-            setTravelDate(dep.toISOString().slice(0, 10))
-            setDepartureTime(dep.toISOString().slice(11, 16))
+            setTravelDate(toLocalDate(listing.departure_time))
+            setDepartureTime(toLocalTime(listing.departure_time))
           }
           if (listing.arrival_time) {
-            setArrivalTime(new Date(listing.arrival_time).toISOString().slice(11, 16))
+            setArrivalTime(toLocalTime(listing.arrival_time))
           }
           setVehicleInfo(listing.vehicle_info || '')
           setSeatLayout(listing.seat_layout || '')
