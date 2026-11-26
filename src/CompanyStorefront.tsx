@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import VerifiedBadge from './VerifiedBadge'
 
 const COLORS = {
   bg: '#F8FAFC',
@@ -204,7 +205,7 @@ export default function CompanyStorefront() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <p style={{ fontSize: '19px', fontWeight: 800, color: COLORS.text }}>{company.business_name}</p>
-          {company.approval_status === 'approved' && <Icon name="checkCircle" size={17} color={COLORS.primary} />}
+          {company.approval_status === 'approved' && <VerifiedBadge size={20} />}
         </div>
         {company.plan === 'business_suite' && (
           <span style={{
