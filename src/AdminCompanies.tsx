@@ -139,7 +139,11 @@ function VerificationDocs({ ownerId }: { ownerId: string | null }) {
     return () => { cancelled = true }
   }, [ownerId])
 
-  const labelFor = (t: string) => t === 'cac_certificate' ? 'CAC Certificate' : t === 'valid_id' ? 'Government ID' : t.replace(/_/g, ' ')
+  // Both 'valid_id' and 'government_id' are shown as "Government ID"
+  const labelFor = (t: string) =>
+    t === 'cac_certificate' ? 'CAC Certificate'
+    : (t === 'valid_id' || t === 'government_id') ? 'Government ID'
+    : t.replace(/_/g, ' ')
 
   if (loading) return <p style={{ fontSize: '12px', color: COLORS.textMuted, padding: '8px 0' }}>Loading documents…</p>
   if (docs.length === 0) return <p style={{ fontSize: '12px', color: COLORS.textMuted, padding: '8px 0' }}>No documents uploaded yet.</p>
@@ -715,6 +719,38 @@ function periodStartDate(key: string): Date | null {
   return null
 }
 
+// ---- Premium grant duration options ----
+type PremiumDurationKey = '1' | '3' | '6' | 'custom'
+
+const PREMIUM_DURATIONS: { key: PremiumDurationKey; label: string; months: number }[] = [
+  { key: '1', label: '1 Month', months: 1 },
+  { key: '3', label: '3 Months', months: 3 },
+  { key: '6', label: '6 Months', months: 6 },
+  { key: 'custom', label: 'Custom', months: 0 },
+]
+
+// Format a Date as YYYY-MM-DD using the local timezone (what <input type="date"> expects)
+function toDateInputValue(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// Today + N months. Clamps to the last day of the target month (e.g. Aug 31 + 6 months = Feb 28)
+function addMonthsFromToday(months: number): string {
+  const now = new Date()
+  const target = new Date(now.getFullYear(), now.getMonth() + months, 1)
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  target.setDate(Math.min(now.getDate(), lastDay))
+  return toDateInputValue(target)
+}
+
+function formatDateLong(yyyyMmDd: string): string {
+  const [y, m, d] = yyyyMmDd.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 function CompanyDetailsView({
   company, isDesktop, onBack, onAction, onPremiumChanged,
 }: {
@@ -734,6 +770,7 @@ function CompanyDetailsView({
   const [localPlan, setLocalPlan] = useState(company.plan)
   const [localExpiresAt, setLocalExpiresAt] = useState(company.plan_expires_at)
   const [showPremiumForm, setShowPremiumForm] = useState(false)
+  const [premiumDuration, setPremiumDuration] = useState<PremiumDurationKey | ''>('')
   const [premiumExpiryInput, setPremiumExpiryInput] = useState('')
   const [premiumNoteInput, setPremiumNoteInput] = useState('')
   const [premiumLoading, setPremiumLoading] = useState(false)
@@ -743,12 +780,29 @@ function CompanyDetailsView({
     setLocalPlan(company.plan)
     setLocalExpiresAt(company.plan_expires_at)
     setShowPremiumForm(false)
+    setPremiumDuration('')
+    setPremiumExpiryInput('')
     setPremiumError('')
   }, [company.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const resetPremiumForm = () => {
+    setShowPremiumForm(false)
+    setPremiumDuration('')
+    setPremiumExpiryInput('')
+    setPremiumNoteInput('')
+    setPremiumError('')
+  }
+
+  const choosePremiumDuration = (opt: { key: PremiumDurationKey; months: number }) => {
+    setPremiumDuration(opt.key)
+    setPremiumError('')
+    // Presets fill the expiry date automatically; custom clears it so the admin picks manually
+    setPremiumExpiryInput(opt.key === 'custom' ? '' : addMonthsFromToday(opt.months))
+  }
+
   const runPremiumAction = async (action: 'grant_premium' | 'revoke_premium') => {
     if (action === 'grant_premium' && !premiumExpiryInput) {
-      setPremiumError('Please select an expiry date')
+      setPremiumError(premiumDuration === 'custom' ? 'Please choose an expiry date' : 'Please choose a duration')
       return
     }
     setPremiumLoading(true)
@@ -765,9 +819,7 @@ function CompanyDetailsView({
     }
     setLocalPlan(action === 'grant_premium' ? 'business_suite' : 'free')
     setLocalExpiresAt(action === 'grant_premium' ? (body.expires_at as string) : null)
-    setShowPremiumForm(false)
-    setPremiumNoteInput('')
-    setPremiumExpiryInput('')
+    resetPremiumForm()
     onPremiumChanged()
   }
 
@@ -957,15 +1009,48 @@ function CompanyDetailsView({
         {showPremiumForm && (
           <div>
             {localPlan !== 'business_suite' && (
-              <div style={{ marginBottom: '10px' }}>
-                <label style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '5px', display: 'block' }}>Expires on *</label>
-                <input
-                  type="date"
-                  value={premiumExpiryInput}
-                  min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
-                  onChange={(e) => setPremiumExpiryInput(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '13px', color: COLORS.text, boxSizing: 'border-box' as const, outline: 'none' }}
-                />
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '7px', display: 'block' }}>Duration *</label>
+                <div style={{ display: 'grid', gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)', gap: '8px' }}>
+                  {PREMIUM_DURATIONS.map((opt) => {
+                    const active = premiumDuration === opt.key
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => choosePremiumDuration(opt)}
+                        style={{
+                          padding: '11px 8px', borderRadius: '9px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer',
+                          background: active ? COLORS.gold : COLORS.card,
+                          color: active ? 'white' : COLORS.text,
+                          border: `1px solid ${active ? COLORS.gold : COLORS.border}`,
+                        }}>
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {premiumDuration === 'custom' && (
+                  <div style={{ marginTop: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: COLORS.textMuted, marginBottom: '5px', display: 'block' }}>Expires on *</label>
+                    <input
+                      type="date"
+                      value={premiumExpiryInput}
+                      min={toDateInputValue(new Date(Date.now() + 24 * 60 * 60 * 1000))}
+                      onChange={(e) => setPremiumExpiryInput(e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontSize: '13px', color: COLORS.text, boxSizing: 'border-box' as const, outline: 'none' }}
+                    />
+                  </div>
+                )}
+
+                {premiumExpiryInput && (
+                  <div style={{ marginTop: '10px', background: COLORS.goldBg, borderRadius: '8px', padding: '9px 11px' }}>
+                    <p style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.gold }}>
+                      Premium will expire on {formatDateLong(premiumExpiryInput)}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
             <div style={{ marginBottom: '10px' }}>
@@ -990,7 +1075,7 @@ function CompanyDetailsView({
                 }}>
                 {premiumLoading ? 'Working...' : localPlan === 'business_suite' ? 'Confirm Revoke' : 'Confirm Grant'}
               </button>
-              <button onClick={() => { setShowPremiumForm(false); setPremiumError(''); setPremiumNoteInput(''); setPremiumExpiryInput('') }}
+              <button onClick={resetPremiumForm}
                 style={{ padding: '11px 16px', background: COLORS.bg, color: COLORS.text, border: `1px solid ${COLORS.border}`, borderRadius: '9px', fontWeight: 'bold', fontSize: '12.5px', cursor: 'pointer' }}>
                 Cancel
               </button>
