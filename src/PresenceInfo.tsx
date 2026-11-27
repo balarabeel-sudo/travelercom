@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { supabase } from './supabaseClient'
 
 const COLORS = {
@@ -67,7 +68,7 @@ function PresenceInfo({ userId, phone, email }: { userId: string | null; phone?:
   const shownPhone = phone || profilePhone
   const shownEmail = email || profileEmail
 
-  const row = (label: string, content: React.ReactNode, last = false) => (
+  const row = (label: string, content: ReactNode, last = false) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: last ? 'none' : `1px solid ${COLORS.border}` }}>
       <span style={{ fontSize: '12px', color: COLORS.textMuted }}>{label}</span>
       <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.text, textAlign: 'right', maxWidth: '65%', wordBreak: 'break-all' }}>{content}</span>
