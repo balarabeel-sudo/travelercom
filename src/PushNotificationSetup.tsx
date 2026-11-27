@@ -13,7 +13,7 @@ const COLORS = {
 }
 
 const DISMISS_KEY = 'tc_push_prompt_dismissed'
-// After tapping "Ba yanzu ba" the prompt stays hidden for a few days, then asks again.
+// After tapping "Not now" the prompt stays hidden for a few days, then asks again.
 // (Before, one tap hid it forever, so most people never enabled push.)
 const DISMISS_DAYS = 3
 
@@ -128,9 +128,9 @@ function PushNotificationSetup() {
             <Icon name="bell" size={17} color={COLORS.primary} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Ba da izinin sanarwa</p>
+            <p style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.text }}>Turn on notifications</p>
             <p style={{ fontSize: '11.5px', color: COLORS.textMuted, marginTop: '2px' }}>
-              Ka sami sanarwa kai tsaye kan wayarka game da booking, updates, da sauransu.
+              Turn on notifications to receive alerts from the app, such as bookings and updates.
             </p>
             <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
               <button
@@ -140,7 +140,7 @@ function PushNotificationSetup() {
                   fontSize: '12px', fontWeight: 700, color: 'white', background: COLORS.primary,
                   border: 'none', borderRadius: '8px', padding: '7px 14px', cursor: 'pointer',
                 }}>
-                {enabling ? 'Ana kunnawa...' : 'Kunna'}
+                {enabling ? 'Turning on...' : 'Turn On'}
               </button>
               <button
                 onClick={handleDismiss}
@@ -148,7 +148,7 @@ function PushNotificationSetup() {
                   fontSize: '12px', fontWeight: 600, color: COLORS.textMuted, background: 'transparent',
                   border: 'none', padding: '7px 6px', cursor: 'pointer',
                 }}>
-                Ba yanzu ba
+                Not now
               </button>
             </div>
           </div>
