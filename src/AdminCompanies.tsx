@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Icon from './Icons'
+import PresenceInfo from './PresenceInfo'
 
 const COLORS = {
   primary: '#0EA5E9',
@@ -916,6 +917,9 @@ function CompanyDetailsView({
           </button>
         </div>
       </div>
+
+      {/* Online / last active status, phone number and email */}
+      <PresenceInfo userId={company.owner_id} phone={company.phone} email={company.email} />
 
       {/* Overview */}
       <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.text, marginBottom: '8px' }}>Performance Overview</p>
