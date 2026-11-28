@@ -389,11 +389,6 @@ function Home() {
     loadUser()
   }, [navigate])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    navigate('/login')
-  }
-
   const toggleFavorite = async (e: React.MouseEvent, serviceId: string) => {
     e.stopPropagation()
     const { data: userData } = await supabase.auth.getUser()
@@ -1208,9 +1203,10 @@ const services = [
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <NotificationBell iconColor={COLORS.text} />
+          {/* Opens the Account page. Logging out now happens only there, so one tap never signs the person out. */}
           <div
-            onClick={handleLogout}
-            title="Logout"
+            onClick={() => navigate('/account')}
+            title="Account"
             style={{
               width: '34px',
               height: '34px',
